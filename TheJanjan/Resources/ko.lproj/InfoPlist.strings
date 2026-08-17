@@ -1,0 +1,5 @@
+/* 더잔잔 (The Janjan) — 한국어 (개발 언어) */
+
+"CFBundleDisplayName" = "더잔잔";
+"NSCameraUsageDescription" = "약봉투의 약 이름을 읽어 등록을 도와드려요. 사진은 저장되지 않습니다.";
+"NSFaceIDUsageDescription" = "앱 잠금을 해제할 때만 Face ID를 사용합니다. 기록은 기기 밖으로 나가지 않습니다.";
