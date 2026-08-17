@@ -1,0 +1,73 @@
+{
+  "version": "0.6.0",
+  "updated": "2026-08-17",
+  "note": "세기 0-10은 모든 항목 공통. aux_field 는 항목별 보조 입력 1개 (none | time | medication).",
+  "groups": [
+    {
+      "id": "mood_anxiety",
+      "name_ko": "기분·불안",
+      "aux_note": "촉발 상황 태그를 공통 입력으로 함께 받는다."
+    },
+    {
+      "id": "sleep_energy_cognition",
+      "name_ko": "수면·에너지·인지",
+      "aux_note": "수면 항목은 시간 입력, 꿈 항목은 '새 약 시작 후 며칠째'를 자동 표시."
+    },
+    {
+      "id": "body_side_effects",
+      "name_ko": "신체·부작용 의심",
+      "aux_note": "관련 약 + 복용 후 경과 시간(자동 계산)."
+    }
+  ],
+  "symptoms": [
+    { "id": "anxiety_restless", "name_ko": "불안·초조", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "panic", "name_ko": "공황(갑자기 몰려옴)", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "palpitations", "name_ko": "가슴 두근거림", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "low_mood", "name_ko": "가라앉음·우울감", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "irritable", "name_ko": "짜증·예민", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "numb", "name_ko": "감정 없음(멍함)", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "elevated", "name_ko": "들뜸·말 많아짐", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "crying", "name_ko": "울음", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "guilt", "name_ko": "죄책감·자책", "group": "mood_anxiety", "aux_field": "none" },
+    { "id": "self_harm_thoughts", "name_ko": "자해·자살 생각", "group": "mood_anxiety", "aux_field": "none", "safety": true },
+
+    { "id": "trouble_falling_asleep", "name_ko": "잠들기 어려움", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "frequent_waking", "name_ko": "자주 깸", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "early_waking", "name_ko": "너무 일찍 깸", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "oversleeping", "name_ko": "과다수면", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "many_dreams", "name_ko": "꿈을 많이 꿈", "group": "sleep_energy_cognition", "aux_field": "medication" },
+    { "id": "vivid_dreams", "name_ko": "생생한 꿈·악몽", "group": "sleep_energy_cognition", "aux_field": "medication" },
+    { "id": "awake_after_waking", "name_ko": "자다 깨서 못 잠", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "morning_grogginess", "name_ko": "아침에 멍함(숙취감)", "group": "sleep_energy_cognition", "aux_field": "medication" },
+    { "id": "daytime_sleepiness", "name_ko": "낮 졸림", "group": "sleep_energy_cognition", "aux_field": "medication" },
+    { "id": "sleep_talking", "name_ko": "잠꼬대·몸부림", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "restless_legs", "name_ko": "밤에 다리 저림", "group": "sleep_energy_cognition", "aux_field": "time" },
+    { "id": "no_energy", "name_ko": "무기력", "group": "sleep_energy_cognition", "aux_field": "none" },
+    { "id": "poor_focus", "name_ko": "집중 안 됨", "group": "sleep_energy_cognition", "aux_field": "none" },
+    { "id": "foggy_memory", "name_ko": "기억이 흐림", "group": "sleep_energy_cognition", "aux_field": "none" },
+    { "id": "racing_thoughts", "name_ko": "생각이 빨라짐", "group": "sleep_energy_cognition", "aux_field": "none" },
+    { "id": "thought_blocking", "name_ko": "생각이 멈춤", "group": "sleep_energy_cognition", "aux_field": "none" },
+    { "id": "obsessive", "name_ko": "강박적 생각·행동", "group": "sleep_energy_cognition", "aux_field": "none" },
+
+    { "id": "drowsiness", "name_ko": "졸림", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "dizziness", "name_ko": "어지러움", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "nausea", "name_ko": "메스꺼움", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "dry_mouth", "name_ko": "입마름", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "hand_tremor", "name_ko": "손 떨림", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "akathisia", "name_ko": "좌불안석(가만히 못 있음)", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "stiffness", "name_ko": "몸이 굳음", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "headache", "name_ko": "두통", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "appetite_up", "name_ko": "식욕 증가", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "appetite_down", "name_ko": "식욕 감소", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "weight_change", "name_ko": "체중 변화", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "sexual_change", "name_ko": "성기능 변화", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "constipation", "name_ko": "변비", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "sweating", "name_ko": "땀", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "blurred_vision", "name_ko": "시야 흐림", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "brain_zap", "name_ko": "전기 오는 느낌(brain zap)", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "night_sweats", "name_ko": "밤에 식은땀", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "drooling", "name_ko": "침 흘림", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "menstrual_change", "name_ko": "생리 변화", "group": "body_side_effects", "aux_field": "medication" },
+    { "id": "skin_rash", "name_ko": "피부 발진", "group": "body_side_effects", "aux_field": "medication" }
+  ]
+}
