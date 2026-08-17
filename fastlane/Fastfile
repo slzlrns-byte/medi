@@ -1,0 +1,121 @@
+# 더잔잔 (The Janjan) — fastlane
+#
+# 개발자에게 맥이 없다. 이 파일은 오직 GitHub Actions macOS 러너에서만 실행된다.
+# 로컬에서 돌릴 일이 없으므로 대화형 프롬프트가 뜰 수 있는 동작은 전부 뺐다.
+
+default_platform(:ios)
+
+SCHEME = "TheJanjan"
+PROJECT = "TheJanjan.xcodeproj"
+APP_ID = "com.thejanjan.app"
+WATCH_ID = "com.thejanjan.app.watchkitapp"
+
+platform :ios do
+
+  before_all do
+    # XcodeGen 이 만든 프로젝트가 있어야 한다. 워크플로가 먼저 생성한다.
+    UI.user_error!("#{PROJECT} 가 없습니다. `xcodegen generate` 를 먼저 실행하세요.") unless File.directory?(PROJECT)
+  end
+
+  desc "테스트 — 순수 로직 패키지 + 앱 타깃"
+  lane :test do
+    # 시뮬레이터가 필요 없는 순수 로직부터. 여기서 깨지면 나머지를 볼 필요가 없다.
+    sh("swift test --package-path ../Packages/JanjanCore")
+
+    run_tests(
+      project: PROJECT,
+      scheme: SCHEME,
+      devices: ["iPhone 15"],
+      clean: false,
+      code_coverage: true,
+      skip_package_dependencies_resolution: false,
+      xcargs: "CODE_SIGNING_ALLOWED=NO"
+    )
+  end
+
+  desc "TestFlight 업로드"
+  lane :beta do
+    team_id = ENV.fetch("APPLE_TEAM_ID")
+
+    # 1. App Store Connect API 키 (.p8 을 base64 로 넣어 둔 시크릿)
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_CONTENT"),
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # 2. 인증서·프로파일 내려받기 (Matchfile 의 설정을 그대로 쓴다)
+    match(type: "appstore")
+
+    # 3. 빌드 번호는 워크플로 실행 번호로. 사람이 세지 않아도 항상 증가한다.
+    increment_build_number(
+      xcodeproj: PROJECT,
+      build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M")
+    )
+
+    # 4. 수동 서명 설정을 두 타깃에 모두 박아 넣는다.
+    #    Release 는 CODE_SIGN_STYLE=Manual 이므로 프로파일 이름이 반드시 있어야 한다.
+    update_code_signing_settings(
+      path: PROJECT,
+      use_automatic_signing: false,
+      team_id: team_id,
+      targets: ["TheJanjan"],
+      bundle_identifier: APP_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV["sigh_#{APP_ID}_appstore_profile-name"],
+      build_configurations: ["Release"]
+    )
+    update_code_signing_settings(
+      path: PROJECT,
+      use_automatic_signing: false,
+      team_id: team_id,
+      targets: ["TheJanjanWatch"],
+      bundle_identifier: WATCH_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV["sigh_#{WATCH_ID}_appstore_profile-name"],
+      build_configurations: ["Release"]
+    )
+
+    # 5. 아카이브 → IPA
+    build_app(
+      project: PROJECT,
+      scheme: SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      output_name: "TheJanjan.ipa",
+      export_options: {
+        provisioningProfiles: {
+          APP_ID => ENV["sigh_#{APP_ID}_appstore_profile-name"],
+          WATCH_ID => ENV["sigh_#{WATCH_ID}_appstore_profile-name"]
+        }
+      },
+      xcargs: "DEVELOPMENT_TEAM=#{team_id}"
+    )
+
+    # 6. TestFlight. 처리 완료를 기다리지 않는다 — 10~30분 걸리는데 러너 시간을 태울 이유가 없다.
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      skip_submission: true,
+      changelog: last_git_commit[:message].to_s.split("\n").first
+    )
+  end
+
+  desc "match 첫 실행 — 인증서와 프로파일을 새로 만들어 medi-certs 에 넣는다"
+  lane :certificates do
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_CONTENT"),
+      is_key_content_base64: true
+    )
+    # MATCH_READONLY=false 일 때만 새로 발급된다.
+    match(type: "appstore")
+  end
+
+  error do |lane, exception|
+    UI.error("레인 #{lane} 실패: #{exception.message}")
+  end
+end

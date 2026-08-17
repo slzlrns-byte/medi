@@ -1,0 +1,24 @@
+# match — 인증서와 프로비저닝 프로파일을 비공개 git 저장소에 넣고 공유한다.
+#
+# 저장소: MATCH_GIT_URL (예: https://github.com/slzlrns-byte/medi-certs)
+# 접근:   MATCH_GIT_BASIC_AUTHORIZATION = base64("사용자이름:PAT")
+# 암호:   MATCH_PASSWORD — 인증서를 암호화하는 열쇠. 잃어버리면 전부 재발급해야 한다.
+
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+git_branch("main")
+
+type("appstore")
+
+app_identifier([
+  "com.thejanjan.app",
+  "com.thejanjan.app.watchkitapp"
+])
+
+# 기본은 readonly. CI 가 실수로 인증서를 새로 발급해 기존 것을 무효화하는 사고를 막는다.
+# 저장소가 비어 있는 "첫 실행" 에만 워크플로 입력값 first_run=true 로 풀어 준다.
+readonly(ENV["MATCH_READONLY"] != "false")
+
+# 러너에는 임시 키체인을 만들어 쓴다.
+keychain_name("janjan-ci.keychain")
+keychain_password(ENV["MATCH_PASSWORD"])

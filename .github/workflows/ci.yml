@@ -1,0 +1,106 @@
+# 더잔잔 (The Janjan) — CI
+#
+# 개발자에게 맥이 없다. 컴파일러는 이 워크플로다.
+# 시크릿을 하나도 쓰지 않으므로 포크에서도 그대로 돈다.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: 빌드와 테스트
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    env:
+      SCHEME: TheJanjan
+      DESTINATION: "platform=iOS Simulator,name=iPhone 15,OS=latest"
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Xcode 15.4 선택
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.4"
+
+      - name: 버전 확인
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: |
+          xcodegen generate --spec project.yml
+          ls -la TheJanjan.xcodeproj
+
+      - name: entitlements 가 Debug/Release 양쪽에 붙어 있는지 확인
+        run: |
+          # 한쪽 구성에만 붙어 있어 아카이브에서만 iCloud 가 빠지는 사고를 여기서 잡는다.
+          COUNT=$(grep -c "CODE_SIGN_ENTITLEMENTS = TheJanjan/TheJanjan.entitlements" \
+            TheJanjan.xcodeproj/project.pbxproj || true)
+          echo "iOS entitlements 참조 $COUNT 곳"
+          if [ "$COUNT" -lt 2 ]; then
+            echo "::error::iOS entitlements 가 Debug/Release 양쪽에 붙어 있지 않습니다."
+            exit 1
+          fi
+          WATCH_COUNT=$(grep -c "CODE_SIGN_ENTITLEMENTS = TheJanjanWatch/TheJanjanWatch.entitlements" \
+            TheJanjan.xcodeproj/project.pbxproj || true)
+          echo "watchOS entitlements 참조 $WATCH_COUNT 곳"
+          if [ "$WATCH_COUNT" -lt 2 ]; then
+            echo "::error::watchOS entitlements 가 Debug/Release 양쪽에 붙어 있지 않습니다."
+            exit 1
+          fi
+
+      - name: 번들 서체 무결성 확인
+        run: |
+          # OTF 는 'OTTO' 로 시작한다. LFS 포인터나 HTML 오류 페이지가 커밋되면 여기서 걸린다.
+          for f in TheJanjan/Resources/Fonts/*.otf; do
+            MAGIC=$(head -c 4 "$f")
+            if [ "$MAGIC" != "OTTO" ]; then
+              echo "::error::$f 가 올바른 OTF 가 아닙니다 (magic=$MAGIC)"
+              exit 1
+            fi
+            echo "ok $f"
+          done
+
+      - name: 순수 로직 테스트 (JanjanCore)
+        run: swift test --package-path Packages/JanjanCore
+
+      - name: 앱 빌드와 테스트 (시뮬레이터, 서명 없음)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -resultBundlePath build/TheJanjan.xcresult \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            build test
+
+      - name: 실패 시 xcresult 보관
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: build/TheJanjan.xcresult
+          retention-days: 7
+          if-no-files-found: ignore

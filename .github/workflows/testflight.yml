@@ -1,0 +1,112 @@
+# 더잔잔 (The Janjan) — TestFlight 배포
+#
+# 수동 실행(Actions 탭) 또는 v* 태그를 밀면 돈다.
+# 필요한 시크릿 7개는 docs/apple-setup.md 의 표를 그대로 따라 등록한다.
+
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      first_run:
+        description: "match 첫 실행 (인증서를 새로 만들어 medi-certs 에 넣습니다)"
+        type: boolean
+        required: false
+        default: false
+      note:
+        description: "TestFlight 빌드 메모 (선택)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: 아카이브와 TestFlight 업로드
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      # 기본은 readonly. 첫 실행에서만 풀어 준다.
+      MATCH_READONLY: ${{ inputs.first_run && 'false' || 'true' }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 시크릿이 다 있는지 먼저 확인
+        run: |
+          MISSING=""
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_CONTENT \
+                      MATCH_GIT_URL MATCH_PASSWORD MATCH_GIT_BASIC_AUTHORIZATION; do
+            eval "value=\${$name}"
+            if [ -z "$value" ]; then MISSING="$MISSING $name"; fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::다음 시크릿이 비어 있습니다:$MISSING — docs/apple-setup.md 6번 항목을 보세요."
+            exit 1
+          fi
+          echo "시크릿 7개 확인 완료"
+
+      - name: Xcode 15.4 선택
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.4"
+
+      - name: Ruby 준비 (Gemfile 캐시 포함)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: match 첫 실행 — 인증서 발급
+        if: ${{ inputs.first_run }}
+        run: bundle exec fastlane certificates
+
+      - name: 빌드와 TestFlight 업로드
+        run: bundle exec fastlane beta
+
+      - name: 실패 시 로그 보관
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastlane-logs
+          path: |
+            ~/Library/Logs/gym
+            ~/Library/Logs/fastlane
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: IPA 보관
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: build/TheJanjan.ipa
+          retention-days: 7
+          if-no-files-found: ignore
