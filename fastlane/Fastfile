@@ -25,7 +25,7 @@ platform :ios do
     run_tests(
       project: PROJECT,
       scheme: SCHEME,
-      devices: ["iPhone 15"],
+      devices: ["iPhone 16"],
       clean: false,
       code_coverage: true,
       skip_package_dependencies_resolution: false,

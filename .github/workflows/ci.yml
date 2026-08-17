@@ -22,21 +22,21 @@ permissions:
 jobs:
   build-and-test:
     name: 빌드와 테스트
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
 
     env:
       SCHEME: TheJanjan
-      DESTINATION: "platform=iOS Simulator,name=iPhone 15,OS=latest"
+      DESTINATION: "platform=iOS Simulator,name=iPhone 16,OS=latest"
 
     steps:
       - name: 체크아웃
         uses: actions/checkout@v4
 
-      - name: Xcode 15.4 선택
+      - name: Xcode 선택 (latest-stable)
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: latest-stable
 
       - name: 버전 확인
         run: |

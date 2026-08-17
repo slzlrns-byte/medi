@@ -31,7 +31,7 @@ permissions:
 jobs:
   upload:
     name: 아카이브와 TestFlight 업로드
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     env:
@@ -67,10 +67,10 @@ jobs:
           fi
           echo "시크릿 7개 확인 완료"
 
-      - name: Xcode 15.4 선택
+      - name: Xcode 선택 (latest-stable)
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: latest-stable
 
       - name: Ruby 준비 (Gemfile 캐시 포함)
         uses: ruby/setup-ruby@v1
