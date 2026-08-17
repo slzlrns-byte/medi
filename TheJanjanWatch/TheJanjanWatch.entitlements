@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  워치 앱은 v1 에서 스스로 CloudKit 을 읽지 않지만(데이터 주인은 아이폰),
+	  같은 컨테이너를 선언해 두어야 나중에 컴플리케이션·독립 실행을 붙일 때
+	  프로파일을 다시 만들지 않아도 된다.
+	  → App ID com.thejanjan.app.watchkitapp 에도 iCloud capability 와
+	    컨테이너 iCloud.com.thejanjan.app 를 체크해야 서명이 통과한다.
+	-->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.thejanjan.app</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array/>
+</dict>
+</plist>

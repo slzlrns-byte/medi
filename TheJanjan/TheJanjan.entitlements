@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  iCloud · CloudKit private DB. SwiftData 의 cloudKitDatabase 설정과 컨테이너 이름이
+	  반드시 같아야 한다. 컨테이너는 Apple Developer 사이트에서 먼저 만들어 두어야 하고,
+	  App ID(com.thejanjan.app)에도 iCloud capability 를 켜 두어야 서명이 통과한다.
+	-->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.thejanjan.app</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array/>
+	<!--
+	  APS_ENVIRONMENT 는 project.yml 에서 Debug=development / Release=production 으로
+	  주입한다. 값을 development 로 고정하면 App Store 프로파일(production)과 어긋나
+	  아카이브 서명이 실패한다.
+	-->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
+</dict>
+</plist>

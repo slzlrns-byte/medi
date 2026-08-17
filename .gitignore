@@ -10,17 +10,19 @@ xcuserdata/
 *.dSYM.zip
 build/
 DerivedData/
-*.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcworkspace/xcuserdata/
 
-# XcodeGen 으로 생성되는 프로젝트 파일 (project.yml 만 커밋)
-# *.xcodeproj/
+# XcodeGen 이 생성하는 것들 (project.yml 만 커밋한다)
+*.xcodeproj/
+*.xcworkspace/
+TheJanjan/Info.plist
+TheJanjanWatch/Info.plist
 
 # ── Swift Package Manager ─────────────────────────────
 .build/
 .swiftpm/
-Packages/
 Package.resolved
+# 주의: 로컬 패키지 Packages/JanjanCore 는 반드시 커밋한다.
+#       예전 규칙이던 `Packages/` 무시를 지웠으니 다시 넣지 말 것.
 
 # ── CocoaPods / Carthage ──────────────────────────────
 Pods/
@@ -42,6 +44,11 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output/
+# fastlane/README.md 는 커밋한다 (레인 목록 문서)
+
+# ── Ruby ──────────────────────────────────────────────
+vendor/bundle/
+.bundle/
 
 # ── OS · 편집기 ────────────────────────────────────────
 .DS_Store
@@ -50,8 +57,9 @@ Thumbs.db
 .idea/
 .vscode/
 
-# ── 예외: 설계 문서와 번들 서체는 반드시 커밋한다 ──────
+# ── 예외: 설계 문서·번들 서체는 반드시 커밋한다 ────────
 !docs/*.html
 !docs/shots/*.png
 !design/fonts/
 !design/fonts/*.woff2
+!TheJanjan/Resources/Fonts/*.otf

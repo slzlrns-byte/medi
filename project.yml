@@ -1,0 +1,181 @@
+# 더잔잔 (The Janjan) — XcodeGen 스펙
+#
+#   xcodegen generate    →  TheJanjan.xcodeproj
+#
+# .xcodeproj 는 절대 커밋하지 않는다(.gitignore). 프로젝트 구조를 바꿀 일이 있으면
+# 이 파일만 고치고 다시 생성한다. 맥 없이 GitHub Actions 에서만 빌드하므로,
+# 여기 적힌 경로에 실제로 파일이 있어야 CI 가 통과한다.
+
+name: TheJanjan
+
+options:
+  bundleIdPrefix: com.thejanjan
+  createIntermediateGroups: true
+  developmentLanguage: ko
+  generateEmptyDirectories: false
+  groupSortPosition: top
+  xcodeVersion: "15.4"
+  minimumXcodeGenVersion: "2.38.0"
+  deploymentTarget:
+    iOS: "17.0"
+    watchOS: "10.0"
+
+configs:
+  Debug: debug
+  Release: release
+
+packages:
+  JanjanCore:
+    path: Packages/JanjanCore
+
+# ── 공통 빌드 설정 ────────────────────────────────────────────────────────
+# DEVELOPMENT_TEAM 은 일부러 비워 둔다. XcodeGen 은 ${ENV} 치환을 지원하지 않으므로
+# fastlane(update_code_signing_settings) / xcodebuild 인자로 주입한다.
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ALWAYS_SEARCH_USER_PATHS: NO
+    CLANG_ENABLE_OBJC_ARC: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    WATCHOS_DEPLOYMENT_TARGET: "10.0"
+  configs:
+    Debug:
+      CODE_SIGN_STYLE: Automatic
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+      ENABLE_TESTABILITY: YES
+      ONLY_ACTIVE_ARCH: YES
+      # 개발 빌드는 development APS 환경. Release 는 production 이어야
+      # App Store 프로파일과 entitlement 가 어긋나지 않는다.
+      APS_ENVIRONMENT: development
+    Release:
+      CODE_SIGN_STYLE: Manual
+      SWIFT_COMPILATION_MODE: wholemodule
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+      ENABLE_TESTABILITY: NO
+      VALIDATE_PRODUCT: YES
+      APS_ENVIRONMENT: production
+
+targets:
+  # ── iOS 앱 ────────────────────────────────────────────────────────────
+  TheJanjan:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TheJanjan
+        excludes:
+          - "TheJanjan.entitlements"
+      - path: TheJanjan/TheJanjan.entitlements
+        buildPhase: none
+    dependencies:
+      - package: JanjanCore
+      - target: TheJanjanWatch
+        embed: true
+        copy:
+          destination: productsDirectory
+          subpath: "$(CONTENTS_FOLDER_PATH)/Watch"
+    info:
+      path: TheJanjan/Info.plist
+      properties:
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleDisplayName: "더잔잔"
+        CFBundleDevelopmentRegion: "ko"
+        CFBundlePackageType: "APPL"
+        ITSAppUsesNonExemptEncryption: false
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: "약봉투의 약 이름을 읽어 등록을 도와드려요. 사진은 저장되지 않습니다."
+        NSFaceIDUsageDescription: "앱 잠금을 해제할 때만 Face ID를 사용합니다. 기록은 기기 밖으로 나가지 않습니다."
+        UIAppFonts:
+          - "SUIT-Light.otf"
+          - "SUIT-Regular.otf"
+          - "Pretendard-Light.otf"
+          - "Pretendard-Regular.otf"
+          - "Pretendard-Medium.otf"
+          - "Pretendard-SemiBold.otf"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app
+        PRODUCT_NAME: TheJanjan
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        # entitlements 는 Debug/Release 양쪽에 반드시 연결한다.
+        # (한쪽에만 붙어 있어 아카이브에서만 iCloud 가 빠지는 사고를 겪은 적 있음)
+        CODE_SIGN_ENTITLEMENTS: TheJanjan/TheJanjan.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: TheJanjan/TheJanjan.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: TheJanjan/TheJanjan.entitlements
+    scheme:
+      testTargets:
+        - TheJanjanTests
+      gatherCoverageData: true
+
+  # ── watchOS 앱 (단일 타깃, iOS 앱에 임베드) ─────────────────────────────
+  TheJanjanWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - path: TheJanjanWatch
+        excludes:
+          - "TheJanjanWatch.entitlements"
+      - path: TheJanjanWatch/TheJanjanWatch.entitlements
+        buildPhase: none
+    dependencies:
+      - package: JanjanCore
+    info:
+      path: TheJanjanWatch/Info.plist
+      properties:
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleDisplayName: "더잔잔"
+        CFBundleDevelopmentRegion: "ko"
+        CFBundlePackageType: "APPL"
+        ITSAppUsesNonExemptEncryption: false
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.thejanjan.app
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.watchkitapp
+        PRODUCT_NAME: TheJanjanWatch
+        TARGETED_DEVICE_FAMILY: "4"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: TheJanjanWatch/TheJanjanWatch.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWatch/TheJanjanWatch.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWatch/TheJanjanWatch.entitlements
+
+  # ── iOS 단위 테스트 ────────────────────────────────────────────────────
+  # 순수 로직 테스트는 Packages/JanjanCore 의 swift test 가 담당하고,
+  # 여기서는 앱 계층(레코드 매핑·토큰 파싱)만 얇게 확인한다.
+  TheJanjanTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - TheJanjanTests
+    dependencies:
+      - target: TheJanjan
+      - package: JanjanCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TheJanjan.app/TheJanjan"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
