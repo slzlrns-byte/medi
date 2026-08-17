@@ -121,6 +121,11 @@ targets:
       testTargets:
         - TheJanjanTests
       gatherCoverageData: true
+      # 시뮬레이터에는 iCloud 계정도 entitlement 도 없다. CloudKit 셋업을 아예 건너뛰어
+      # 테스트가 저장소 문제로 흔들리지 않게 한다. 이 값은 Xcode 가 프로세스를 띄울 때만
+      # 적용되므로 TestFlight/기기 설치본에는 아무 영향이 없다.
+      environmentVariables:
+        JANJAN_DISABLE_CLOUDKIT: "1"
 
   # ── watchOS 앱 (단일 타깃, iOS 앱에 임베드) ─────────────────────────────
   TheJanjanWatch:

@@ -8,9 +8,9 @@ struct SymptomQuickEntryView: View {
     @EnvironmentObject private var session: WatchSessionManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selected: SymptomItem?
+    @State private var selected: SymptomItem? = nil
 
-    private let items = Catalogs.watchQuickSymptoms
+    private var items: [SymptomItem] { Catalogs.watchQuickSymptoms }
 
     var body: some View {
         NavigationStack {

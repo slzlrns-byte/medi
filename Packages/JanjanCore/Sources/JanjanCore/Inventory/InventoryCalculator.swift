@@ -29,8 +29,8 @@ public enum InventoryCalculator {
         asOf: Date = Date()
     ) -> Decimal {
 
-        /// 같은 시각에 여러 사건이 있을 때의 순서.
-        /// 정정(0) → 보충(1) → 복용(2). 정정이 먼저 기준을 세우고 그 위에 나머지가 얹힌다.
+        // 같은 시각에 여러 사건이 있을 때의 순서.
+        // 정정(0) → 보충(1) → 복용(2). 정정이 먼저 기준을 세우고 그 위에 나머지가 얹힌다.
         enum Step {
             case correction(Decimal)
             case refill(Decimal)
@@ -51,9 +51,9 @@ public enum InventoryCalculator {
             guard event.occurredAt <= asOf else { continue }
             switch event.kind {
             case .correction(let setTo):
-                steps.append((event.occurredAt, .correction(setTo)))
+                steps.append((date: event.occurredAt, step: .correction(setTo)))
             case .refill(let quantity):
-                steps.append((event.occurredAt, .refill(quantity)))
+                steps.append((date: event.occurredAt, step: .refill(quantity)))
             }
         }
 
@@ -61,7 +61,7 @@ public enum InventoryCalculator {
             guard event.status.consumesStock else { continue }
             let when = event.effectiveDate
             guard when <= asOf else { continue }
-            steps.append((when, .consumption(event.quantity)))
+            steps.append((date: when, step: .consumption(event.quantity)))
         }
 
         steps.sort { lhs, rhs in

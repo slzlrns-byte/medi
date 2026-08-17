@@ -7,11 +7,11 @@ import JanjanCore
 /// "한 줄 남길까요?" 가 조용히 펼쳐진다. 2층(감정 단어·수면·활동 태그)은 다음 단계.
 struct DiaryView: View {
 
-    @State private var moodScore: Int?
+    @State private var moodScore: Int? = nil
     @State private var noteText: String = ""
     @State private var selectedWords: Set<String> = []
 
-    private let today = Date()
+    private var today: Date { Date() }
 
     var body: some View {
         NavigationStack {

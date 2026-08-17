@@ -7,7 +7,7 @@ import JanjanCore
 /// 추이선·PDF·CSV 는 Pro 범위이고 다음 단계에서 붙인다.
 struct ReportView: View {
 
-    private let today = Date()
+    private var today: Date { Date() }
 
     var body: some View {
         NavigationStack {

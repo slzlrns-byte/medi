@@ -7,7 +7,7 @@ import JanjanCore
 /// InventoryCalculator 가 사건에서 매번 다시 계산한 값이다.
 struct MedicationsView: View {
 
-    private let today = Date()
+    private var today: Date { Date() }
 
     var body: some View {
         NavigationStack {

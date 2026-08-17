@@ -9,7 +9,9 @@ struct TodayView: View {
 
     @Binding var isShowingSettings: Bool
 
-    private let today = Date()
+    // 저장 프로퍼티로 두면 private 때문에 memberwise 초기화 함수가 private 이 되어
+    // 다른 파일에서 TodayView(isShowingSettings:) 를 부를 수 없다. 계산 프로퍼티로 둔다.
+    private var today: Date { Date() }
 
     var body: some View {
         NavigationStack {
