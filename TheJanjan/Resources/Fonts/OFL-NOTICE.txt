@@ -1,0 +1,22 @@
+번들 서체 라이선스 고지 (SIL Open Font License 1.1)
+
+이 폴더의 서체 6개는 모두 SIL Open Font License 1.1 (OFL 1.1) 로 배포되며,
+앱에 번들해 재배포하는 것이 허용됩니다.
+
+  Pretendard-Light.otf     Pretendard  (c) Kil Hyung-jin (길형진)
+  Pretendard-Regular.otf   Pretendard  (c) Kil Hyung-jin (길형진)
+  Pretendard-Medium.otf    Pretendard  (c) Kil Hyung-jin (길형진)
+  Pretendard-SemiBold.otf  Pretendard  (c) Kil Hyung-jin (길형진)
+  SUIT-Light.otf           SUIT        (c) SUNN (선앤도트)
+  SUIT-Regular.otf         SUIT        (c) SUNN (선앤도트)
+
+OFL 1.1 전문: https://openfontlicense.org
+Pretendard:   https://github.com/orioncactus/pretendard
+SUIT:         https://github.com/sun-typeface/SUIT
+
+지킬 것
+  - 서체 파일 자체를 판매하지 않는다 (앱에 번들해 배포하는 것은 허용).
+  - Reserved Font Name 을 유지한다 — 수정본에 "Pretendard" / "SUIT" 이름을 쓸 수 없다.
+  - 이 고지를 함께 배포한다. 설정 → 오픈소스 라이선스 화면에 OFL 전문을 넣는 것이 관례.
+
+이 파일은 일부러 앱 번들에 함께 들어갑니다. 서체와 라이선스 고지가 떨어지지 않게 하려는 것입니다.
