@@ -7,6 +7,8 @@ import JanjanCore
 /// InventoryCalculator 가 사건에서 매번 다시 계산한 값이다.
 struct MedicationsView: View {
 
+    @State private var isShowingAddFlow = false
+
     private var today: Date { Date() }
 
     var body: some View {
@@ -29,9 +31,12 @@ struct MedicationsView: View {
             .navigationBarTitleDisplayMode(.large)
             .overlay(alignment: .bottomTrailing) {
                 BlackCircleButton(systemImage: "plus", accessibilityLabelKo: "약 추가") {
-                    // TODO: 약 추가 흐름 (검색 · 약봉투 스캔 · 지난 처방 복사)
+                    isShowingAddFlow = true
                 }
                 .padding(CGFloat(JanjanSpacing.l))
+            }
+            .sheet(isPresented: $isShowingAddFlow) {
+                AddMedicationEntryView()
             }
         }
     }
@@ -137,6 +142,75 @@ struct MedicationsView: View {
     }
 }
 
+/// 약 추가의 첫 갈림길. 직접 입력은 무료, 약봉투 스캔은 Pro다(유도 세 곳 중 하나).
+private struct AddMedicationEntryView: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                entryRow(
+                    title: "직접 입력",
+                    subtitle: "이름 · 용량 · 시간을 하나씩 적어요.",
+                    systemImage: "square.and.pencil"
+                ) {
+                    // TODO: 약 등록 폼 (이름 검색 → 용량 → 시간대 → 재고)
+                }
+
+                entryRow(
+                    title: ProFeature.pharmacyScan.titleKo,
+                    subtitle: "봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.",
+                    systemImage: "camera"
+                ) {
+                    // TODO: 온디바이스 Vision 텍스트 인식 → 확인 화면 → 저장
+                }
+                .proGated(.pharmacyScan)
+
+                Spacer()
+            }
+            .padding(.horizontal, CGFloat(JanjanSpacing.m))
+            .padding(.top, CGFloat(JanjanSpacing.m))
+            .fogBackground()
+            .navigationTitle("약 추가")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+    }
+
+    private func entryRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+                HStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    CircleGlyph(systemImage: systemImage)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(JanjanFont.body(16, weight: .medium))
+                            .foregroundStyle(Color.ink)
+                        Text(subtitle)
+                            .font(JanjanFont.body(12))
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: CGFloat(JanjanSpacing.xs))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 #Preview {
     MedicationsView()
+        .environmentObject(ProStore())
 }

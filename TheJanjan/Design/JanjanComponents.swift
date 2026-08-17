@@ -105,6 +105,39 @@ struct WhitePillButton: View {
     }
 }
 
+/// 화면 폭을 다 쓰는 검은 알약 버튼. 검은 원 버튼과 같은 자리(화면당 하나)를 차지하므로,
+/// 결제처럼 되돌릴 수 없는 결정 하나에만 쓴다.
+struct BlackPillButton: View {
+
+    let title: String
+    var isBusy: Bool = false
+    var isEnabled: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isBusy {
+                    ProgressView()
+                        .tint(Color.janjan(.surface))
+                } else {
+                    Text(title)
+                        .font(JanjanFont.body(17, weight: .semibold))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .foregroundStyle(Color.janjan(.surface))
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.janjan(.ink).opacity(isEnabled ? 1 : 0.35))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled || isBusy)
+    }
+}
+
 /// 지름 36pt 흰 원 안의 선 아이콘. 색 아이콘은 쓰지 않는다.
 struct CircleGlyph: View {
 

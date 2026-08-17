@@ -51,4 +51,5 @@ struct RootTabView: View {
 #Preview {
     RootTabView()
         .environmentObject(AppLockManager())
+        .environmentObject(ProStore())
 }

@@ -72,7 +72,12 @@ targets:
         excludes:
           - "TheJanjan.entitlements"
           - "PrivacyInfo.xcprivacy"
+          - "Configuration/Janjan.storekit"
       - path: TheJanjan/TheJanjan.entitlements
+        buildPhase: none
+      # StoreKit 설정 파일은 시뮬레이터에서 구독을 눌러 보기 위한 것이다.
+      # 앱 번들에는 들어가면 안 되므로 폴더 스캔에서 제외하고 buildPhase: none 으로만 넣는다.
+      - path: TheJanjan/Configuration/Janjan.storekit
         buildPhase: none
       # 개인정보 매니페스트는 번들에 들어가야 한다(리소스). 폴더 통째로 넣으면
       # 두 번 등록되어 "Multiple commands produce" 가 나므로 위에서 제외하고 여기서만 넣는다.
@@ -127,6 +132,10 @@ targets:
       testTargets:
         - TheJanjanTests
       gatherCoverageData: true
+      # 시뮬레이터에서 실제로 구매 흐름을 눌러 볼 수 있게 로컬 StoreKit 설정을 연결한다.
+      # 이 값은 Xcode 스킴(Run)에만 들어가고, 아카이브·TestFlight 빌드와는 무관하다.
+      # StoreKit 2 구독에는 별도 entitlement 가 필요 없다(In-App Purchase 는 자동).
+      storeKitConfiguration: TheJanjan/Configuration/Janjan.storekit
       # 시뮬레이터에는 iCloud 계정도 entitlement 도 없다. CloudKit 셋업을 아예 건너뛰어
       # 테스트가 저장소 문제로 흔들리지 않게 한다. 이 값은 Xcode 가 프로세스를 띄울 때만
       # 적용되므로 TestFlight/기기 설치본에는 아무 영향이 없다.

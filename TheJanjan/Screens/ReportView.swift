@@ -16,6 +16,7 @@ struct ReportView: View {
                     adherenceCard
                     perMedicationCard
                     askDoctorCard
+                    exportCard
                     MedicalDisclaimer()
                         .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
                 }
@@ -115,6 +116,30 @@ struct ReportView: View {
         }
     }
 
+    /// 내보내기는 Pro. 무료 사용자가 누르면 페이월이 올라온다(유도 세 곳 중 하나).
+    private var exportCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text("진료에 가져가기")
+                    .font(JanjanFont.display(20))
+                    .foregroundStyle(Color.ink)
+
+                WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {
+                    // TODO: 4주 요약 PDF 생성 (하단에 면책 한 줄 포함) → 공유 시트
+                }
+                .overlay(
+                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                )
+                .proGated(.reports)
+
+                Text("만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.")
+                    .font(JanjanFont.body(12))
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var askDoctorCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
@@ -131,4 +156,5 @@ struct ReportView: View {
 
 #Preview {
     ReportView()
+        .environmentObject(ProStore())
 }

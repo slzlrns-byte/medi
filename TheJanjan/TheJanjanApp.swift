@@ -7,6 +7,7 @@ struct TheJanjanApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appLock = AppLockManager()
+    @StateObject private var proStore = ProStore()
 
     private let modelContainer: ModelContainer
 
@@ -21,6 +22,8 @@ struct TheJanjanApp: App {
                     // 화면이 올라온 뒤 한 번만. 여기서 알림 권한을 조르지는 않는다 —
                     // 권한은 온보딩에서 "왜 필요한지" 한 문장을 보여 준 뒤에 묻는다.
                     await AppServices.shared.start(container: modelContainer)
+                    // 상품·권한 확인. 실패해도 무료 기능은 그대로 돈다(체크리스트 3.6).
+                    await proStore.reload()
                 }
                 .overlay {
                     // "일기만 잠그기" 를 켠 경우에는 앱 전체를 덮지 않고,
@@ -30,6 +33,7 @@ struct TheJanjanApp: App {
                     }
                 }
                 .environmentObject(appLock)
+                .environmentObject(proStore)
                 .onChange(of: scenePhase) { _, phase in
                     appLock.handle(scenePhase: phase)
                 }

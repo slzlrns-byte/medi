@@ -1,0 +1,88 @@
+{
+  "identifier" : "6E1B7C40",
+  "nonRenewingSubscriptions" : [
+  ],
+  "products" : [
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "ko_KR",
+    "_storefront" : "KOR",
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21A4F0C7",
+      "localizations" : [
+        {
+          "description" : "약봉투 스캔, 소진 예측, 자세한 기분일기, 약 알아보기를 모두 열어요.",
+          "displayName" : "The잔잔 Pro",
+          "locale" : "ko_KR"
+        }
+      ],
+      "name" : "The잔잔 Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+          ],
+          "codeOffers" : [
+          ],
+          "displayPrice" : "19900",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "3F52A118",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "8C0D4A96",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "7일 무료 체험 후 연 ₩19,900. 언제든 해지할 수 있어요.",
+              "displayName" : "Pro 연간",
+              "locale" : "ko_KR"
+            }
+          ],
+          "productID" : "pro_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro 연간",
+          "subscriptionGroupID" : "21A4F0C7",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+          ]
+        },
+        {
+          "adHocOffers" : [
+          ],
+          "codeOffers" : [
+          ],
+          "displayPrice" : "2900",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "5B93E27D",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "월 ₩2,900. 언제든 해지할 수 있어요.",
+              "displayName" : "Pro 월간",
+              "locale" : "ko_KR"
+            }
+          ],
+          "productID" : "pro_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro 월간",
+          "subscriptionGroupID" : "21A4F0C7",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

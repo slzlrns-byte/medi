@@ -7,14 +7,17 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var lock: AppLockManager
+    @EnvironmentObject private var pro: ProStore
 
     @AppStorage("janjan.notifications.hideMedicationNames") private var hidesMedicationNames = false
 
     @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingPaywall = false
 
     var body: some View {
         NavigationStack {
             Form {
+                proSection
                 notificationsSection
                 securitySection
                 privacySection
@@ -31,6 +34,9 @@ struct SettingsView: View {
                         .foregroundStyle(Color.ink)
                 }
             }
+            .sheet(isPresented: $isShowingPaywall) {
+                PaywallView()
+            }
             .confirmationDialog(
                 "모든 데이터를 삭제할까요?",
                 isPresented: $isShowingDeleteConfirmation,
@@ -44,6 +50,46 @@ struct SettingsView: View {
                 Text("되돌릴 수 없습니다. 기록·약·설정이 모두 사라집니다.")
             }
         }
+    }
+
+    // MARK: - Pro
+
+    /// 심사자가 복원 버튼을 찾는 곳이기도 하다(심사 노트에 "복원은 설정 > Pro" 라고 적었다).
+    private var proSection: some View {
+        Section {
+            LabeledContent("상태") {
+                Text(pro.isPro ? "Pro 사용 중" : "무료")
+                    .foregroundStyle(Color.muted)
+            }
+
+            Button("Pro 알아보기") {
+                isShowingPaywall = true
+            }
+            .foregroundStyle(Color.ink)
+
+            Button("구매 복원") {
+                Task { await pro.restore() }
+            }
+            .foregroundStyle(Color.ink)
+            .disabled(pro.isLoading)
+
+            if pro.isPro, let url = URL(string: ProProduct.manageSubscriptionsURLString) {
+                Link("구독 관리", destination: url)
+                    .foregroundStyle(Color.ink)
+            }
+        } header: {
+            Text("Pro")
+        } footer: {
+            Text(proFooterKo)
+        }
+    }
+
+    private var proFooterKo: String {
+        if let message = pro.lastError { return message }
+        if pro.isPro {
+            return "기간과 해지는 \"구독 관리\" 에서 확인할 수 있어요."
+        }
+        return "무료 기능은 구독 없이 계속 쓸 수 있어요."
     }
 
     // MARK: - 알림
@@ -210,4 +256,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environmentObject(AppLockManager())
+        .environmentObject(ProStore())
 }
