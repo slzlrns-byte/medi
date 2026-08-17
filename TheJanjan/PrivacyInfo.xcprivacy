@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  개인정보 매니페스트 (심사 리스크 2.4 · 2.5)
+
+  서버가 없고 서드파티 SDK 가 하나도 없으므로 수집 항목은 비어 있고,
+  "필수 사유 API" 만 적는다. 이걸 빼면 업로드 자체가 거절 메일로 돌아온다.
+
+    CA92.1  UserDefaults — 앱 자신의 설정만 읽고 쓴다(알림 문구 숨기기, 앱 잠금 등).
+    C617.1  파일 타임스탬프 — SwiftData 저장소 파일에 접근할 때 시스템이 함께 읽는다.
+
+  디스크 공간(E174.1)은 실제로 쓰는 곳이 생기면 그때 추가한다. 쓰지 않는 사유를
+  미리 적어 두면 그것도 지적 대상이다.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -84,6 +84,10 @@ swift test --package-path Packages/JanjanCore
   unique 금지, 관계 금지)을 지키려고 관계 대신 UUID 외래키만 씁니다.
 - **`TheJanjan/Notifications/NotificationManager.swift`** — `DOSE_REMINDER` 카테고리와
   복용함/건너뜀/30분 뒤 액션. 앱을 열지 않고 백그라운드에서 기록합니다.
+- **`TheJanjan/Security/AppLockManager.swift`** — 앱 잠금(Face ID · Touch ID · 기기 암호).
+  앱 전용 비밀번호를 만들지 않고 `deviceOwnerAuthentication` 하나만 씁니다.
+  켤 때 먼저 인증해서 "열 수 없는 기기에서 잠겨 나가는" 경로를 막고,
+  다시 잠글 시점 판단은 `JanjanCore/Security/LockPolicy.swift` 의 순수 함수가 합니다.
 
 ## 면책
 

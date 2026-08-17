@@ -13,6 +13,12 @@ public enum Janjan {
     public static let appBundleID = "com.thejanjan.app"
     public static let watchBundleID = "com.thejanjan.app.watchkitapp"
 
+    /// 정책 페이지. 원본은 저장소의 `docs/site/` 이고 GitHub Pages 로 낸다.
+    /// App Store Connect 의 URL 칸과 앱 설정 화면이 같은 주소를 쓴다.
+    public static let privacyPolicyURLString = "https://slzlrns-byte.github.io/medi/site/privacy.html"
+    public static let supportURLString = "https://slzlrns-byte.github.io/medi/site/support.html"
+    public static let termsURLString = "https://slzlrns-byte.github.io/medi/site/terms.html"
+
     /// 앱 어디에도 진단·조언을 쓰지 않는다는 약속을 문장으로 고정해 둔다.
     public static let medicalDisclaimerKo =
         "이 앱은 의료 조언이 아닙니다. 복용 변경은 담당 의사와 상의해 주세요."
