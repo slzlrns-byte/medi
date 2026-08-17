@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The잔잔 — 더 잔잔한 하루를 위해</title>
+<meta name="description" content="The잔잔은 정신과 투약·기분·증상을 조용히 기록하는 iPhone·Apple Watch 앱입니다. 로그인도 서버도 없습니다.">
+<meta name="color-scheme" content="light dark">
+<style>
+:root{
+  --fog:#F2F2F0; --surface:#FFFFFF; --surface2:#E9EAE7;
+  --ink:#1C1C1B; --ink2:#4E4F4B; --muted:#8B8C87;
+  --line:#E4E5E1; --sage:#CBDAD5; --sage-ink:#3E5F58;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --fog:#161716; --surface:#1F201E; --surface2:#272826;
+    --ink:#ECECE9; --ink2:#C6C7C2; --muted:#8E8F8A;
+    --line:#2E2F2C; --sage:#2C3B37; --sage-ink:#A9CFC3;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; padding:40px 20px 64px;
+  background:var(--fog); color:var(--ink);
+  font-family:"Pretendard Variable","SUIT Variable",Pretendard,SUIT,
+    -apple-system,BlinkMacSystemFont,system-ui,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:16px; line-height:1.75; font-weight:400;
+  word-break:keep-all;
+}
+.wrap{max-width:720px;margin:0 auto}
+.card{background:var(--surface);border-radius:24px;padding:28px;margin:0 0 16px}
+h1{font-size:40px;font-weight:300;letter-spacing:-.02em;line-height:1.25;margin:0 0 8px}
+h2{font-size:20px;font-weight:500;margin:0 0 12px}
+p{margin:0 0 14px}
+p:last-child{margin-bottom:0}
+.slogan{color:var(--ink2);font-size:17px;margin:0 0 28px}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 0;padding:0;list-style:none}
+.links a{
+  display:inline-block;padding:10px 18px;border-radius:999px;
+  background:var(--surface2);color:var(--ink);text-decoration:none;font-size:15px;
+}
+.links a:hover{background:var(--sage);color:var(--sage-ink)}
+.en{color:var(--ink2);font-size:15px}
+.en h2{font-size:17px}
+.note{color:var(--muted);font-size:14px;line-height:1.7}
+footer{color:var(--muted);font-size:13px;margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1>The잔잔</h1>
+    <p class="slogan">더 잔잔한 하루를 위해</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <p>
+        The잔잔(한국어 표기 <b>더잔잔</b>)은 정신과 투약과 기분·증상을 조용히 적어 두는
+        iPhone·Apple Watch 앱입니다. 약 시간을 알려 주고, 복용함과 건너뜀을 한 번에 기록하고,
+        남은 개수를 세어 두고, 하루의 기분을 원 하나로 남깁니다.
+        로그인도 서버도 광고도 없습니다. 기록은 사용자의 기기와 사용자의 iCloud에만 남고,
+        개발자는 그 내용을 볼 수 없습니다. 이 앱은 의료 조언을 하지 않으며 진단·약 추천·용량 안내를
+        하지 않습니다.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>문서</h2>
+      <ul class="links">
+        <li><a href="privacy.html">개인정보처리방침</a></li>
+        <li><a href="support.html">지원 · 자주 묻는 질문</a></li>
+        <li><a href="terms.html">이용약관</a></li>
+        <li><a href="mailto:slzlrns@gmail.com">문의 메일</a></li>
+      </ul>
+    </section>
+
+    <section class="card en">
+      <h2>In English</h2>
+      <p>
+        The Janjan is a quiet iPhone and Apple Watch app for tracking psychiatric medication,
+        mood, and symptoms. There is no account, no server, and no advertising.
+        Your records stay on your device and in your own iCloud private database;
+        the developer cannot see them. The app is not a medical device and does not
+        diagnose, recommend medication, or suggest dosages.
+      </p>
+      <p>
+        <a href="privacy.html">Privacy Policy</a> ·
+        <a href="support.html">Support</a> ·
+        <a href="terms.html">Terms</a> ·
+        <a href="mailto:slzlrns@gmail.com">slzlrns@gmail.com</a>
+      </p>
+    </section>
+
+    <p class="note">
+      위기 상담: 109(자살예방상담전화, 24시간) · 1577-0199(정신건강위기상담) · 응급 112 / 119.
+    </p>
+  </main>
+
+  <footer>
+    © 2026 slzlrns / FlowBmarket. 문의 <a href="mailto:slzlrns@gmail.com">slzlrns@gmail.com</a>
+  </footer>
+
+</div>
+
+</body>
+</html>

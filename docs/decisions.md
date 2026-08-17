@@ -58,6 +58,19 @@
 - **2026-08-17 · 말투 규칙** (확정)
   존댓말, 이모지 없음, 한 문장에 한 정보. "복약을 놓쳤습니다!" → "아침 약이 아직 남아 있어요". streak·연속기록 압박 없음. 건너뜀도 정상적인 선택으로 기록.
 
+- **2026-08-17 · 정책 페이지 4장은 GitHub Pages(`/docs`)에서 낸다** (확정)
+  원본은 `docs/site/` 에 정적 HTML로 두고, 저장소 Settings → Pages → Deploy from branch → `main` / `/docs` 로 켠다.
+  별도 도메인·호스팅·빌드 없음. 앱과 같은 시각 언어(Fog 바탕 · 흰 카드 24pt · Ink 글자 · Sage 강조)를 쓰고, 한국어가 본문이며 영어 요약을 함께 둔다. 주소는 다음과 같다.
+
+  | 페이지 | 주소 |
+  | --- | --- |
+  | 랜딩 | `https://slzlrns-byte.github.io/medi/site/` |
+  | 개인정보처리방침 | `https://slzlrns-byte.github.io/medi/site/privacy.html` |
+  | 지원 | `https://slzlrns-byte.github.io/medi/site/support.html` |
+  | 이용약관 | `https://slzlrns-byte.github.io/medi/site/terms.html` |
+
+  App Store Connect 의 개인정보 처리방침 URL · 지원 URL · EULA 보조 링크와 앱 설정 화면이 모두 이 주소를 쓴다(심사 리스크 2.1 · 3.2).
+
 - **2026-08-17 · 배포는 GitHub Actions(macOS runner) → TestFlight** (반영)
   Archive → Export → 업로드까지 자동화. 인증서는 App Store Connect API 키로 자동 서명, 맥에서는 첫 인증서 등록만. 워크플로 골격은 `.github/workflows/ios-testflight.yml`에 있으나 프로젝트 골격 생성 전까지 비활성(`workflow_dispatch`).
 
@@ -65,7 +78,7 @@
 
 - 상표 출원 실행(KIPRIS 검색 결과 확인 후), 도메인·인스타 계정 확보
 - 연령 등급 설정("의료/치료 정보: 자주" → 12+)과 Privacy Nutrition Label 실제 기입
-- 개인정보처리방침·지원 페이지 2장(GitHub Pages 예정)의 실제 문구
+- GitHub Pages 실제 활성화(저장소 Settings → Pages)와 App Store Connect 의 URL 칸 기입 — 페이지 문구 자체는 `docs/site/` 에 다 써 두었다
 - 알림 미리보기 기본값은 "약 이름 표시 + 온보딩에서 숨김 선택"으로 두되 실사용 피드백 후 재검토
 - 2026-08-17 · 슬로건/스토어 부제 확정: "더 잔잔한 하루를 위해"
 - 2026-08-17 · 스토어 앱 이름: **The잔잔** (App Store Connect 등록명). 한국어 표기·앱 아이콘 표시명은 **더잔잔**, 영문 The Janjan.

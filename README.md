@@ -20,6 +20,7 @@
 - [**애플 · 깃허브 설정 (한 번만)**](docs/apple-setup.md) — 개발자 계정부터 TestFlight 설치까지 클릭 순서
 - [화면 초안 이미지](docs/shots/)
 - [데이터 카탈로그 설명](data/README.md)
+- 정책 페이지 원본: [docs/site/](docs/site/) (GitHub Pages: 저장소 Settings → Pages → Deploy from branch → main /docs 로 켜면 https://slzlrns-byte.github.io/medi/site/privacy.html 로 열림)
 
 ## 폴더
 
