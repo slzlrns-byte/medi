@@ -1,0 +1,57 @@
+# ── Xcode ─────────────────────────────────────────────
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+build/
+DerivedData/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# XcodeGen 으로 생성되는 프로젝트 파일 (project.yml 만 커밋)
+# *.xcodeproj/
+
+# ── Swift Package Manager ─────────────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# ── CocoaPods / Carthage ──────────────────────────────
+Pods/
+Carthage/Build/
+
+# ── 서명 · 비밀 ────────────────────────────────────────
+*.p8
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+!.env.example
+
+# ── fastlane ──────────────────────────────────────────
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# ── OS · 편집기 ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ── 예외: 설계 문서와 번들 서체는 반드시 커밋한다 ──────
+!docs/*.html
+!docs/shots/*.png
+!design/fonts/
+!design/fonts/*.woff2

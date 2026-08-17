@@ -1,0 +1,136 @@
+# 더잔잔 (The Janjan) — Archive → TestFlight
+#
+# TODO: 프로젝트 골격 생성 후 활성화
+#
+# 지금은 Xcode 프로젝트가 없으므로 모든 빌드 단계가 주석 처리되어 있고,
+# 트리거도 workflow_dispatch 뿐이라 자동으로는 절대 돌지 않는다.
+# XcodeGen 으로 project.yml → TheJanjan.xcodeproj 를 만든 뒤,
+# 아래 주석을 풀고 push 트리거(또는 태그 트리거)를 추가한다.
+#
+# 필요한 Secrets (App Store Connect API 키 방식):
+#   ASC_KEY_ID           App Store Connect API 키 ID
+#   ASC_ISSUER_ID        Issuer ID
+#   ASC_PRIVATE_KEY      .p8 본문 (저장소에는 절대 커밋하지 않는다)
+#   BUILD_CERT_P12       배포 인증서 .p12 를 base64 로 인코딩한 값
+#   BUILD_CERT_PASSWORD  .p12 암호
+#   PROVISIONING_PROFILE .mobileprovision 을 base64 로 인코딩한 값
+#   KEYCHAIN_PASSWORD    러너에 만들 임시 키체인 암호
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "TestFlight 빌드 메모 (선택)"
+        required: false
+        default: ""
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Archive and upload
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    env:
+      SCHEME: TheJanjan
+      PROJECT: TheJanjan.xcodeproj
+      CONFIGURATION: Release
+      ARCHIVE_PATH: build/TheJanjan.xcarchive
+      EXPORT_PATH: build/export
+
+    steps:
+      - name: 준비 상태 안내
+        run: |
+          echo "이 워크플로는 아직 골격입니다."
+          echo "TODO: 프로젝트 골격 생성 후 아래 단계의 주석을 해제하세요."
+          exit 0
+
+      # - name: 체크아웃
+      #   uses: actions/checkout@v4
+      #
+      # - name: Xcode 버전 선택
+      #   run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+      #
+      # - name: XcodeGen 설치
+      #   run: brew install xcodegen
+      #
+      # - name: 프로젝트 생성
+      #   run: xcodegen generate
+      #
+      # - name: 인증서 · 프로비저닝 프로파일 가져오기
+      #   env:
+      #     BUILD_CERT_P12: ${{ secrets.BUILD_CERT_P12 }}
+      #     BUILD_CERT_PASSWORD: ${{ secrets.BUILD_CERT_PASSWORD }}
+      #     PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+      #     KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      #   run: |
+      #     CERT_PATH="$RUNNER_TEMP/cert.p12"
+      #     PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+      #     KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+      #     echo -n "$BUILD_CERT_P12" | base64 --decode -o "$CERT_PATH"
+      #     echo -n "$PROVISIONING_PROFILE" | base64 --decode -o "$PROFILE_PATH"
+      #     security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+      #     security set-keychain-settings -lut 21600 "$KEYCHAIN"
+      #     security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+      #     security import "$CERT_PATH" -P "$BUILD_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+      #     security list-keychain -d user -s "$KEYCHAIN"
+      #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+      #     cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+      #
+      # - name: entitlements 검사 (Debug/Release 양쪽)
+      #   run: |
+      #     # iCloud·푸시 entitlement 가 한쪽 구성에만 붙어 있는 사고를 여기서 잡는다.
+      #     echo "TODO: pbxproj 의 CODE_SIGN_ENTITLEMENTS 를 Debug/Release 모두에서 확인"
+      #
+      # - name: 아카이브
+      #   run: |
+      #     xcodebuild archive \
+      #       -project "$PROJECT" \
+      #       -scheme "$SCHEME" \
+      #       -configuration "$CONFIGURATION" \
+      #       -destination "generic/platform=iOS" \
+      #       -archivePath "$ARCHIVE_PATH" \
+      #       -allowProvisioningUpdates \
+      #       CODE_SIGN_STYLE=Manual
+      #
+      # - name: IPA 내보내기
+      #   run: |
+      #     xcodebuild -exportArchive \
+      #       -archivePath "$ARCHIVE_PATH" \
+      #       -exportPath "$EXPORT_PATH" \
+      #       -exportOptionsPlist ci/ExportOptions.plist
+      #
+      # - name: TestFlight 업로드
+      #   env:
+      #     ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      #     ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      #     ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      #   run: |
+      #     mkdir -p ~/.appstoreconnect/private_keys
+      #     echo -n "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+      #     xcrun altool --upload-app \
+      #       --type ios \
+      #       --file "$EXPORT_PATH/$SCHEME.ipa" \
+      #       --apiKey "$ASC_KEY_ID" \
+      #       --apiIssuer "$ASC_ISSUER_ID"
+      #     # 또는: xcrun notarytool / fastlane pilot upload
+      #
+      # - name: 아티팩트 보관
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ipa
+      #     path: build/export
+      #     retention-days: 7
+      #
+      # - name: 키체인 정리
+      #   if: always()
+      #   run: security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true

@@ -1,0 +1,50 @@
+{
+  "version": "0.6.0",
+  "updated": "2026-08-17",
+  "note": "감정 단어는 '어떤', 기분 점수는 '얼마나'. UI에서는 세 묶음 모두 같은 회색 칩으로 보여 좋은/나쁜 감정을 시각적으로 편 가르지 않는다. 직접 추가 가능.",
+  "groups": [
+    { "id": "hard", "name_ko": "힘든" },
+    { "id": "neutral", "name_ko": "중립·복합" },
+    { "id": "good", "name_ko": "좋은" }
+  ],
+  "words": [
+    { "id": "anxious", "name_ko": "불안", "group": "hard" },
+    { "id": "restless", "name_ko": "초조", "group": "hard" },
+    { "id": "sad", "name_ko": "슬픔", "group": "hard" },
+    { "id": "depressed", "name_ko": "우울감", "group": "hard" },
+    { "id": "angry", "name_ko": "화남", "group": "hard" },
+    { "id": "irritated", "name_ko": "짜증", "group": "hard" },
+    { "id": "sensitive", "name_ko": "예민", "group": "hard" },
+    { "id": "lonely", "name_ko": "외로움", "group": "hard" },
+    { "id": "guilty", "name_ko": "죄책감", "group": "hard" },
+    { "id": "ashamed", "name_ko": "수치심", "group": "hard" },
+    { "id": "listless", "name_ko": "무기력", "group": "hard" },
+    { "id": "worn_out", "name_ko": "지침", "group": "hard" },
+    { "id": "tense", "name_ko": "긴장", "group": "hard" },
+    { "id": "afraid", "name_ko": "두려움", "group": "hard" },
+    { "id": "hopeless", "name_ko": "절망감", "group": "hard" },
+    { "id": "aggrieved", "name_ko": "억울함", "group": "hard" },
+
+    { "id": "blank", "name_ko": "멍함", "group": "neutral" },
+    { "id": "indifferent", "name_ko": "무덤덤", "group": "neutral" },
+    { "id": "bored", "name_ko": "지루함", "group": "neutral" },
+    { "id": "confused", "name_ko": "혼란", "group": "neutral" },
+    { "id": "floaty", "name_ko": "붕 뜬 느낌", "group": "neutral" },
+    { "id": "excited_up", "name_ko": "들뜸", "group": "neutral" },
+    { "id": "impatient", "name_ko": "조급함", "group": "neutral" },
+    { "id": "longing", "name_ko": "그리움", "group": "neutral" },
+    { "id": "empty", "name_ko": "허전함", "group": "neutral" },
+    { "id": "tangled", "name_ko": "복잡함", "group": "neutral" },
+
+    { "id": "calm", "name_ko": "평온", "group": "good" },
+    { "id": "relieved", "name_ko": "안도", "group": "good" },
+    { "id": "grateful", "name_ko": "고마움", "group": "good" },
+    { "id": "joyful", "name_ko": "기쁨", "group": "good" },
+    { "id": "fluttery", "name_ko": "설렘", "group": "good" },
+    { "id": "proud", "name_ko": "뿌듯함", "group": "good" },
+    { "id": "warm", "name_ko": "따뜻함", "group": "good" },
+    { "id": "focused", "name_ko": "집중됨", "group": "good" },
+    { "id": "unburdened", "name_ko": "홀가분", "group": "good" },
+    { "id": "hopeful", "name_ko": "희망", "group": "good" }
+  ]
+}
