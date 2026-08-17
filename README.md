@@ -9,7 +9,7 @@
 
 - SwiftUI · iOS 17+ / watchOS 10+ (네이티브, iOS 전용)
 - SwiftData + CloudKit **private** DB (개발자 서버 없음)
-- StoreKit 2 구독 (월 ₩2,900 / 연 ₩19,900, 7일 체험은 연간만) — 아직 미구현
+- StoreKit 2 구독 (월 ₩2,900 / 연 ₩19,900, 7일 체험은 연간만) — 페이월·복원·게이팅 구현됨
 - 로그인 없음 · 서버 없음 · 광고 없음 · 분석 SDK 없음
 - 서체 SUIT Light(제목) + Pretendard(본문), 둘 다 SIL OFL 1.1
 
@@ -84,6 +84,11 @@ swift test --package-path Packages/JanjanCore
   unique 금지, 관계 금지)을 지키려고 관계 대신 UUID 외래키만 씁니다.
 - **`TheJanjan/Notifications/NotificationManager.swift`** — `DOSE_REMINDER` 카테고리와
   복용함/건너뜀/30분 뒤 액션. 앱을 열지 않고 백그라운드에서 기록합니다.
+- **`TheJanjan/Pro/ProStore.swift`** — StoreKit 2 구독. 애플이 서명한
+  `Transaction.currentEntitlements` 만 진실로 보고 `.unverified` 는 세지 않습니다.
+  상품을 못 불러와도 크래시하지 않고 `storeUnavailable` 로 알립니다(무료 기능은 그대로).
+  상품 ID·Pro 경계·문구는 `JanjanCore/Pro/ProFeature.swift` 한 곳에만 있습니다.
+  페이월은 `TheJanjan/Pro/PaywallView.swift`, 게이팅은 `.proGated(_:)` 한 줄입니다.
 - **`TheJanjan/Security/AppLockManager.swift`** — 앱 잠금(Face ID · Touch ID · 기기 암호).
   앱 전용 비밀번호를 만들지 않고 `deviceOwnerAuthentication` 하나만 씁니다.
   켤 때 먼저 인증해서 "열 수 없는 기기에서 잠겨 나가는" 경로를 막고,

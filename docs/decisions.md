@@ -79,6 +79,22 @@
 - **2026-08-17 · 배포는 GitHub Actions(macOS runner) → TestFlight** (반영)
   Archive → Export → 업로드까지 자동화. 인증서는 App Store Connect API 키로 자동 서명, 맥에서는 첫 인증서 등록만. 워크플로 골격은 `.github/workflows/ios-testflight.yml`에 있으나 프로젝트 골격 생성 전까지 비활성(`workflow_dispatch`).
 
+- **2026-08-18 · Pro 페이월과 게이팅 구현** (반영)
+  StoreKit 2 하나로 끝낸다. 서버·영수증 검증 서버 없이 애플이 서명한 `Transaction.currentEntitlements` 만 진실로 보고, `.unverified` 는 세지 않는다. 구현 위치는 세 곳이다.
+
+  | 무엇 | 어디 |
+  | --- | --- |
+  | Pro 경계·상품 ID·문구 | `Packages/JanjanCore/Sources/JanjanCore/Pro/ProFeature.swift` (순수 Swift, 단위 테스트 있음) |
+  | 구독 상태 | `TheJanjan/Pro/ProStore.swift` |
+  | 페이월 · 게이팅 | `TheJanjan/Pro/PaywallView.swift` · `TheJanjan/Pro/ProGate.swift` |
+
+  상품 ID 는 `pro_monthly` · `pro_yearly`, 구독 그룹 이름은 `The잔잔 Pro`. 코드 어디에도 이 문자열을 직접 쓰지 않고 `ProProduct` 만 본다(체크리스트 3.4). 페이월에 적는 4줄은 `ProFeature.launchHighlights` 이고 ASC 구독 설명이 약속한 것과 같은 순서다.
+  **가격을 코드에 적지 않는다** — "연 ₩19,900", "월 ₩1,658 꼴", 자동 갱신 고지 문장까지 전부 `product.displayPrice` / `price ÷ 12` + `priceFormatStyle` 로 만든다. 통화·지역이 바뀌어도 문장이 거짓이 되지 않는다. "7일 무료" 문구는 `Product.SubscriptionInfo.isEligibleForIntroOffer` 가 true 일 때만 나온다(3.1.2(b)).
+  게이팅은 `.proGated(_:)` 한 줄. 무료 사용자에게 "Pro" 자물쇠 알약을 얹고, 누르면 원래 동작 대신 페이월이 올라온다 — 잠긴 기능이 반쯤 동작하는 경로를 만들지 않는다. 유도 지점은 설계대로 세 곳뿐이다: 설정 → Pro, 리포트 → PDF 내보내기, 약 추가 → 약봉투 스캔(워치 첫 실행은 워치 앱 붙일 때).
+  스토어가 죽어도 앱은 멀쩡하다 — 상품이 비면 `storeUnavailable` 로 "지금은 스토어에 연결할 수 없어요. 무료 기능은 그대로 쓸 수 있어요." 를 보이고 크래시하지 않는다(3.6, 러비티에서 겪은 "상품을 찾을 수 없어요").
+  시뮬레이터 확인용으로 `TheJanjan/Configuration/Janjan.storekit` 을 두고 XcodeGen 스킴의 `storeKitConfiguration` 에만 연결했다. 이 파일은 앱 번들에 들어가지 않고 아카이브·TestFlight 와도 무관하다. **StoreKit 2 구독에는 별도 entitlement 가 필요 없다** — In-App Purchase 는 모든 App ID 에 기본으로 켜져 있고, `com.apple.developer.in-app-payments` 는 Apple Pay 용이라 여기엔 넣지 않는다(entitlements 파일 그대로).
+  디버그 전용 우회 `JANJAN_FORCE_PRO=1` 은 `#if DEBUG` 안에만 있고 릴리스에서는 컴파일 시점에 false 로 굳는다(6.5).
+
 ## 아직 안 정한 것
 
 - 상표 출원 실행(KIPRIS 검색 결과 확인 후), 도메인·인스타 계정 확보
