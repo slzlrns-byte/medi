@@ -10,6 +10,24 @@
 | `question_cards.json` | 기분일기 질문 카드 30장 | 초안 |
 | `schema/drug_catalog.schema.json` | `drug_catalog.json` 의 JSON Schema (draft-07) | 초안 |
 
+## 앱 번들로의 복사 (지금은 수동)
+
+여기 `data/` 가 **원본(source of truth)** 입니다.
+앱에 실제로 실리는 것은 Swift 패키지 리소스로 복사해 둔 사본입니다.
+
+```
+data/symptom_catalog.json  →  Packages/JanjanCore/Sources/JanjanCore/Resources/symptom_catalog.json
+data/emotion_words.json    →  Packages/JanjanCore/Sources/JanjanCore/Resources/emotion_words.json
+data/question_cards.json   →  Packages/JanjanCore/Sources/JanjanCore/Resources/question_cards.json
+```
+
+**원본을 고쳤으면 사본도 함께 갱신하고 같은 커밋에 넣으세요.** 지금은 손으로 복사합니다
+(빌드 스크립트를 넣으면 `ENABLE_USER_SCRIPT_SANDBOXING` 과 CI 캐시 문제가 따라와서,
+파일 3개짜리 규모에서는 수동이 더 안전합니다).
+
+사본이 없거나 깨지면 `JanjanCoreTests/CatalogTests` 가 즉시 실패하므로,
+갱신을 잊은 채로 배포되지는 않습니다.
+
 ---
 
 ## `drug_catalog.json`
