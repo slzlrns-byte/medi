@@ -2,8 +2,9 @@
 
 **더 잔잔한 하루를 위해** — 정신과 투약·기분·증상 기록 iOS/watchOS 앱
 
-**상태 · 코드 골격 v0.1.0 (설계 초안 v0.6 기준)** — 화면과 로직의 뼈대가 올라갔습니다.
-재고 계산은 완성되어 단위 테스트로 잠겨 있고, 화면은 아직 예시 데이터로 그려집니다.
+**상태 · v0.2.0 (설계 초안 v0.6 기준)** — 화면이 실제 저장소에 붙었습니다.
+약을 등록하고, 복용을 기록하고, 재고가 줄고, 리포트를 PDF 로 내보낼 수 있습니다.
+계산은 전부 순수 모듈에 있고 단위 테스트로 잠겨 있습니다.
 
 ## 스택
 
@@ -27,7 +28,7 @@
 ```
 project.yml            XcodeGen 스펙 — 여기서 TheJanjan.xcodeproj 를 만든다
 Packages/JanjanCore/   순수 로직 (Foundation 만). 재고·복약률·카탈로그·디자인 토큰 + 테스트
-TheJanjan/             iOS 앱 (SwiftUI, SwiftData, 알림, 번들 서체)
+TheJanjan/             iOS 앱 (SwiftUI, SwiftData, 알림, 번들 서체, 스캔·리포트)
 TheJanjanWatch/        watchOS 앱 (SwiftUI, WatchConnectivity)
 TheJanjanTests/        iOS 단위 테스트 (앱 계층 얇게)
 fastlane/              Appfile / Matchfile / Fastfile
@@ -47,7 +48,7 @@ data/                  앱에 번들할 JSON 카탈로그 + JSON Schema (원본)
 
 | 워크플로 | 언제 | 무엇을 | 시크릿 |
 | --- | --- | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | main 에 push · PR · 수동 | xcodegen → entitlements 검사 → 서체 무결성 검사 → `swift test` → 시뮬레이터 빌드·테스트 | 없음 |
+| [`ci.yml`](.github/workflows/ci.yml) | main 에 push · PR · 수동 | xcodegen → entitlements 검사 → 서체 무결성 검사 → `swift test` → 시뮬레이터 고르기 → 빌드·테스트 | 없음 |
 | [`testflight.yml`](.github/workflows/testflight.yml) | 수동 실행 · `v*` 태그 | match 서명 → 아카이브 → TestFlight 업로드 | 7개 (아래) |
 
 필요한 저장소 시크릿 7개 — **값을 어디서 얻는지는 [docs/apple-setup.md](docs/apple-setup.md) 에 클릭 순서로 적어 두었습니다.**
@@ -79,6 +80,20 @@ swift test --package-path Packages/JanjanCore
   마지막 직접 정정이 기준점 → 이후 보충 더하기 → **복용함만** 빼기.
   건너뜀·미기록은 차감하지 않고, 대신 소진 예측에 최근 4주 복약률을 곱해 보정합니다.
   개수는 전부 `Decimal` (반 알 0.5, 최소 단위 0.25).
+- **`Packages/JanjanCore/Sources/JanjanCore/Schedule/DayPlan.swift`**
+  오늘 하루의 시간대별 계획. 재고와 같은 원칙으로 저장하지 않고 사건에서 매번 다시 만듭니다.
+  오늘 화면·워치 스냅샷·알림 재예약이 전부 여기를 지나서, 셋이 다른 숫자를 말할 수 없습니다.
+- **`Packages/JanjanCore/Sources/JanjanCore/Report/ReportComposer.swift`**
+  진료에 가져갈 4주 요약의 문장. PDF 그리는 코드에 문장이 섞이면 말투 규칙을 테스트할 수 없어서
+  코어에 둡니다. "판단하지 않는다" 가 테스트로 잠겨 있습니다.
+- **`Packages/JanjanCore/Sources/JanjanCore/Scan/PharmacyLabelParser.swift`**
+  약봉투 글자에서 약 후보를 골라 냅니다. 걸러 내는 쪽으로 기웁니다 — 후보를 놓치면
+  직접 적으면 되지만, "조제일자" 를 약 이름이라고 우기면 확인 화면을 못 믿게 됩니다.
+- **`TheJanjan/Persistence/DoseRecorder.swift`** — 복용 기록을 쓰는 단 하나의 통로.
+  같은 날·같은 시간대·같은 약의 기록은 새 줄을 만들지 않고 **덮어씁니다.**
+  새 줄을 만들면 알림에서 복용함을 누른 뒤 앱에서 건너뜀으로 고쳤을 때 재고가 두 번 깎입니다.
+- **`TheJanjan/Persistence/MedicationStore.swift`** — CloudKit 제약 때문에 관계가 없어
+  **연쇄 삭제도 없습니다.** 약을 지울 때 스케줄·복용·재고를 함께 지우는 곳입니다.
 - **`Design/Tokens.swift`** — `design/tokens.json` 의 Swift 사본. SwiftUI를 import하지 않아 테스트 가능합니다.
 - **`TheJanjan/Persistence/Records.swift`** — SwiftData 모델. CloudKit 제약(모든 속성 기본값,
   unique 금지, 관계 금지)을 지키려고 관계 대신 UUID 외래키만 씁니다.
