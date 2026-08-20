@@ -63,7 +63,16 @@ final class NotificationManager: NSObject {
     weak var doseLogger: (any DoseLogging)?
 
     /// 잠금화면 미리보기에 약 이름을 띄울지. 기본은 표시, 설정에서 끌 수 있다.
-    var showsMedicationNames = true
+    /// 설정의 "잠금화면에서 약 이름 숨기기" 를 뒤집은 값.
+    ///
+    /// 저장은 UserDefaults 한 곳에서 한다. 화면이 `@AppStorage` 로만 들고 있으면
+    /// 알림을 굽는 이 클래스는 그 값을 영영 못 보고, 토글은 아무 일도 하지 않는
+    /// 장식이 된다. 정신과 약 이름이 잠금화면에 뜨는 문제라 그냥 두면 안 된다.
+    static let hideNamesDefaultsKey = "janjan.notifications.hideMedicationNames"
+
+    var showsMedicationNames: Bool {
+        !UserDefaults.standard.bool(forKey: Self.hideNamesDefaultsKey)
+    }
 
     private override init() {
         super.init()
@@ -211,8 +220,31 @@ final class NotificationManager: NSObject {
         }
     }
 
+    /// 이미 배달돼 잠금화면·알림센터에 떠 있는 이 약의 알림을 걷는다.
+    ///
+    /// 예약된 알림(`pending`)만 지우면 이미 나가 있는 알림은 그대로 남는다.
+    /// 지운 약의 이름이 계속 보이는 것도 문제고, 거기서 "복용함" 을 누르면
+    /// 주인 없는 기록이 새로 생기는 것은 더 문제다.
+    func removeDeliveredNotifications(for medicationID: UUID) {
+        let idText = medicationID.uuidString
+        center.getDeliveredNotifications { [center] delivered in
+            let ids = delivered.compactMap { notification -> String? in
+                let info = notification.request.content.userInfo
+                guard let raw = info[DoseNotification.medicationIDsField] as? [String],
+                      raw.contains(idText)
+                else { return nil }
+                return notification.request.identifier
+            }
+            guard !ids.isEmpty else { return }
+            center.removeDeliveredNotifications(withIdentifiers: ids)
+        }
+    }
+
     func cancelAllDoseReminders() {
         center.removeAllPendingNotificationRequests()
+        // 이미 나가 있는 알림도 함께 걷는다. 전체 삭제를 누른 뒤에도
+        // 잠금화면에 약 이름이 남아 있으면 지운 의미가 없다.
+        center.removeAllDeliveredNotifications()
     }
 
     // MARK: - 액션 처리

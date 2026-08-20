@@ -34,12 +34,28 @@ public struct TimeOfDay: Hashable, Codable, Sendable, Comparable, CustomStringCo
     }
 
     /// 주어진 날짜에 이 시각을 얹은 `Date`.
+    ///
+    /// 서머타임으로 그 시각이 아예 없는 날이 있다(봄에 02:00~03:00 이 통째로 사라진다).
+    /// 그때 `calendar.date(from:)` 은 nil 을 돌려주는데, 예전처럼 `?? day` 로 넘기면
+    /// 넘겨받은 자정이 그대로 나가서 02:30 약이 00:00 약이 된다 — 두 시간 반이 조용히 어긋난다.
+    /// 없는 시각이면 그 다음으로 실제 존재하는 시각을 찾는다.
     public func date(on day: Date, calendar: Calendar = .current) -> Date {
         var components = calendar.dateComponents([.year, .month, .day], from: day)
         components.hour = hour
         components.minute = minute
         components.second = 0
-        return calendar.date(from: components) ?? day
+
+        if let exact = calendar.date(from: components) { return exact }
+
+        let startOfDay = calendar.startOfDay(for: day)
+        if let next = calendar.nextDate(
+            after: startOfDay,
+            matching: DateComponents(hour: hour, minute: minute),
+            matchingPolicy: .nextTime
+        ) {
+            return next
+        }
+        return startOfDay
     }
 }
 
@@ -176,9 +192,15 @@ public struct Schedule: Identifiable, Hashable, Codable, Sendable {
     }
 
     /// 그 날짜에 이 스케줄이 살아 있는지.
+    ///
+    /// 양끝을 **날 단위로** 본다. 시작일은 그 날 0시부터, 종료일은 그 날이 다 갈 때까지다.
+    /// 종료일만 날짜로 자르지 않으면, 8월 20일까지인 약이 20일 오후에 이미 끝난 것으로
+    /// 취급돼 마지막 날 알림이 하루 일찍 사라진다.
     public func isActive(on day: Date, calendar: Calendar = .current) -> Bool {
         if let start = startDate, day < calendar.startOfDay(for: start) { return false }
-        if let end = endDate, day > end { return false }
+        if let end = endDate, calendar.startOfDay(for: day) > calendar.startOfDay(for: end) {
+            return false
+        }
         return weekdays.contains(Weekday.from(date: day, calendar: calendar))
     }
 }

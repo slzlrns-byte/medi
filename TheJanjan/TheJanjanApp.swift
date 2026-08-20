@@ -15,6 +15,14 @@ struct TheJanjanApp: App {
         modelContainer = JanjanModelContainer.make()
     }
 
+    /// 앱 전체를 덮어야 하는 상태인가. 잠금은 사용자가 푸는 것이라 되돌리는 쪽은 비워 둔다.
+    private var isFullyLocked: Binding<Bool> {
+        Binding(
+            get: { appLock.isEnabled && appLock.isLocked && !appLock.diaryOnly },
+            set: { _ in }
+        )
+    }
+
     var body: some Scene {
         WindowGroup {
             RootTabView()
@@ -24,18 +32,35 @@ struct TheJanjanApp: App {
                     await AppServices.shared.start(container: modelContainer)
                     // 상품·권한 확인. 실패해도 무료 기능은 그대로 돈다(체크리스트 3.6).
                     await proStore.reload()
+                    AppServices.shared.updatePro(proStore.isPro)
                 }
-                .overlay {
-                    // "일기만 잠그기" 를 켠 경우에는 앱 전체를 덮지 않고,
-                    // RootTabView 의 기록 탭 안에서만 덮는다.
-                    if appLock.isEnabled, appLock.isLocked, !appLock.diaryOnly {
-                        LockScreenView()
-                    }
+                // 시트가 아니라 fullScreenCover 로 덮는다.
+                //
+                // .overlay 는 화면 **위에 올라온 시트 아래**에 깔린다. 복용 기록 시트나
+                // 리포트 공유 시트를 열어 둔 채로 앱을 내렸다 다시 열면, 잠겼는데도
+                // 그 시트가 그대로 보이고 잠금 화면은 시트 뒤에 숨는다.
+                // fullScreenCover 는 모달 계층의 맨 위로 올라가서 그 경로를 막는다.
+                //
+                // "일기만 잠그기" 를 켠 경우에는 앱 전체를 덮지 않고,
+                // RootTabView 의 기록 탭 안에서만 덮는다.
+                .fullScreenCover(isPresented: isFullyLocked) {
+                    LockScreenView()
+                        .environmentObject(appLock)
                 }
                 .environmentObject(appLock)
                 .environmentObject(proStore)
+                .onChange(of: proStore.isPro) { _, isPro in
+                    AppServices.shared.updatePro(isPro)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     appLock.handle(scenePhase: phase)
+
+                    // 구독이 밤사이 끝나도 Transaction.updates 는 새 거래가 없으면
+                    // 울리지 않는다. 앱을 다시 켤 때 권한을 한 번 더 확인하지 않으면
+                    // 만료된 채로 Pro 화면이 열려 있게 된다.
+                    if phase == .active {
+                        Task { _ = await proStore.refreshEntitlements() }
+                    }
                 }
         }
         .modelContainer(modelContainer)
@@ -55,6 +80,10 @@ final class AppServices {
     private(set) var container: ModelContainer?
     private var hasStarted = false
 
+    /// 워치 앱 전체가 Pro 기능이라, 워치로 무엇을 보낼지 정하려면 구독 상태를 알아야 한다.
+    /// 워치에는 StoreKit 을 올리지 않는다 — 판단은 폰에서 하고 결과만 건너간다.
+    private(set) var isPro = false
+
     private init() {}
 
     func start(container: ModelContainer) {
@@ -69,8 +98,11 @@ final class AppServices {
         NotificationManager.shared.bootstrap()
 
         PhoneSessionManager.shared.doseLogger = logger
-        PhoneSessionManager.shared.snapshotProvider = {
-            WatchSnapshotBuilder.snapshot(using: container.mainContext)
+        PhoneSessionManager.shared.snapshotProvider = { [weak self] in
+            WatchSnapshotBuilder.snapshot(
+                using: container.mainContext,
+                isPro: self?.isPro ?? false
+            )
         }
         PhoneSessionManager.shared.activate()
 
@@ -84,7 +116,16 @@ final class AppServices {
     func pushWatchSnapshot() {
         guard let container else { return }
         PhoneSessionManager.shared.pushSnapshot(
-            WatchSnapshotBuilder.snapshot(using: container.mainContext)
+            WatchSnapshotBuilder.snapshot(using: container.mainContext, isPro: isPro)
         )
+    }
+
+    /// 구독 상태가 바뀌었다. 워치가 들고 있는 그림도 따라가야 한다 —
+    /// 구독이 끝났는데 워치에 오늘 일정이 그대로 남아 있으면 안 되고,
+    /// 방금 구독했는데 잠긴 화면이 남아 있어도 안 된다.
+    func updatePro(_ isPro: Bool) {
+        guard self.isPro != isPro else { return }
+        self.isPro = isPro
+        pushWatchSnapshot()
     }
 }

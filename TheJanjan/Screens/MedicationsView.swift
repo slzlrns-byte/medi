@@ -9,6 +9,7 @@ import JanjanCore
 struct MedicationsView: View {
 
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var pro: ProStore
 
     @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
@@ -237,7 +238,7 @@ struct MedicationsView: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
-                        Text("\(DecimalQuantity.display(row.snapshot.remaining))정")
+                        Text("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정")
                             .font(JanjanFont.display(20))
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
@@ -270,15 +271,21 @@ struct MedicationsView: View {
         }
     }
 
+    /// 잔여 개수는 무료다 — 사용자가 직접 센 숫자이므로.
+    /// **앞으로 며칠 남는지 내다보는 것만 Pro** 다(ASC 구독 설명이 약속한 네 가지 중 하나).
     private func runOutText(_ row: Row) -> String? {
         guard row.hasStock else { return nil }
+
+        // 세어 둔 것보다 많이 먹은 것으로 계산되면 음수가 나온다.
+        // 0 으로 깎아 보이되 그 사실을 숨기지는 않는다 — 다시 세어 달라고 말한다.
+        if row.snapshot.remaining < 0 { return "다시 세어 주세요" }
+        guard pro.isPro else { return nil }
+
         if let shortfall = row.snapshot.shortfallDays, shortfall > 0 {
             return "진료 전 \(shortfall)일 모자람"
         }
         guard let days = row.snapshot.daysRemaining else { return nil }
-        let whole = DecimalQuantity.floorToInt(days)
-        guard whole >= 0 else { return nil }
-        return "약 \(whole)일치"
+        return "약 \(DecimalQuantity.floorToInt(days))일치"
     }
 
     // MARK: - 손대기

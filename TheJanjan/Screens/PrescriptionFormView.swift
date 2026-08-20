@@ -17,6 +17,7 @@ struct PrescriptionFormView: View {
 
     @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var stockRecords: [StockEventRecord]
 
     @State private var visitDate = Date()
     @State private var daysSupplied = 28
@@ -54,6 +55,14 @@ struct PrescriptionFormView: View {
                     medicationCard
                 }
                 noteCard
+                if let warning = staleDateWarning {
+                    JanjanCard {
+                        Text(warning)
+                            .font(JanjanFont.body(13))
+                            .foregroundStyle(Color.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
 
                 BlackPillButton(title: "저장", isBusy: isSaving, isEnabled: canSave) {
                     save()
@@ -191,6 +200,22 @@ struct PrescriptionFormView: View {
 
     /// 진료일만 있어도 저장된다. 약을 아직 안 넣었어도 "다음 진료 D-" 는 살아난다.
     private var canSave: Bool { !isSaving }
+
+    /// 재고 계산은 **마지막 직접 정정**을 기준점으로 삼고 그 이전 사건을 전부 버린다(설계 05절).
+    /// 그래서 정정보다 앞선 날짜로 보충을 넣으면 개수가 하나도 안 늘어난다.
+    /// 규칙 자체는 옳지만, 아무 말 없이 삼켜 버리면 사용자는 앱이 고장 났다고 생각한다.
+    private var staleDateWarning: String? {
+        let chosen = Set(refills.filter { $0.value > 0 }.keys)
+        guard !chosen.isEmpty else { return nil }
+
+        let blocked = stockRecords
+            .filter { chosen.contains($0.medicationID) && $0.core.isCorrection }
+            .filter { $0.occurredAt > visitDate }
+
+        guard !blocked.isEmpty else { return nil }
+        return "고른 약 중에 진료일 뒤에 재고를 직접 센 기록이 있어요. "
+            + "재고는 마지막으로 센 개수가 기준이라, 그보다 앞선 보충은 개수에 더해지지 않아요."
+    }
 
     private func changeDays(by delta: Int) {
         let previous = daysSupplied

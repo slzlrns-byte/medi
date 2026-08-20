@@ -13,7 +13,16 @@ struct WatchHomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                if session.snapshot.slots.isEmpty {
+                if !session.snapshot.isPro {
+                    // 워치 앱 전체가 Pro 다. 반쯤 동작하게 두지 않고 여기서 멈춘다.
+                    // 결제는 워치에서 받지 않는다 — 작은 화면에서 되돌릴 수 없는
+                    // 결정을 받지 않기 위해서다.
+                    Text("워치 앱은 Pro 기능이에요.")
+                        .font(.footnote)
+                    Text("아이폰의 설정에서 Pro 를 켜면 여기에 오늘 일정이 나와요.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if session.snapshot.slots.isEmpty {
                     Text("아이폰에서 약을 등록하면 여기 나옵니다.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -23,8 +32,10 @@ struct WatchHomeView: View {
                     }
                 }
 
-                Button("증상 기록") { isShowingSymptom = true }
-                Button("기분") { isShowingMood = true }
+                if session.snapshot.isPro {
+                    Button("증상 기록") { isShowingSymptom = true }
+                    Button("기분") { isShowingMood = true }
+                }
 
                 Text("자세한 건 iPhone에서")
                     .font(.footnote)

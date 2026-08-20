@@ -48,6 +48,13 @@ final class PhoneSessionManager: NSObject {
     }
 
     fileprivate func handle(_ message: WatchMessage) {
+        // 워치 앱 전체가 Pro 다. 화면을 잠가 두고 기록만 받아 주면
+        // 잠긴 기능이 반쯤 동작하는 것이 된다. 스냅샷 요청은 그대로 받는다 —
+        // 잠겼다는 사실 자체를 워치에 알려 줘야 하기 때문이다.
+        if case .requestSnapshot = message {} else {
+            guard AppServices.shared.isPro else { return }
+        }
+
         switch message {
         case .doseAction(let medicationIDs, let slotKey, let action):
             doseLogger?.logDose(

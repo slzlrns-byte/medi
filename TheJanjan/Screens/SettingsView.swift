@@ -11,7 +11,7 @@ struct SettingsView: View {
     @EnvironmentObject private var lock: AppLockManager
     @EnvironmentObject private var pro: ProStore
 
-    @AppStorage("janjan.notifications.hideMedicationNames") private var hidesMedicationNames = false
+    @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
 
     @State private var isShowingDeleteConfirmation = false
     @State private var isShowingPaywall = false
@@ -101,6 +101,10 @@ struct SettingsView: View {
     private var notificationsSection: some View {
         Section {
             Toggle("잠금화면에서 약 이름 숨기기", isOn: $hidesMedicationNames)
+                .onChange(of: hidesMedicationNames) { _, _ in
+                    // 이미 예약된 알림은 문구가 구워진 채로 남아 있다. 다시 깔아야 바뀐다.
+                    Task { await ReminderPlanner.reschedule(using: context) }
+                }
         } header: {
             Text("알림")
         } footer: {
@@ -186,7 +190,7 @@ struct SettingsView: View {
 
     private var safetySection: some View {
         Section {
-            ForEach(Janjan.crisisContactsKR) { contact in
+            ForEach(Janjan.crisisContactsForCurrentRegion) { contact in
                 Button {
                     call(contact)
                 } label: {
@@ -266,6 +270,15 @@ struct SettingsView: View {
     private func deleteEverything() {
         NotificationManager.shared.cancelAllDoseReminders()
         MedicationStore.deleteEverything(in: context)
+
+        // SwiftData 밖에도 기록이 남는다. 여기서 같이 걷지 않으면
+        // "모두 사라집니다" 라고 적어 놓고 거짓말을 하는 셈이 된다.
+        //
+        //  · 내보낸 리포트 PDF — 약 이름·복약률·기분·의사에게 물어볼 말이 들어 있다.
+        //  · 진료 질문 메모 — iCloud 로 안 넘어가는 대신 이 기기에 남는다.
+        ReportPDF.removeExportedFiles()
+        UserDefaults.standard.removeObject(forKey: ReportView.questionsDefaultsKey)
+
         AppServices.shared.pushWatchSnapshot()
     }
 

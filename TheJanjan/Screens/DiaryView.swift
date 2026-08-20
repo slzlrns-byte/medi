@@ -20,6 +20,7 @@ struct DiaryView: View {
 
     @State private var isExpanded = false
     @State private var isShowingSymptomSheet = false
+    @State private var pendingSymptomDeletion: SymptomEntryRecord?
     @State private var safetyReason: SafetyReason?
 
     /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
@@ -75,6 +76,18 @@ struct DiaryView: View {
             .sheet(item: $safetyReason) { _ in
                 SafetyCardView()
             }
+            .confirmationDialog(
+                "이 증상 기록을 지울까요?",
+                isPresented: Binding(
+                    get: { pendingSymptomDeletion != nil },
+                    set: { if !$0 { pendingSymptomDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingSymptomDeletion
+            ) { entry in
+                Button("지우기", role: .destructive) { delete(entry) }
+                Button("취소", role: .cancel) { pendingSymptomDeletion = nil }
+            }
         }
     }
 
@@ -119,6 +132,9 @@ struct DiaryView: View {
                         .strokeBorder(Color.ink, lineWidth: isChosen ? 2 : 0)
                         .padding(-3)
                 }
+                // 색 동그라미 크기는 그대로 두고 누를 수 있는 범위만 44pt 로 넓힌다.
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
@@ -339,11 +355,15 @@ struct DiaryView: View {
             PillChip(text: "세기 \(entry.severity)")
             Spacer(minLength: 0)
             Button {
-                context.delete(entry)
+                // 바로 지우지 않는다. 12pt 글리프를 잘못 스치면 기록이 사라지고,
+                // 약 삭제에는 확인을 붙여 두고 여기만 안 붙이는 것도 앞뒤가 안 맞는다.
+                pendingSymptomDeletion = entry
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(Color.muted)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text("이 증상 기록 지우기"))
@@ -513,9 +533,20 @@ struct DiaryView: View {
         )
     }
 
-    /// 마지막으로 손댄 시각. 같은 날 여러 번 고쳤을 때 어느 것이 진실인지 가른다.
+    private func delete(_ entry: SymptomEntryRecord) {
+        context.delete(entry)
+        pendingSymptomDeletion = nil
+        save()
+    }
+
+    /// 마지막으로 손댄 시각과 저장.
+    ///
+    /// 자동 저장에 기대지 않고 여기서 직접 쓴다. 이 화면은 "저장 버튼이 없다" 고
+    /// 약속해 놓았는데, 자동 저장은 즉시가 아니라 잠시 뒤에 몰아서 일어난다.
+    /// 감정 단어를 누르고 앱이 강제로 내려가면 그 사이의 편집이 조용히 사라진다.
     private func touch(_ record: CheckInRecord) {
         record.updatedAt = Date()
+        save()
     }
 
     private func save() {

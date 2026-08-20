@@ -44,17 +44,38 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     public let slots: [SlotLine]
     /// 오늘 아직 기록하지 않은 약 개수. 컴플리케이션에 그대로 쓴다.
     public let remainingCountToday: Int
+    /// 워치 앱은 Pro 기능이다(무료/Pro 경계 결정). **판단은 폰이 한다.**
+    /// 워치에 StoreKit 을 올리지 않는 이유는 이 앱의 원칙 그대로다 —
+    /// 워치는 아무것도 계산하지 않고 받은 그림만 그린다.
+    public let isPro: Bool
 
     public init(
         generatedAt: Date = Date(),
         dateText: String,
         slots: [SlotLine],
-        remainingCountToday: Int
+        remainingCountToday: Int,
+        isPro: Bool = true
     ) {
         self.generatedAt = generatedAt
         self.dateText = dateText
         self.slots = slots
         self.remainingCountToday = remainingCountToday
+        self.isPro = isPro
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case generatedAt, dateText, slots, remainingCountToday, isPro
+    }
+
+    /// 키가 없던 시절의 스냅샷이 남아 있어도 되살아나게 한다.
+    /// 워치에 마지막으로 건너간 그림은 앱을 지우기 전까지 그대로 남아 있다.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        generatedAt = try container.decode(Date.self, forKey: .generatedAt)
+        dateText = try container.decode(String.self, forKey: .dateText)
+        slots = try container.decode([SlotLine].self, forKey: .slots)
+        remainingCountToday = try container.decode(Int.self, forKey: .remainingCountToday)
+        isPro = try container.decodeIfPresent(Bool.self, forKey: .isPro) ?? true
     }
 
     public static let placeholder = WatchSnapshot(
@@ -62,6 +83,17 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         slots: [],
         remainingCountToday: 0
     )
+
+    /// 구독하지 않은 사용자의 워치에 보내는 그림. 오늘 일정은 담기지 않는다.
+    public static func locked(dateText: String, generatedAt: Date = Date()) -> WatchSnapshot {
+        WatchSnapshot(
+            generatedAt: generatedAt,
+            dateText: dateText,
+            slots: [],
+            remainingCountToday: 0,
+            isPro: false
+        )
+    }
 }
 
 /// 워치 → 아이폰으로 흘려보내는 메시지.

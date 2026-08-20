@@ -35,7 +35,9 @@ enum DoseRecorder {
     ) -> DoseEventRecord {
 
         let schedule = scheduleRecord(medicationID: medicationID, slotKey: slotKey, in: context)
-        let amount = quantity ?? schedule?.dosePerIntake ?? 1
+        // 새로 넣는 쪽은 DoseEvent 의 초기화 함수가 스냅해 주지만 고쳐 쓰는 쪽은 그냥 들어간다.
+        // 여기서 한 번 맞춰 두면 두 갈래가 같은 값을 남긴다.
+        let amount = DecimalQuantity.snapToQuarter(quantity ?? schedule?.dosePerIntake ?? 1)
         let time = plannedTime(for: schedule, slotKey: slotKey)
         let targetDay = day ?? plannedDay(near: moment, scheduleTime: time, calendar: calendar)
         let scheduledAt = time.date(on: targetDay, calendar: calendar)
@@ -134,40 +136,54 @@ enum DoseRecorder {
         slotKey: String,
         in context: ModelContext
     ) -> ScheduleRecord? {
+        // 정렬 없이 하나만 집으면, 같은 시간대에 스케줄이 둘 생겼을 때(두 기기가 동기화
+        // 전에 각자 만든 경우) 아무거나 골라 엉뚱한 개수와 시각을 기록한다.
         var descriptor = FetchDescriptor<ScheduleRecord>(
             predicate: #Predicate { record in
                 record.medicationID == medicationID && record.slotKey == slotKey
-            }
+            },
+            sortBy: [SortDescriptor(\.hour), SortDescriptor(\.minute), SortDescriptor(\.id)]
         )
         descriptor.fetchLimit = 1
         return (try? context.fetch(descriptor))?.first
     }
 
-    /// 알림에 늦게(또는 조금 이르게) 답했을 때 어느 날의 예정분인지 고른다.
+    /// 알림에 답한 시각이 **어느 날의 예정분**인지 고른다.
     ///
-    /// 어제·오늘·내일의 그 시간대 중 지금과 가장 가까운 것을 고른다.
-    /// 23:50 취침약 알림에 00:05 에 답해도 어제의 취침 줄에 붙는다 —
-    /// 그냥 `startOfDay(moment)` 를 쓰면 어제 줄은 영영 미기록으로 남고
-    /// 오늘 줄에는 아직 오지도 않은 답이 적힌다.
+    /// 규칙은 하나다: 아직 오지도 않은 예정분에는 답을 붙이지 않는다.
+    /// 이미 지난 것 중 가장 나중 것을 고르고, 조금 이르게 누른 경우만 봐 준다.
+    ///
+    /// 예전에는 어제·오늘·내일 중 "지금과 가장 가까운" 것을 골랐는데, 그러면
+    /// 하루 한 번 먹는 약에서 **12시간이 경계**가 되어 버린다. 아침 8시 약을
+    /// 그날 밤 9시에 뒤늦게 기록하면 내일 아침 8시가 더 가까워서 내일 줄에 적히고,
+    /// 다음 날 진짜로 아침 약을 먹고 기록하면 그 줄을 덮어쓴다.
+    /// 두 번 먹은 것이 한 번으로 남고, 재고는 한 알만 줄고, 오늘 아침은 영영 미기록이 된다.
     static func plannedDay(
         near moment: Date,
         scheduleTime: TimeOfDay,
         calendar: Calendar = .current
     ) -> Date {
+
+        // 알림이 울리기 직전에 미리 먹고 누르는 사람이 있다. 그 정도는 그 날 것으로 본다.
+        let earlyGrace: TimeInterval = 2 * 60 * 60
+        let cutoff = moment.addingTimeInterval(earlyGrace)
+
         let today = calendar.startOfDay(for: moment)
-        var best = today
-        var bestDistance = Double.greatestFiniteMagnitude
+        var best: Date?
+        var bestOccurrence: Date?
 
         for offset in -1...1 {
             guard let day = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
             let occurrence = scheduleTime.date(on: day, calendar: calendar)
-            let distance = abs(occurrence.timeIntervalSince(moment))
-            if distance < bestDistance {
-                bestDistance = distance
-                best = day
-            }
+            guard occurrence <= cutoff else { continue }
+            if let current = bestOccurrence, occurrence <= current { continue }
+            bestOccurrence = occurrence
+            best = day
         }
-        return best
+
+        // 그 시간대가 오늘도 어제도 아직 오지 않았다면(시각을 방금 옮긴 경우 등)
+        // 가장 가까운 지난 날인 어제로 둔다.
+        return best ?? calendar.date(byAdding: .day, value: -1, to: today) ?? today
     }
 
     /// 사용자가 시각을 옮겼으면 옮긴 시각, 아니면 그 시간대의 기본 시각.

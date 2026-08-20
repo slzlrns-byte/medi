@@ -83,6 +83,11 @@ enum MedicationStore {
 
     /// 약과 그에 딸린 모든 줄을 지운다. 되돌릴 수 없다.
     static func delete(medicationID: UUID, in context: ModelContext) {
+        // 이미 잠금화면에 떠 있는 알림부터 걷는다.
+        // 남겨 두면 지운 약의 이름이 계속 보이고, 거기서 "복용함" 을 누르면
+        // 주인 없는 복용 기록이 새로 생겨 복약률에 조용히 섞인다.
+        NotificationManager.shared.removeDeliveredNotifications(for: medicationID)
+
         if let record = medicationRecord(medicationID, in: context) {
             context.delete(record)
         }
@@ -99,6 +104,23 @@ enum MedicationStore {
             predicate: #Predicate { $0.medicationID == medicationID }
         ), in: context)
 
+        // 이 약을 가리키던 다른 줄의 손가락도 내려 준다. 관계가 없는 스키마라
+        // 아무도 대신 해 주지 않고, 남겨 두면 없는 약을 가리키는 UUID 가 떠돈다.
+        let symptoms = FetchDescriptor<SymptomEntryRecord>(
+            predicate: #Predicate { $0.relatedMedicationID == medicationID }
+        )
+        for entry in (try? context.fetch(symptoms)) ?? [] {
+            entry.relatedMedicationID = nil
+        }
+
+        let idText = medicationID.uuidString
+        let prescriptions = FetchDescriptor<PrescriptionRecord>(
+            predicate: #Predicate { $0.medicationIDValues.contains(idText) }
+        )
+        for prescription in (try? context.fetch(prescriptions)) ?? [] {
+            prescription.medicationIDValues.removeAll { $0 == idText }
+        }
+
         save("약 삭제", in: context)
     }
 
@@ -110,7 +132,12 @@ enum MedicationStore {
         // 타입을 하나씩 적는다. `JanjanSchema.allModels` 를 돌리고 싶지만
         // `delete(model:)` 는 제네릭이라 `any PersistentModel.Type` 로는 부를 수 없다.
         // 새 모델을 만들면 여기에도 한 줄 늘려야 한다 — 아래 개수 확인이 그걸 잡아 준다.
-        assert(JanjanSchema.allModels.count == 7, "모델을 추가했다면 전체 삭제에도 넣어 주세요.")
+        // assert 는 릴리스에서 통째로 빠진다. 여기서 빠지면 "모두 사라집니다" 라고
+        // 적어 놓고 한 종류를 남겨 두는 일이 앱스토어 빌드에서만 조용히 일어난다.
+        precondition(
+            JanjanSchema.allModels.count == 7,
+            "모델을 추가했다면 전체 삭제에도 넣어 주세요."
+        )
 
         wipe(MedicationRecord.self, in: context)
         wipe(ScheduleRecord.self, in: context)

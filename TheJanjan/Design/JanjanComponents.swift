@@ -263,6 +263,10 @@ struct CountStepper: View {
     ) -> some View {
         Button(action: action) {
             CircleGlyph(systemImage: systemImage, background: .surface2, diameter: 30)
+                // 동그라미는 30pt 그대로 두고 누를 수 있는 범위만 44pt 로 넓힌다.
+                // 애플이 정한 최소 크기이고, 손이 떨리는 날에도 눌러야 하는 버튼이다.
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(label))

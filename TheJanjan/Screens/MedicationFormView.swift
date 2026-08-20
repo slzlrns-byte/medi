@@ -209,7 +209,7 @@ struct MedicationFormView: View {
                 }
 
                 if weekdays.isEmpty {
-                    Text("하루도 고르지 않으면 알림이 가지 않아요.")
+                    Text("하루는 골라 주세요. 고른 요일에만 일정이 만들어져요.")
                         .font(JanjanFont.body(12))
                         .foregroundStyle(Color.muted)
                 }
@@ -245,7 +245,9 @@ struct MedicationFormView: View {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
-        return drafts.contains { $0.isOn }
+        // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
+        // 재고도 안 줄어든다. 저장은 되는데 아무 일도 일어나지 않는 약이 생긴다.
+        return drafts.contains { $0.isOn } && !weekdays.isEmpty
     }
 
     private func adjust(_ index: Int, by delta: Decimal) {

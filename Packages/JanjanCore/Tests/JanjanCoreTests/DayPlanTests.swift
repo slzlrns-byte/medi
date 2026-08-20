@@ -464,6 +464,50 @@ final class DayPlanTests: XCTestCase {
         XCTAssertEqual(reminders.first?.time, TimeOfDay(hour: 7, minute: 15))
     }
 
+    // MARK: - 마지막 날
+
+    func testScheduleLivesThroughItsLastDay() {
+        // 8월 17일까지인 약을 17일 오전 9시에 본다. 아직 그 날이다.
+        let ending = [
+            Schedule(
+                medicationID: Fixed.medA,
+                slot: .morning,
+                dosePerIntake: 1,
+                endDate: Fixed.calendar.startOfDay(for: monday)
+            )
+        ]
+        XCTAssertEqual(plan(schedules: ending).count, 1)
+
+        // 그리고 다음 날에는 빠진다.
+        let tomorrow = DayPlan.slots(
+            on: Fixed.date(2026, 8, 18, 9, 0),
+            schedules: ending,
+            medications: medications,
+            doseEvents: [],
+            calendar: Fixed.calendar
+        )
+        XCTAssertTrue(tomorrow.isEmpty)
+    }
+
+    func testReminderSurvivesUntilTheEndOfTheLastDay() {
+        // 종료일을 시각으로 자르면 마지막 날 오후에 그 날 알림이 통째로 사라진다.
+        let ending = [
+            Schedule(
+                medicationID: Fixed.medA,
+                slot: .morning,
+                dosePerIntake: 1,
+                endDate: Fixed.calendar.startOfDay(for: monday)
+            )
+        ]
+        let atNight = DayPlan.weeklyReminders(
+            schedules: ending,
+            medications: medications,
+            asOf: Fixed.date(2026, 8, 17, 23, 0),
+            calendar: Fixed.calendar
+        )
+        XCTAssertFalse(atNight.isEmpty)
+    }
+
     // MARK: - 워치 스냅샷
 
     func testWatchSnapshotMirrorsThePlan() {
@@ -483,6 +527,34 @@ final class DayPlanTests: XCTestCase {
         XCTAssertEqual(snapshot.slots[0].medicationNames, ["에스시탈로프람"])
         XCTAssertFalse(snapshot.slots[0].isCompleted)
         XCTAssertEqual(snapshot.remainingCountToday, 2)
+    }
+
+    func testWatchSnapshotIsLockedWithoutPro() {
+        // 워치 앱 전체가 Pro 다. 잠긴 채로 오늘 일정만 넘겨주면
+        // "잠긴 기능이 반쯤 동작하는" 경로가 생긴다.
+        let snapshot = DayPlan.watchSnapshot(
+            on: monday,
+            schedules: schedules,
+            medications: medications,
+            doseEvents: [],
+            calendar: Fixed.calendar,
+            generatedAt: monday,
+            isPro: false
+        )
+
+        XCTAssertFalse(snapshot.isPro)
+        XCTAssertTrue(snapshot.slots.isEmpty)
+        XCTAssertEqual(snapshot.remainingCountToday, 0)
+    }
+
+    func testOldSnapshotWithoutTheProKeyStillDecodes() {
+        // 워치에 마지막으로 건너간 그림은 앱을 지우기 전까지 남아 있다.
+        let json = """
+        {"generatedAt": 0, "dateText": "8/17", "slots": [], "remainingCountToday": 0}
+        """
+        let restored = try? JSONDecoder().decode(WatchSnapshot.self, from: Data(json.utf8))
+        XCTAssertNotNil(restored)
+        XCTAssertEqual(restored?.isPro, true)
     }
 
     func testWatchSnapshotIsCodable() {

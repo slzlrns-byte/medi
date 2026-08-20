@@ -33,7 +33,9 @@ public enum PharmacyLabelParser {
     static let noiseKeywords: [String] = [
         "조제", "환자", "처방", "약국", "병원", "의원", "医", "발행", "교부",
         "용법", "용량은", "복용법", "보험", "청구", "전화", "주소", "사업자",
-        "일분", "일치", "총량", "投薬", "성명", "생년", "면허", "약사", "의사"
+        "일분", "일치", "총량", "投薬", "성명", "생년", "면허", "약사", "의사",
+        // 설명문에도 용량이 적힌다. "1회 1정에 500mg 함유" 같은 줄은 약 이름 줄이 아니다.
+        "함유", "성분명", "첨가"
     ]
 
     /// 용량 표기. "25mg", "0.5 mg", "12.5밀리그램", "10㎎", "5mcg", "1g", "100IU".
@@ -58,7 +60,7 @@ public enum PharmacyLabelParser {
             // (InventoryCalculator 에서 같은 이유로 정해 둔 규칙).
             let strength = PharmacyLabelParser.strength(in: line) ?? ""
             let name = PharmacyLabelParser.medicationName(in: line)
-            guard name.count >= 2 else { continue }
+            guard PharmacyLabelParser.isPlausibleName(name) else { continue }
 
             // 같은 약이 봉투에 여러 번 적히는 일이 흔하다(요일별 칸 등).
             let key = "\(name)|\(strength)"
@@ -108,6 +110,24 @@ public enum PharmacyLabelParser {
         // 용량이 없어도 제형 이름이 붙어 있으면 약으로 본다.
         let forms = ["정", "캡슐", "서방정", "산", "시럽", "패치", "주사", "액"]
         return forms.contains { lowered.hasSuffix($0) }
+    }
+
+    /// 떼어 내고 남은 것이 이름 같은가.
+    ///
+    /// 용량과 용법 숫자를 걷어 내면 설명문에서는 조사 부스러기만 남는다.
+    /// 그런 줄을 확인 화면에 올리면 사용자가 목록을 못 믿게 되고,
+    /// 그러면 진짜 약 이름까지 하나하나 다시 읽어 봐야 한다.
+    static func isPlausibleName(_ name: String) -> Bool {
+        guard name.count >= 2 else { return false }
+        guard name.unicodeScalars.contains(where: isNameScalar) else { return false }
+
+        // 조사로 시작하는 이름은 없다. 문장 가운데를 잘라 낸 부스러기다.
+        let particles = ["에 ", "을 ", "를 ", "이 ", "가 ", "은 ", "는 ", "의 ", "와 ", "과 "]
+        if particles.contains(where: { name.hasPrefix($0) }) { return false }
+
+        // 한글·로마자를 뺀 나머지가 절반을 넘으면 이름이 아니라 부스러기다.
+        let letters = name.unicodeScalars.filter(isNameScalar).count
+        return letters * 2 >= name.unicodeScalars.count
     }
 
     private static func isNameScalar(_ scalar: Unicode.Scalar) -> Bool {

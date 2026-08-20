@@ -17,7 +17,10 @@ struct ReportView: View {
     private var prescriptionRecords: [PrescriptionRecord]
 
     /// 진료 전에 적어 두는 메모. 이 기기에만 남는다.
-    @AppStorage("janjan.report.questions") private var questions = ""
+    /// 전체 삭제가 이 키를 지워야 해서 이름을 밖에서도 부를 수 있게 둔다.
+    static let questionsDefaultsKey = "janjan.report.questions"
+
+    @AppStorage(ReportView.questionsDefaultsKey) private var questions = ""
 
     @State private var exportURL: ExportedFile?
     @State private var isExporting = false
@@ -48,6 +51,11 @@ struct ReportView: View {
             .navigationTitle("리포트")
             .sheet(item: $exportURL) { file in
                 ShareSheet(items: [file.url])
+                    .onDisappear {
+                        // 공유가 끝나면 기기에 남겨 두지 않는다. 사용자가 보낸 곳에는
+                        // 사본이 남고, 여기 남은 것은 아무도 쓰지 않는 사본일 뿐이다.
+                        ReportPDF.removeExportedFiles()
+                    }
             }
         }
     }

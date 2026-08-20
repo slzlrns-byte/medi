@@ -26,7 +26,8 @@ public enum InventoryCalculator {
         for medicationID: UUID,
         stockEvents: [StockEvent],
         doseEvents: [DoseEvent],
-        asOf: Date = Date()
+        asOf: Date = Date(),
+        calendar: Calendar = .current
     ) -> Decimal {
 
         // 같은 시각에 여러 사건이 있을 때의 순서.
@@ -57,7 +58,7 @@ public enum InventoryCalculator {
             }
         }
 
-        for event in doseEvents where event.medicationID == medicationID {
+        for event in collapsedDoses(for: medicationID, in: doseEvents, calendar: calendar) {
             guard event.status.consumesStock else { continue }
             let when = event.effectiveDate
             guard when <= asOf else { continue }
@@ -79,6 +80,49 @@ public enum InventoryCalculator {
         }
 
         return DecimalQuantity.round(running, scale: 4)
+    }
+
+    /// 같은 날 · 같은 시간대 · 같은 약의 **정기** 복용 사건이 둘 이상이면 가장 나중 것만 남긴다.
+    ///
+    /// 기기가 둘이면 이런 일이 생긴다. 워치에서 "복용함" 을 누르고, 동기화가 오기 전에
+    /// 폰에서 한 번 더 누른다. 두 기기가 각자 새 줄을 만들고 CloudKit 은 둘 다 남긴다 —
+    /// SwiftData + CloudKit 에서는 유니크 제약을 걸 수 없어서(Records.swift 머리말) 막을 수가 없다.
+    ///
+    /// 화면은 이미 이 경우를 견딘다. `DayPlan` 이 가장 나중 것만 골라 한 줄로 그린다.
+    /// 그런데 재고만 둘 다 빼면, 사용자는 "완료" 한 줄을 보면서 두 알이 사라진 것을 보게 되고
+    /// 왜 어긋났는지 알 길이 없다. 그래서 두 계산이 같은 규칙을 쓰게 맞춘다.
+    ///
+    /// **필요시(PRN) 약은 묶지 않는다.** 시간대가 없고, 하루에 두 번 먹었으면
+    /// 두 번 먹은 것이 사실이다.
+    static func collapsedDoses(
+        for medicationID: UUID,
+        in doseEvents: [DoseEvent],
+        calendar: Calendar = .current
+    ) -> [DoseEvent] {
+
+        var latestBySlot: [String: DoseEvent] = [:]
+        var untouched: [DoseEvent] = []
+
+        for event in doseEvents where event.medicationID == medicationID {
+            guard event.kind == .scheduled, let slotKey = event.slotKey else {
+                untouched.append(event)
+                continue
+            }
+
+            let day = calendar.startOfDay(for: event.scheduledAt)
+            let key = "\(slotKey)|\(day.timeIntervalSinceReferenceDate)"
+
+            if let kept = latestBySlot[key], isLater(kept, than: event) { continue }
+            latestBySlot[key] = event
+        }
+
+        return untouched + Array(latestBySlot.values)
+    }
+
+    /// `DayPlan.latestEvent` 와 같은 순서 규칙. 둘이 어긋나면 화면과 재고가 다시 갈라진다.
+    private static func isLater(_ lhs: DoseEvent, than rhs: DoseEvent) -> Bool {
+        if lhs.effectiveDate != rhs.effectiveDate { return lhs.effectiveDate > rhs.effectiveDate }
+        return lhs.id.uuidString > rhs.id.uuidString
     }
 
     // MARK: - 복약률
@@ -256,7 +300,8 @@ public enum InventoryCalculator {
             for: medicationID,
             stockEvents: stockEvents,
             doseEvents: doseEvents,
-            asOf: asOf
+            asOf: asOf,
+            calendar: calendar
         )
 
         let rate = InventoryCalculator.adherenceRate(

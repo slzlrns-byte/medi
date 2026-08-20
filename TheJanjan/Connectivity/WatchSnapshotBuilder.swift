@@ -11,6 +11,7 @@ enum WatchSnapshotBuilder {
 
     static func snapshot(
         using context: ModelContext,
+        isPro: Bool,
         on day: Date = Date(),
         calendar: Calendar = .current
     ) -> WatchSnapshot {
@@ -23,7 +24,8 @@ enum WatchSnapshotBuilder {
             schedules: schedules,
             medications: medications,
             doseEvents: doseEvents(around: day, in: context, calendar: calendar),
-            calendar: calendar
+            calendar: calendar,
+            isPro: isPro
         )
     }
 

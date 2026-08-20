@@ -11,6 +11,7 @@ struct TodayView: View {
     @Binding var isShowingSettings: Bool
 
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var pro: ProStore
 
     // v1 의 기록량(하루 몇 건 × 1년)에서는 통째로 읽어도 부담이 없고,
     // 재고는 마지막 정정 이후 전부를 봐야 하므로 기간으로 자르면 오히려 틀린다.
@@ -104,6 +105,10 @@ struct TodayView: View {
                     SlotRecordSheet(line: line) { entry, status in
                         record(entry, in: line, as: status)
                     }
+                } else {
+                    // 시트를 열어 둔 사이에 그 시간대가 사라질 수 있다(다른 기기에서
+                    // 약을 중단하거나 지웠을 때). 빈 시트를 남기지 않고 이유를 말한다.
+                    SlotGoneSheet()
                 }
             }
         }
@@ -253,6 +258,9 @@ struct TodayView: View {
                         .strokeBorder(Color.ink, lineWidth: isChosen ? 2 : 0)
                         .padding(-3)
                 }
+                // 색 동그라미 크기는 그대로 두고 누를 수 있는 범위만 44pt 로 넓힌다.
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
@@ -270,7 +278,11 @@ struct TodayView: View {
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     PillChip(text: nextVisitText, tint: .surface2)
-                    PillChip(text: shortfallText, tint: .surface2)
+                    // 소진 예측은 Pro. 무료에서는 자리만 비우고 조르지 않는다 —
+                    // 유도 지점은 설계가 정한 세 곳뿐이고 여기는 그 중 하나가 아니다.
+                    if pro.isPro, let text = shortfallText {
+                        PillChip(text: text, tint: .surface2)
+                    }
                 }
             }
         }
@@ -286,12 +298,12 @@ struct TodayView: View {
     }
 
     /// 다음 진료 전에 모자라는 약을 약별로 세지 않고 한 번에 묶어 말한다(설계 05절).
-    private var shortfallText: String {
+    private var shortfallText: String? {
         guard let nextVisit = prescriptionRecords
             .compactMap({ $0.core.nextVisitDate })
             .filter({ $0 >= today })
             .min()
-        else { return "부족한 약 없음" }
+        else { return nil }
 
         let short = medications.filter { medication in
             let snapshot = InventoryCalculator.snapshot(
@@ -345,6 +357,28 @@ struct TodayView: View {
         try? context.save()
         // 폰에서 기록했으니 워치 화면도 따라오게 한다.
         AppServices.shared.pushWatchSnapshot()
+    }
+}
+
+/// 열어 둔 사이에 그 시간대가 사라졌을 때.
+private struct SlotGoneSheet: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: CGFloat(JanjanSpacing.m)) {
+            Text("이 시간대가 지금은 없어요")
+                .font(JanjanFont.display(22))
+                .foregroundStyle(Color.ink)
+            Text("다른 기기에서 약이 바뀌었을 수 있어요.")
+                .font(JanjanFont.body(14))
+                .foregroundStyle(Color.muted)
+            WhitePillButton(title: "닫기") { dismiss() }
+        }
+        .padding(CGFloat(JanjanSpacing.l))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .fogBackground()
+        .presentationDetents([.medium])
     }
 }
 

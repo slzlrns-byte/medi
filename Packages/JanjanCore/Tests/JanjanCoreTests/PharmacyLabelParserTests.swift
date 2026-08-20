@@ -141,4 +141,28 @@ final class PharmacyLabelParserTests: XCTestCase {
         XCTAssertTrue(PharmacyLabelParser.candidates(from: []).isEmpty)
         XCTAssertTrue(PharmacyLabelParser.candidates(from: ["", "   "]).isEmpty)
     }
+
+    // MARK: - 설명문은 약 이름이 아니다
+
+    func testInstructionLineWithAStrengthIsNotAMedication() {
+        // 용량이 적혀 있다는 이유만으로 후보로 올리면, 용량과 용법 숫자를 떼어 낸 뒤
+        // "에 함유" 같은 부스러기가 확인 화면에 약 이름처럼 올라온다.
+        let lines = ["1회 1정에 500mg 함유", "쿠에티아핀정 25mg"]
+        let candidates = PharmacyLabelParser.candidates(from: lines)
+        XCTAssertEqual(candidates.map(\.name), ["쿠에티아핀정"])
+    }
+
+    func testParticleFragmentsAreRejected() {
+        XCTAssertFalse(PharmacyLabelParser.isPlausibleName("에 함유"))
+        XCTAssertFalse(PharmacyLabelParser.isPlausibleName("를 복용"))
+        XCTAssertFalse(PharmacyLabelParser.isPlausibleName("1"))
+        XCTAssertFalse(PharmacyLabelParser.isPlausibleName("· - ·"))
+    }
+
+    func testRealNamesStillPass() {
+        // 걸러 내는 규칙을 세게 잡다가 진짜 약을 떨어뜨리면 더 나쁘다.
+        for name in ["쿠에티아핀정", "라믹탈", "escitalopram", "인데놀", "아빌리파이정"] {
+            XCTAssertTrue(PharmacyLabelParser.isPlausibleName(name), name)
+        }
+    }
 }

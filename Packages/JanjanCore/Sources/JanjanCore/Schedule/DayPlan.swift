@@ -228,7 +228,8 @@ public enum DayPlan {
     public static func weeklyReminders(
         schedules: [Schedule],
         medications: [Medication],
-        asOf now: Date = Date()
+        asOf now: Date = Date(),
+        calendar: Calendar = .current
     ) -> [WeeklyReminder] {
 
         var active: [UUID: Medication] = [:]
@@ -240,7 +241,12 @@ public enum DayPlan {
         // 알림은 매주 반복이라 시작일이 오면 저절로 맞아떨어진다.
         let live = schedules.filter { schedule in
             guard active[schedule.medicationID] != nil else { return false }
-            if let end = schedule.endDate, end < now { return false }
+            // 종료일은 그 날이 다 갈 때까지 살아 있다. 시각으로 자르면 마지막 날
+            // 오후에 이미 끝난 것이 되어 그 날 알림이 통째로 사라진다.
+            if let end = schedule.endDate,
+               calendar.startOfDay(for: end) < calendar.startOfDay(for: now) {
+                return false
+            }
             return true
         }
 
@@ -299,8 +305,15 @@ public enum DayPlan {
         medications: [Medication],
         doseEvents: [DoseEvent],
         calendar: Calendar = .current,
-        generatedAt: Date = Date()
+        generatedAt: Date = Date(),
+        isPro: Bool = true
     ) -> WatchSnapshot {
+
+        // 구독하지 않았으면 오늘 일정을 담지 않는다. 워치 앱 전체가 Pro 이므로
+        // "잠긴 기능이 반쯤 동작하는" 경로를 여기서도 만들지 않는다.
+        guard isPro else {
+            return .locked(dateText: shortDateText(for: day), generatedAt: generatedAt)
+        }
 
         let lines = slots(
             on: day,
