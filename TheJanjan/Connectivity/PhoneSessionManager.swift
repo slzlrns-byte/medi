@@ -16,8 +16,8 @@ final class PhoneSessionManager: NSObject {
 
     weak var doseLogger: (any DoseLogging)?
 
-    /// 워치에 보낼 오늘 요약. 화면 쪽에서 갱신해 준다.
-    var snapshotProvider: (() -> WatchSnapshot)?
+    /// 워치에 보낼 오늘 요약. 저장소를 읽어야 만들 수 있어 MainActor 로 못박는다.
+    var snapshotProvider: (@MainActor () -> WatchSnapshot)?
 
     private override init() {
         super.init()
@@ -54,6 +54,7 @@ final class PhoneSessionManager: NSObject {
                 medicationIDs: medicationIDs,
                 slotKey: slotKey,
                 action: action,
+                source: .watch,
                 at: Date()
             )
         case .symptom(let symptomID, let severity, let date):

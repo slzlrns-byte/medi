@@ -9,7 +9,13 @@ import JanjanCore
 /// 화면·뷰모델에 의존해서는 안 된다. 테스트에서는 가짜 구현을 끼운다.
 @MainActor
 protocol DoseLogging: AnyObject {
-    func logDose(medicationIDs: [UUID], slotKey: String, action: WatchMessage.DoseAction, at date: Date)
+    func logDose(
+        medicationIDs: [UUID],
+        slotKey: String,
+        action: WatchMessage.DoseAction,
+        source: DoseEvent.Source,
+        at date: Date
+    )
     func logSymptom(symptomID: String, severity: Int, at date: Date, source: SymptomEntry.Source)
     func logMood(score: Int, at date: Date)
 }
@@ -34,6 +40,7 @@ final class SwiftDataDoseLogger: DoseLogging {
         medicationIDs: [UUID],
         slotKey: String,
         action: WatchMessage.DoseAction,
+        source: DoseEvent.Source,
         at date: Date
     ) {
         guard action != .snooze else {
@@ -44,21 +51,20 @@ final class SwiftDataDoseLogger: DoseLogging {
 
         let status: DoseEvent.Status = (action == .taken) ? .taken : .skipped
 
+        // 저장 규칙은 DoseRecorder 한 곳에만 있다. 같은 시간대의 기록은 덮어쓴다 —
+        // 알림에서 복용함을 누른 뒤 앱에서 건너뜀으로 고쳐도 재고가 두 번 깎이지 않는다.
         for medicationID in medicationIDs {
-            let quantity = scheduledQuantity(for: medicationID, slotKey: slotKey)
-            let event = DoseEvent(
+            DoseRecorder.record(
                 medicationID: medicationID,
-                scheduledAt: date,
-                actualAt: status == .taken ? date : nil,
+                slotKey: slotKey,
                 status: status,
-                source: .notificationAction,
-                quantity: quantity,
-                kind: .scheduled,
-                slotKey: slotKey
+                source: source,
+                at: date,
+                in: context
             )
-            context.insert(DoseEventRecord.make(from: event))
         }
         save("복용 기록")
+        AppServices.shared.pushWatchSnapshot()
     }
 
     func logSymptom(symptomID: String, severity: Int, at date: Date, source: SymptomEntry.Source) {
@@ -73,30 +79,10 @@ final class SwiftDataDoseLogger: DoseLogging {
     }
 
     func logMood(score: Int, at date: Date) {
-        let calendar = Calendar.current
-        let day = calendar.startOfDay(for: date)
-
-        // 하루 1개 원칙: 같은 날 기록이 있으면 덮어쓴다.
-        let descriptor = FetchDescriptor<CheckInRecord>(
-            predicate: #Predicate { $0.date == day }
-        )
-        if let existing = try? context.fetch(descriptor), let record = existing.first {
-            record.moodScore = CheckIn.Mood(score).score
-            record.updatedAt = date
-        } else {
-            let checkIn = CheckIn(date: day, mood: CheckIn.Mood(score), updatedAt: date)
-            context.insert(CheckInRecord.make(from: checkIn))
-        }
+        // 하루 1개 원칙은 CheckInRecorder 한 곳에 있다. 워치에서 올라온 기분과
+        // 오늘 화면에서 고른 기분이 같은 줄을 고쳐 쓴다.
+        CheckInRecorder.recordMood(score: score, on: date, at: date, in: context)
         save("기분 기록")
-    }
-
-    /// 그 시간대에 예정된 1회 개수. 스케줄을 못 찾으면 1정으로 둔다.
-    private func scheduledQuantity(for medicationID: UUID, slotKey: String) -> Decimal {
-        let descriptor = FetchDescriptor<ScheduleRecord>(
-            predicate: #Predicate { $0.medicationID == medicationID && $0.slotKey == slotKey }
-        )
-        guard let matches = try? context.fetch(descriptor), let first = matches.first else { return 1 }
-        return first.dosePerIntake
     }
 
     private func save(_ what: String) {

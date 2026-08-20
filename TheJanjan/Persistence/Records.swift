@@ -432,6 +432,56 @@ final class SymptomEntryRecord {
     }
 }
 
+@Model
+final class PrescriptionRecord {
+
+    var id: UUID = UUID()
+    var visitDate: Date = Date()
+    var daysSupplied: Int = 0
+    var nextVisitDate: Date?
+    var clinicNote: String = ""
+    /// UUID.uuidString 목록. 관계를 쓰지 않는 규칙 그대로 문자열로 담는다.
+    var medicationIDValues: [String] = []
+
+    init(
+        id: UUID = UUID(),
+        visitDate: Date = Date(),
+        daysSupplied: Int = 0,
+        nextVisitDate: Date? = nil,
+        clinicNote: String = "",
+        medicationIDValues: [String] = []
+    ) {
+        self.id = id
+        self.visitDate = visitDate
+        self.daysSupplied = daysSupplied
+        self.nextVisitDate = nextVisitDate
+        self.clinicNote = clinicNote
+        self.medicationIDValues = medicationIDValues
+    }
+
+    static func make(from core: Prescription) -> PrescriptionRecord {
+        PrescriptionRecord(
+            id: core.id,
+            visitDate: core.visitDate,
+            daysSupplied: core.daysSupplied,
+            nextVisitDate: core.nextVisitDate,
+            clinicNote: core.clinicNote,
+            medicationIDValues: core.medicationIDs.map(\.uuidString)
+        )
+    }
+
+    var core: Prescription {
+        Prescription(
+            id: id,
+            visitDate: visitDate,
+            daysSupplied: daysSupplied,
+            nextVisitDate: nextVisitDate,
+            clinicNote: clinicNote,
+            medicationIDs: medicationIDValues.compactMap(UUID.init(uuidString:))
+        )
+    }
+}
+
 /// 스키마 한 곳. ModelContainer 와 테스트가 같은 목록을 쓴다.
 enum JanjanSchema {
     static let allModels: [any PersistentModel.Type] = [
@@ -440,6 +490,7 @@ enum JanjanSchema {
         DoseEventRecord.self,
         StockEventRecord.self,
         CheckInRecord.self,
-        SymptomEntryRecord.self
+        SymptomEntryRecord.self,
+        PrescriptionRecord.self
     ]
 }

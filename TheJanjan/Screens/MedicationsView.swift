@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import JanjanCore
 
 /// 약 — 처방·재고 관리 (설계 03절).
@@ -7,7 +8,17 @@ import JanjanCore
 /// InventoryCalculator 가 사건에서 매번 다시 계산한 값이다.
 struct MedicationsView: View {
 
+    @Environment(\.modelContext) private var context
+
+    @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+    @Query private var stockRecords: [StockEventRecord]
+    @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
+    private var prescriptionRecords: [PrescriptionRecord]
+
     @State private var isShowingAddFlow = false
+    @State private var pendingDeletion: Row?
 
     private var today: Date { Date() }
 
@@ -15,6 +26,9 @@ struct MedicationsView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    if sections.isEmpty {
+                        emptyCard
+                    }
                     ForEach(sections, id: \.title) { section in
                         sectionHeader(section.title)
                         ForEach(section.rows) { row in
@@ -38,15 +52,33 @@ struct MedicationsView: View {
             .sheet(isPresented: $isShowingAddFlow) {
                 AddMedicationEntryView()
             }
+            .confirmationDialog(
+                "이 약의 기록을 모두 지울까요?",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    // 바깥을 눌러 닫았을 때도 고른 줄을 놓아 준다.
+                    // .constant 로 두면 한 번 닫힌 뒤 다시는 열리지 않는다.
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingDeletion
+            ) { row in
+                Button("삭제", role: .destructive) { delete(row) }
+                Button("취소", role: .cancel) { pendingDeletion = nil }
+            } message: { row in
+                Text("\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.")
+            }
         }
     }
 
     // MARK: - 데이터
 
-    private struct Row: Identifiable {
+    struct Row: Identifiable {
         let id: UUID
         let medication: Medication
         let snapshot: InventoryCalculator.Snapshot
+        /// 재고를 한 번도 세지 않았으면 잔여를 숫자로 말하지 않는다.
+        let hasStock: Bool
     }
 
     private struct RowGroup {
@@ -54,23 +86,37 @@ struct MedicationsView: View {
         let rows: [Row]
     }
 
-    private var rows: [Row] {
-        let stock = SampleData.stockEvents(referenceDate: today)
-        let doses = SampleData.doseEvents(referenceDate: today)
-        let nextVisit = SampleData.prescription(referenceDate: today).nextVisitDate
+    private var medications: [Medication] { medicationRecords.map(\.core) }
+    private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+    private var doseEvents: [DoseEvent] { doseRecords.map(\.core) }
+    private var stockEvents: [StockEvent] { stockRecords.map(\.core) }
 
-        return SampleData.medications.map { medication in
+    /// 가장 가까운 다음 진료. 부족 판단의 기준선이다.
+    private var nextVisit: Date? {
+        prescriptionRecords
+            .compactMap { $0.core.nextVisitDate }
+            .filter { $0 >= today }
+            .min()
+    }
+
+    private var rows: [Row] {
+        let stock = stockEvents
+        let doses = doseEvents
+        let visit = nextVisit
+
+        return medications.map { medication in
             Row(
                 id: medication.id,
                 medication: medication,
                 snapshot: InventoryCalculator.snapshot(
                     medicationID: medication.id,
-                    schedules: SampleData.schedules,
+                    schedules: schedules,
                     stockEvents: stock,
                     doseEvents: doses,
-                    nextVisit: nextVisit,
+                    nextVisit: visit,
                     asOf: today
-                )
+                ),
+                hasStock: stock.contains { $0.medicationID == medication.id }
             )
         }
     }
@@ -78,13 +124,32 @@ struct MedicationsView: View {
     private var sections: [RowGroup] {
         let all = rows
         return [
-            RowGroup(title: "복용 중", rows: all.filter { $0.medication.kind == .scheduled }),
-            RowGroup(title: "필요시", rows: all.filter { $0.medication.kind == .asNeeded })
+            RowGroup(title: "복용 중", rows: all.filter {
+                $0.medication.status == .active && $0.medication.kind == .scheduled
+            }),
+            RowGroup(title: "필요시", rows: all.filter {
+                $0.medication.status == .active && $0.medication.kind == .asNeeded
+            }),
+            RowGroup(title: "중단", rows: all.filter { $0.medication.status == .stopped })
         ]
         .filter { !$0.rows.isEmpty }
     }
 
     // MARK: - 조각
+
+    private var emptyCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                Text("첫 약을 등록해 볼까요")
+                    .font(JanjanFont.display(20))
+                    .foregroundStyle(Color.ink)
+                Text("오른쪽 아래 + 를 누르면 이름과 시간만으로 시작할 수 있어요.")
+                    .font(JanjanFont.body(13))
+                    .foregroundStyle(Color.muted)
+            }
+        }
+        .padding(.top, CGFloat(JanjanSpacing.s))
+    }
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
@@ -117,10 +182,16 @@ struct MedicationsView: View {
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(DecimalQuantity.display(row.snapshot.remaining))정")
-                        .font(JanjanFont.display(20))
-                        .foregroundStyle(Color.ink)
-                        .monospacedDigit()
+                    if row.hasStock {
+                        Text("\(DecimalQuantity.display(row.snapshot.remaining))정")
+                            .font(JanjanFont.display(20))
+                            .foregroundStyle(Color.ink)
+                            .monospacedDigit()
+                    } else {
+                        Text("재고 미기록")
+                            .font(JanjanFont.body(13))
+                            .foregroundStyle(Color.muted)
+                    }
                     if let text = runOutText(row) {
                         Text(text)
                             .font(JanjanFont.body(12))
@@ -129,16 +200,43 @@ struct MedicationsView: View {
                 }
             }
         }
+        .contextMenu {
+            if row.medication.status == .active {
+                Button("복용 중단") {
+                    MedicationStore.setStatus(.stopped, for: row.id, in: context)
+                    rescheduleReminders()
+                }
+            } else {
+                Button("다시 복용") {
+                    MedicationStore.setStatus(.active, for: row.id, in: context)
+                    rescheduleReminders()
+                }
+            }
+            Button("삭제", role: .destructive) { pendingDeletion = row }
+        }
     }
 
     private func runOutText(_ row: Row) -> String? {
+        guard row.hasStock else { return nil }
+        if let shortfall = row.snapshot.shortfallDays, shortfall > 0 {
+            return "진료 전 \(shortfall)일 모자람"
+        }
         guard let days = row.snapshot.daysRemaining else { return nil }
         let whole = DecimalQuantity.floorToInt(days)
         guard whole >= 0 else { return nil }
-        if let shortfall = row.snapshot.shortfallDays {
-            return "진료 전 \(shortfall)일 모자람"
-        }
         return "약 \(whole)일치"
+    }
+
+    // MARK: - 손대기
+
+    private func delete(_ row: Row) {
+        MedicationStore.delete(medicationID: row.id, in: context)
+        pendingDeletion = nil
+        rescheduleReminders()
+    }
+
+    private func rescheduleReminders() {
+        Task { await ReminderPlanner.reschedule(using: context) }
     }
 }
 
@@ -146,6 +244,7 @@ struct MedicationsView: View {
 private struct AddMedicationEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
+    @State private var isShowingForm = false
 
     var body: some View {
         NavigationStack {
@@ -155,7 +254,7 @@ private struct AddMedicationEntryView: View {
                     subtitle: "이름 · 용량 · 시간을 하나씩 적어요.",
                     systemImage: "square.and.pencil"
                 ) {
-                    // TODO: 약 등록 폼 (이름 검색 → 용량 → 시간대 → 재고)
+                    isShowingForm = true
                 }
 
                 entryRow(
@@ -179,6 +278,9 @@ private struct AddMedicationEntryView: View {
                     Button("닫기") { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
+            }
+            .navigationDestination(isPresented: $isShowingForm) {
+                MedicationFormView { dismiss() }
             }
         }
     }
@@ -212,5 +314,6 @@ private struct AddMedicationEntryView: View {
 
 #Preview {
     MedicationsView()
+        .modelContainer(for: JanjanSchema.allModels, inMemory: true)
         .environmentObject(ProStore())
 }

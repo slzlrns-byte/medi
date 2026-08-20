@@ -229,6 +229,7 @@ final class NotificationManager: NSObject {
             medicationIDs: payload.medicationIDs,
             slotKey: payload.slotKey,
             action: action,
+            source: .notificationAction,
             at: date
         )
     }

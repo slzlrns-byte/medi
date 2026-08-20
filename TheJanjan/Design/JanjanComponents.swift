@@ -177,3 +177,54 @@ struct MedicalDisclaimer: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+/// 흰 카드 안에 들어가는 한 줄 입력칸.
+/// 테두리를 그리지 않고 라벨과 여백으로만 나눈다 — 화면에 선을 늘리지 않기 위해서다.
+struct JanjanField: View {
+
+    let label: String
+    var placeholder: String = ""
+    var keyboard: UIKeyboardType = .default
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+            Text(label)
+                .font(JanjanFont.body(12, weight: .medium))
+                .foregroundStyle(Color.muted)
+            TextField(placeholder, text: $text)
+                .font(JanjanFont.body(16))
+                .foregroundStyle(Color.ink)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 눌러서 켜고 끄는 알약. 요일·시간대처럼 여러 개를 고를 때.
+/// 켜지면 바탕과 글자가 함께 뒤집힌다. 색맹·저시력에서도 명도 차이로 구별된다.
+struct TogglePill: View {
+
+    let text: String
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(JanjanFont.body(14, weight: .medium))
+                .foregroundStyle(Color.janjan(isOn ? .surface : .ink2))
+                .frame(minWidth: 40)
+                .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                .padding(.vertical, CGFloat(JanjanSpacing.xs))
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.janjan(isOn ? .ink : .surface2))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
+    }
+}

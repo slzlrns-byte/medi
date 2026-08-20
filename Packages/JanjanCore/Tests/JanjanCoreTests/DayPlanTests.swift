@@ -270,6 +270,36 @@ final class DayPlanTests: XCTestCase {
         XCTAssertNil(plan(doses: bedtime)[0].entries[0].status)
     }
 
+    func testLateNightDoseStaysOnItsScheduledDay() {
+        // 어젯밤 22:30 취침약을 자정 넘겨 00:10 에 먹은 경우.
+        // 실제 복용 시각은 다음 날이지만 그 줄은 여전히 어제의 취침 줄이다.
+        let doses = [
+            DoseEvent(
+                medicationID: Fixed.medB,
+                scheduledAt: Fixed.date(2026, 8, 17, 22, 30),
+                actualAt: Fixed.date(2026, 8, 18, 0, 10),
+                status: .taken,
+                quantity: Fixed.decimal("0.5"),
+                kind: .scheduled,
+                slotKey: DoseSlot.bedtime.storageKey
+            )
+        ]
+
+        let today = plan(doses: doses)
+        XCTAssertEqual(today[1].entries[0].status, .taken)
+        XCTAssertTrue(today[1].isCompleted)
+
+        // 다음 날 취침 줄은 아직 비어 있어야 한다.
+        let tomorrow = DayPlan.slots(
+            on: Fixed.date(2026, 8, 18, 9, 0),
+            schedules: schedules,
+            medications: medications,
+            doseEvents: doses,
+            calendar: Fixed.calendar
+        )
+        XCTAssertNil(tomorrow[1].entries[0].status)
+    }
+
     // MARK: - 요약
 
     func testPendingCounts() {
@@ -337,6 +367,101 @@ final class DayPlanTests: XCTestCase {
         XCTAssertNil(
             DayPlan.nextPendingSlot(in: slots, at: monday, calendar: Fixed.calendar)
         )
+    }
+
+    // MARK: - 알림 목록
+
+    func testWeeklyRemindersCoverEveryWeekday() {
+        let reminders = DayPlan.weeklyReminders(
+            schedules: schedules,
+            medications: medications,
+            asOf: monday
+        )
+        // 시간대 2개 × 요일 7일.
+        XCTAssertEqual(reminders.count, 14)
+    }
+
+    func testWeekdayOnlyMedicationDoesNotAppearOnOtherDays() {
+        // 월요일만 먹는 약과 매일 먹는 약이 같은 아침 시간대에 있을 때,
+        // 화요일 알림 문구에 월요일 약 이름이 끼면 안 된다.
+        let mixed = [
+            Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1),
+            Schedule(
+                medicationID: Fixed.medB,
+                slot: .morning,
+                weekdays: [.monday],
+                dosePerIntake: 1
+            )
+        ]
+
+        let reminders = DayPlan.weeklyReminders(
+            schedules: mixed,
+            medications: medications,
+            asOf: monday
+        )
+
+        let mondayMorning = reminders.first { $0.weekday == .monday && $0.slot == .morning }
+        XCTAssertEqual(mondayMorning?.medicationIDs.count, 2)
+
+        let tuesdayMorning = reminders.first { $0.weekday == .tuesday && $0.slot == .morning }
+        XCTAssertEqual(tuesdayMorning?.medicationIDs, [Fixed.medA])
+        XCTAssertEqual(tuesdayMorning?.medicationNames, ["에스시탈로프람"])
+    }
+
+    func testEndedScheduleMakesNoReminder() {
+        let ended = [
+            Schedule(
+                medicationID: Fixed.medA,
+                slot: .morning,
+                dosePerIntake: 1,
+                endDate: Fixed.date(2026, 8, 10, 9, 0)
+            )
+        ]
+        XCTAssertTrue(
+            DayPlan.weeklyReminders(schedules: ended, medications: medications, asOf: monday).isEmpty
+        )
+    }
+
+    func testStoppedMedicationMakesNoReminder() {
+        let stopped = [Medication(id: Fixed.medA, name: "에스시탈로프람", status: .stopped)]
+        let onlyA = [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)]
+        XCTAssertTrue(
+            DayPlan.weeklyReminders(schedules: onlyA, medications: stopped, asOf: monday).isEmpty
+        )
+    }
+
+    func testReminderIdentifiersAreUnique() {
+        // 알림 식별자가 겹치면 나중 것이 앞의 것을 조용히 덮어써 알림이 사라진다.
+        let reminders = DayPlan.weeklyReminders(
+            schedules: schedules,
+            medications: medications,
+            asOf: monday
+        )
+        XCTAssertEqual(Set(reminders.map(\.id)).count, reminders.count)
+    }
+
+    func testReminderTakesEarliestTimeInSlot() {
+        let two = [
+            Schedule(
+                medicationID: Fixed.medA,
+                slot: .morning,
+                timeOfDay: TimeOfDay(hour: 9, minute: 30),
+                dosePerIntake: 1
+            ),
+            Schedule(
+                medicationID: Fixed.medB,
+                slot: .morning,
+                timeOfDay: TimeOfDay(hour: 7, minute: 15),
+                dosePerIntake: 1
+            )
+        ]
+
+        let reminders = DayPlan.weeklyReminders(
+            schedules: two,
+            medications: medications,
+            asOf: monday
+        )
+        XCTAssertEqual(reminders.first?.time, TimeOfDay(hour: 7, minute: 15))
     }
 
     // MARK: - 워치 스냅샷

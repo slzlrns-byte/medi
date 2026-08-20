@@ -114,10 +114,13 @@ public enum DayPlan {
         }
 
         // 그 날의 정기 예정분 사건만 미리 추려 둔다. 스케줄마다 전체를 훑지 않기 위해서다.
+        //
+        // 실제 복용 시각이 아니라 **예정 시각**으로 날짜를 가른다.
+        // 어젯밤 22:30 취침약을 자정 넘겨 00:10 에 먹었어도 그것은 어제의 취침 줄이다.
         var eventsByKey: [String: [DoseEvent]] = [:]
         for event in doseEvents {
             guard event.kind == .scheduled, let slotKey = event.slotKey else { continue }
-            guard calendar.isDate(event.effectiveDate, inSameDayAs: day) else { continue }
+            guard calendar.isDate(event.scheduledAt, inSameDayAs: day) else { continue }
             eventsByKey["\(event.medicationID.uuidString)|\(slotKey)", default: []].append(event)
         }
 
@@ -188,6 +191,102 @@ public enum DayPlan {
         let pending = slots.filter { !$0.isCompleted }
         // 아직 오지 않은 시간대가 있으면 그 중 가장 이른 것, 다 지났으면 지난 것 중 가장 이른 것.
         return pending.first { $0.sortKey >= minutes } ?? pending.first
+    }
+
+    // MARK: - 알림 목록
+
+    /// 한 주에 한 번씩 반복되는 알림 한 건. 요일마다 따로 만든다.
+    public struct WeeklyReminder: Identifiable, Hashable, Sendable {
+
+        public let slot: DoseSlot
+        public let weekday: Weekday
+        public let time: TimeOfDay
+        public let medicationIDs: [UUID]
+        public let medicationNames: [String]
+
+        public var id: String { "\(slot.storageKey)-\(weekday.rawValue)" }
+
+        public init(
+            slot: DoseSlot,
+            weekday: Weekday,
+            time: TimeOfDay,
+            medicationIDs: [UUID],
+            medicationNames: [String]
+        ) {
+            self.slot = slot
+            self.weekday = weekday
+            self.time = time
+            self.medicationIDs = medicationIDs
+            self.medicationNames = medicationNames
+        }
+    }
+
+    /// 알림으로 깔 목록.
+    ///
+    /// 시간대 하나에 요일 하나씩 따로 만든다. 시간대별로 요일을 합쳐 버리면,
+    /// 월요일만 먹는 약이 화요일 알림 문구에도 이름을 올린다.
+    public static func weeklyReminders(
+        schedules: [Schedule],
+        medications: [Medication],
+        asOf now: Date = Date()
+    ) -> [WeeklyReminder] {
+
+        var active: [UUID: Medication] = [:]
+        for medication in medications where medication.status == .active {
+            active[medication.id] = medication
+        }
+
+        // 이미 끝난 스케줄은 알림을 남기지 않는다. 시작 전 스케줄은 남긴다 —
+        // 알림은 매주 반복이라 시작일이 오면 저절로 맞아떨어진다.
+        let live = schedules.filter { schedule in
+            guard active[schedule.medicationID] != nil else { return false }
+            if let end = schedule.endDate, end < now { return false }
+            return true
+        }
+
+        var reminders: [WeeklyReminder] = []
+
+        for weekday in Weekday.allCases {
+            let onThatDay = live.filter { $0.weekdays.contains(weekday) }
+            let grouped = Dictionary(grouping: onThatDay, by: { $0.slot.storageKey })
+
+            for (key, group) in grouped {
+                guard let slot = DoseSlot(storageKey: key) else { continue }
+
+                let sorted = group.sorted { lhs, rhs in
+                    if lhs.timeOfDay != rhs.timeOfDay { return lhs.timeOfDay < rhs.timeOfDay }
+                    return lhs.id.uuidString < rhs.id.uuidString
+                }
+                guard let earliest = sorted.first else { continue }
+
+                // 한 약이 같은 시간대에 두 줄이면 이름이 두 번 나오지 않게 한 번만 싣는다.
+                var seen: Set<UUID> = []
+                var ids: [UUID] = []
+                var names: [String] = []
+                for schedule in sorted where seen.insert(schedule.medicationID).inserted {
+                    guard let medication = active[schedule.medicationID] else { continue }
+                    ids.append(medication.id)
+                    names.append(medication.name)
+                }
+
+                guard !ids.isEmpty else { continue }
+                reminders.append(
+                    WeeklyReminder(
+                        slot: slot,
+                        weekday: weekday,
+                        time: earliest.timeOfDay,
+                        medicationIDs: ids,
+                        medicationNames: names
+                    )
+                )
+            }
+        }
+
+        return reminders.sorted { lhs, rhs in
+            if lhs.weekday != rhs.weekday { return lhs.weekday < rhs.weekday }
+            if lhs.time != rhs.time { return lhs.time < rhs.time }
+            return lhs.slot.storageKey < rhs.slot.storageKey
+        }
     }
 
     // MARK: - 워치 스냅샷

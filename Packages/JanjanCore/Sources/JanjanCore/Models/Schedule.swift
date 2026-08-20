@@ -69,6 +69,12 @@ public enum Weekday: Int, Codable, Sendable, CaseIterable, Comparable {
 
     public static let everyday: Set<Weekday> = Set(Weekday.allCases)
 
+    /// 화면에 늘어놓는 순서. `allCases` 는 Calendar 규약대로 일요일부터라
+    /// 그대로 그리면 한국 달력과 어긋난다.
+    public static let displayOrderKo: [Weekday] = [
+        .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
+    ]
+
     public static func from(date: Date, calendar: Calendar = .current) -> Weekday {
         Weekday(rawValue: calendar.component(.weekday, from: date)) ?? .monday
     }
