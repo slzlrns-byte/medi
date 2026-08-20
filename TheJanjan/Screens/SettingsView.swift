@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import JanjanCore
 
 /// 설정 — 오늘 탭 우상단 톱니에서 올라온다 (설계 03절).
@@ -6,6 +7,7 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.modelContext) private var context
     @EnvironmentObject private var lock: AppLockManager
     @EnvironmentObject private var pro: ProStore
 
@@ -13,6 +15,7 @@ struct SettingsView: View {
 
     @State private var isShowingDeleteConfirmation = false
     @State private var isShowingPaywall = false
+    @State private var isShowingLicenses = false
 
     var body: some View {
         NavigationStack {
@@ -42,12 +45,13 @@ struct SettingsView: View {
                 isPresented: $isShowingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("삭제", role: .destructive) {
-                    // TODO: SwiftData 저장소 전체 삭제 + iCloud 레코드 삭제
-                }
+                Button("삭제", role: .destructive) { deleteEverything() }
                 Button("취소", role: .cancel) {}
             } message: {
-                Text("되돌릴 수 없습니다. 기록·약·설정이 모두 사라집니다.")
+                Text(deleteWarningKo)
+            }
+            .sheet(isPresented: $isShowingLicenses) {
+                LicenseNoticeView()
             }
         }
     }
@@ -231,8 +235,9 @@ struct SettingsView: View {
                     .foregroundStyle(Color.ink)
             }
             Button("오픈소스 라이선스") {
-                // TODO: SUIT · Pretendard (SIL OFL 1.1) 고지 화면
+                isShowingLicenses = true
             }
+            .foregroundStyle(Color.ink)
             LabeledContent("버전") {
                 Text(appVersionText)
                     .foregroundStyle(Color.muted)
@@ -245,6 +250,25 @@ struct SettingsView: View {
         }
     }
 
+    /// iCloud 를 쓰는 중이면 삭제가 동기화를 타고 다른 기기에서도 사라진다.
+    /// 그 사실을 누르기 전에 말해 준다.
+    private var deleteWarningKo: String {
+        let base = "되돌릴 수 없습니다. 기록·약·설정이 모두 사라집니다."
+        guard JanjanModelContainer.activeStorage == .cloudKit else { return base }
+        return base + " iCloud 로 연결된 다른 기기에서도 사라집니다."
+    }
+
+    /// 저장된 것을 전부 지운다.
+    ///
+    /// 지우는 순서가 중요하다. 알림을 먼저 걷어야 이미 예약된 알림이
+    /// 사라진 약의 이름을 잠금화면에 띄우는 일이 없다.
+    /// iCloud 레코드는 따로 부를 것이 없다 — SwiftData 가 지운 행이 그대로 동기화된다.
+    private func deleteEverything() {
+        NotificationManager.shared.cancelAllDoseReminders()
+        MedicationStore.deleteEverything(in: context)
+        AppServices.shared.pushWatchSnapshot()
+    }
+
     private var appVersionText: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "—"
@@ -253,8 +277,59 @@ struct SettingsView: View {
     }
 }
 
+/// 번들 서체 고지 (SIL OFL 1.1).
+///
+/// 원본은 서체와 같은 폴더의 `OFL-NOTICE.txt` 다. 파일 하나만 두고 화면이 그걸 읽는다 —
+/// 같은 문구를 코드에도 적어 두면 서체를 갈아 끼울 때 한쪽만 고치게 된다.
+private struct LicenseNoticeView: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(noticeText)
+                    .font(JanjanFont.body(13))
+                    .foregroundStyle(Color.ink2)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(CGFloat(JanjanSpacing.m))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle("오픈소스 라이선스")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+    }
+
+    private var noticeText: String {
+        guard let url = Bundle.main.url(forResource: "OFL-NOTICE", withExtension: "txt"),
+              let text = try? String(contentsOf: url, encoding: .utf8)
+        else { return Self.fallbackKo }
+        return text
+    }
+
+    /// 번들에서 못 찾았을 때도 고지 없이 넘어가지는 않는다 — OFL 이 요구하는 것이다.
+    private static let fallbackKo = """
+    번들 서체 라이선스 고지 (SIL Open Font License 1.1)
+
+    Pretendard (c) Kil Hyung-jin — https://github.com/orioncactus/pretendard
+    SUIT (c) SUNN — https://github.com/sun-typeface/SUIT
+
+    두 서체 모두 SIL Open Font License 1.1 로 배포됩니다.
+    전문: https://openfontlicense.org
+    """
+}
+
 #Preview {
     SettingsView()
         .environmentObject(AppLockManager())
         .environmentObject(ProStore())
+        .modelContainer(for: JanjanSchema.allModels, inMemory: true)
 }

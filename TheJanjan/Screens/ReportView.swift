@@ -1,11 +1,31 @@
 import SwiftUI
+import SwiftData
 import JanjanCore
 
 /// 리포트 — 진료 준비 (설계 03절).
 ///
-/// 골격에서는 지난 4주 복약률과 약별 잔여만 보여 준다.
-/// 추이선·PDF·CSV 는 Pro 범위이고 다음 단계에서 붙인다.
+/// 지난 4주 복약률과 약별 잔여를 보여 주고, 같은 내용을 PDF 한 장으로 낸다.
+/// 무엇을 적을지는 `ReportComposer` 가 정한다 — 화면과 PDF 가 다른 말을 하지 않도록.
 struct ReportView: View {
+
+    @Query private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+    @Query private var stockRecords: [StockEventRecord]
+    @Query private var checkInRecords: [CheckInRecord]
+    @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
+    private var prescriptionRecords: [PrescriptionRecord]
+
+    /// 진료 전에 적어 두는 메모. 이 기기에만 남는다.
+    @AppStorage("janjan.report.questions") private var questions = ""
+
+    @State private var exportURL: ExportedFile?
+    @State private var isExporting = false
+
+    private struct ExportedFile: Identifiable {
+        let url: URL
+        var id: String { url.absoluteString }
+    }
 
     private var today: Date { Date() }
 
@@ -26,19 +46,36 @@ struct ReportView: View {
             .fogBackground()
             .scrollContentBackground(.hidden)
             .navigationTitle("리포트")
+            .sheet(item: $exportURL) { file in
+                ShareSheet(items: [file.url])
+            }
         }
     }
 
     // MARK: - 데이터
 
-    private var doses: [DoseEvent] { SampleData.doseEvents(referenceDate: today) }
-    private var stock: [StockEvent] { SampleData.stockEvents(referenceDate: today) }
+    private var medications: [Medication] { medicationRecords.map(\.core) }
+    private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+    private var doses: [DoseEvent] { doseRecords.map(\.core) }
+    private var stock: [StockEvent] { stockRecords.map(\.core) }
+    private var checkIns: [CheckIn] { checkInRecords.map(\.core) }
+
+    private var nextVisit: Date? {
+        prescriptionRecords
+            .compactMap { $0.core.nextVisitDate }
+            .filter { $0 >= today }
+            .min()
+    }
 
     private var overallAdherence: Decimal? {
         InventoryCalculator.adherenceRate(
             doseEvents: doses,
             last28DaysEndingAt: today
         )
+    }
+
+    private var activeMedications: [Medication] {
+        medications.filter { $0.status == .active }
     }
 
     // MARK: - 조각
@@ -94,25 +131,38 @@ struct ReportView: View {
                     .font(JanjanFont.display(20))
                     .foregroundStyle(Color.ink)
 
-                ForEach(SampleData.medications) { medication in
-                    let remaining = InventoryCalculator.remaining(
-                        for: medication.id,
-                        stockEvents: stock,
-                        doseEvents: doses,
-                        asOf: today
-                    )
-                    HStack {
-                        Text(medication.displayTitle)
-                            .font(JanjanFont.body(15))
-                            .foregroundStyle(Color.ink2)
-                        Spacer()
-                        Text("\(DecimalQuantity.display(remaining))정")
-                            .font(JanjanFont.body(15, weight: .medium))
-                            .foregroundStyle(Color.ink)
-                            .monospacedDigit()
-                    }
+                if activeMedications.isEmpty {
+                    Text("등록된 약이 없어요.")
+                        .font(JanjanFont.body(13))
+                        .foregroundStyle(Color.muted)
+                }
+
+                ForEach(activeMedications) { medication in
+                    medicationLine(medication)
                 }
             }
+        }
+    }
+
+    private func medicationLine(_ medication: Medication) -> some View {
+        let counted = stock.contains { $0.medicationID == medication.id }
+        let remaining = InventoryCalculator.remaining(
+            for: medication.id,
+            stockEvents: stock,
+            doseEvents: doses,
+            asOf: today
+        )
+
+        return HStack {
+            Text(medication.displayTitle)
+                .font(JanjanFont.body(15))
+                .foregroundStyle(Color.ink2)
+            Spacer()
+            // 한 번도 세지 않았으면 0정이라고 말하지 않는다.
+            Text(counted ? "\(DecimalQuantity.display(remaining))정" : "재고 미기록")
+                .font(JanjanFont.body(15, weight: counted ? .medium : .light))
+                .foregroundStyle(counted ? Color.ink : Color.muted)
+                .monospacedDigit()
         }
     }
 
@@ -125,12 +175,13 @@ struct ReportView: View {
                     .foregroundStyle(Color.ink)
 
                 WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {
-                    // TODO: 4주 요약 PDF 생성 (하단에 면책 한 줄 포함) → 공유 시트
+                    export()
                 }
                 .overlay(
                     Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
                 )
                 .proGated(.reports)
+                .disabled(isExporting)
 
                 Text("만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.")
                     .font(JanjanFont.body(12))
@@ -146,15 +197,56 @@ struct ReportView: View {
                 Text("의사에게 물어볼 것")
                     .font(JanjanFont.display(20))
                     .foregroundStyle(Color.ink)
-                Text("진료 전에 여기 적어 두면 리포트에 함께 나갑니다.")
-                    .font(JanjanFont.body(13))
+
+                TextEditor(text: $questions)
+                    .font(JanjanFont.body(14))
+                    .foregroundStyle(Color.ink)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 92)
+                    .overlay(alignment: .topLeading) {
+                        if questions.isEmpty {
+                            Text("한 줄에 하나씩 적어 두면 리포트에 함께 나가요.")
+                                .font(JanjanFont.body(14))
+                                .foregroundStyle(Color.muted)
+                                .allowsHitTesting(false)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                        }
+                    }
+
+                Text("이 메모는 이 기기에만 남고 iCloud 로 넘어가지 않아요.")
+                    .font(JanjanFont.body(12))
                     .foregroundStyle(Color.muted)
             }
+        }
+    }
+
+    // MARK: - 내보내기
+
+    private func export() {
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
+
+        let content = ReportComposer.make(
+            endingAt: today,
+            medications: medications,
+            schedules: schedules,
+            doseEvents: doses,
+            stockEvents: stock,
+            checkIns: checkIns,
+            nextVisit: nextVisit,
+            questionsKo: questions
+        )
+
+        if let url = ReportPDF.write(content) {
+            exportURL = ExportedFile(url: url)
         }
     }
 }
 
 #Preview {
     ReportView()
+        .modelContainer(for: JanjanSchema.allModels, inMemory: true)
         .environmentObject(ProStore())
 }

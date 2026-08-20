@@ -27,7 +27,6 @@ jobs:
 
     env:
       SCHEME: TheJanjan
-      DESTINATION: "platform=iOS Simulator,name=iPhone 16,OS=latest"
 
     steps:
       - name: 체크아웃
@@ -84,13 +83,49 @@ jobs:
       - name: 순수 로직 테스트 (JanjanCore)
         run: swift test --package-path Packages/JanjanCore
 
+      # 기기 이름을 못 박지 않는다. 러너 이미지마다 깔린 시뮬레이터가 달라서
+      # "iPhone 16" 같은 이름은 언젠가 반드시 없어진다(실제로 없어져서 CI가 깨졌다).
+      # 그때그때 실제로 있는 iPhone 중 가장 최신 iOS 것을 골라 UDID 로 지목한다.
+      - name: 시뮬레이터 고르기
+        id: simulator
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]          # com.apple...iOS-18-2 -> iOS-18-2
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          best = None
+          for identifier, devices in runtimes.items():
+              if "iOS" not in identifier:
+                  continue
+              phones = [d for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not phones:
+                  continue
+              candidate = (version(identifier), identifier, phones[0])
+              if best is None or candidate[0] > best[0]:
+                  best = candidate
+
+          if best is None:
+              sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
+
+          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
+          print(best[2]["udid"])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
       - name: 앱 빌드와 테스트 (시뮬레이터, 서명 없음)
         run: |
           set -o pipefail
           xcodebuild \
             -project TheJanjan.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
             -resultBundlePath build/TheJanjan.xcresult \
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
