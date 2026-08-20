@@ -15,8 +15,8 @@ struct MedicationFormView: View {
 
     @Environment(\.modelContext) private var context
 
-    @State private var name = ""
-    @State private var strength = ""
+    @State private var name: String
+    @State private var strength: String
     @State private var purpose = ""
     @State private var form: Medication.Form = .tablet
     @State private var kind: Medication.Kind = .scheduled
@@ -24,6 +24,14 @@ struct MedicationFormView: View {
     @State private var stockText = ""
     @State private var drafts: [SlotDraft] = SlotDraft.presets()
     @State private var isSaving = false
+
+    /// - Parameter prefill: 약봉투 스캔이 읽어 온 값. 채워만 두고 사용자가 고칠 수 있다 —
+    ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
+    init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
+        self.onSaved = onSaved
+        _name = State(initialValue: prefill?.name ?? "")
+        _strength = State(initialValue: prefill?.strengthText ?? "")
+    }
 
     /// 시간대 한 줄의 초안. 켜진 것만 스케줄이 된다.
     private struct SlotDraft: Identifiable {

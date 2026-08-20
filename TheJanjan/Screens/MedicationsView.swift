@@ -245,6 +245,7 @@ private struct AddMedicationEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isShowingForm = false
+    @State private var isShowingScan = false
 
     var body: some View {
         NavigationStack {
@@ -262,7 +263,7 @@ private struct AddMedicationEntryView: View {
                     subtitle: "봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.",
                     systemImage: "camera"
                 ) {
-                    // TODO: 온디바이스 Vision 텍스트 인식 → 확인 화면 → 저장
+                    isShowingScan = true
                 }
                 .proGated(.pharmacyScan)
 
@@ -281,6 +282,9 @@ private struct AddMedicationEntryView: View {
             }
             .navigationDestination(isPresented: $isShowingForm) {
                 MedicationFormView { dismiss() }
+            }
+            .navigationDestination(isPresented: $isShowingScan) {
+                PharmacyScanView { dismiss() }
             }
         }
     }

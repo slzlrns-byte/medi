@@ -7,7 +7,10 @@ import JanjanCore
 ///
 /// 무엇을 적을지는 `ReportComposer` 가 이미 정해 두었다. 여기서는 종이에 앉히기만 한다.
 /// 파일은 임시 폴더에 만들고, 사용자가 공유 시트에서 보내지 않으면 기기 밖으로 나가지 않는다.
-@MainActor
+///
+/// MainActor 로 묶지 않는다. `writePDF` 가 넘겨주는 그리기 클로저는 격리가 없어서,
+/// 이 타입이 MainActor 면 클로저 안에서 자기 메서드조차 부를 수 없다.
+/// 그릴 때 화면을 건드리지도 않으므로 묶을 이유도 없다.
 enum ReportPDF {
 
     private static let logger = Logger(subsystem: Janjan.appBundleID, category: "report-pdf")
