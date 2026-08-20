@@ -53,8 +53,11 @@ public enum PharmacyLabelParser {
             let line = normalize(raw)
             guard isPlausibleMedicationLine(line) else { continue }
 
-            let strength = strength(in: line)
-            let name = medicationName(in: line, strength: strength)
+            // 용량을 못 찾는 봉투도 있다. 그때는 빈 문자열로 두고 사용자가 채운다.
+            // 지역 이름이 static 메서드 이름을 가리지 않도록 타입 이름으로 부른다
+            // (InventoryCalculator 에서 같은 이유로 정해 둔 규칙).
+            let strength = PharmacyLabelParser.strength(in: line) ?? ""
+            let name = PharmacyLabelParser.medicationName(in: line)
             guard name.count >= 2 else { continue }
 
             // 같은 약이 봉투에 여러 번 적히는 일이 흔하다(요일별 칸 등).
@@ -124,7 +127,7 @@ public enum PharmacyLabelParser {
     }
 
     /// 용량과 꼬리 숫자를 떼어 낸 이름.
-    static func medicationName(in line: String, strength: String?) -> String {
+    static func medicationName(in line: String) -> String {
         var name = line
 
         if let range = name.range(of: strengthPattern, options: [.regularExpression, .caseInsensitive]) {
