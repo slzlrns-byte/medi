@@ -228,3 +228,43 @@ struct TogglePill: View {
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
     }
 }
+
+/// 숫자를 하나씩 올리고 내리는 줄.
+///
+/// 시스템 `Stepper` 는 회색 시스템 컨트롤이라 "칩과 버튼은 완전한 알약" 규칙(설계 02절)과
+/// 어긋난다. 개수·세기·시간처럼 눈금이 있는 값은 전부 이걸 쓴다.
+struct CountStepper: View {
+
+    let text: String
+    var decreaseLabelKo: String = "줄이기"
+    var increaseLabelKo: String = "늘리기"
+    let onDecrease: () -> Void
+    let onIncrease: () -> Void
+
+    var body: some View {
+        HStack(spacing: CGFloat(JanjanSpacing.s)) {
+            button("minus", label: decreaseLabelKo, action: onDecrease)
+
+            Text(text)
+                .font(JanjanFont.body(14))
+                .foregroundStyle(Color.ink2)
+                .monospacedDigit()
+
+            button("plus", label: increaseLabelKo, action: onIncrease)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func button(
+        _ systemImage: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            CircleGlyph(systemImage: systemImage, background: .surface2, diameter: 30)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(label))
+    }
+}

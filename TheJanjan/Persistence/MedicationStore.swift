@@ -46,6 +46,34 @@ enum MedicationStore {
         return draft.medication.id
     }
 
+    /// 한 번의 진료로 받아 온 처방과, 그때 채운 약들을 함께 저장한다.
+    ///
+    /// 보충은 **정정이 아니라 refill** 이다. 정정은 기준점을 새로 세워 그 이전을 지워 버리지만,
+    /// 처방은 있던 것 위에 더해지는 사건이라서다(설계 05절).
+    @discardableResult
+    static func add(
+        prescription: Prescription,
+        refills: [(medicationID: UUID, quantity: Decimal)],
+        at moment: Date = Date(),
+        in context: ModelContext
+    ) -> UUID {
+
+        context.insert(PrescriptionRecord.make(from: prescription))
+
+        for refill in refills where refill.quantity > 0 {
+            let event = StockEvent.refill(
+                medicationID: refill.medicationID,
+                quantity: refill.quantity,
+                at: moment,
+                prescriptionID: prescription.id
+            )
+            context.insert(StockEventRecord.make(from: event))
+        }
+
+        save("처방 기록", in: context)
+        return prescription.id
+    }
+
     /// 복용 중 ↔ 중단. 기록은 그대로 두고 앞으로의 일정에서만 뺀다.
     static func setStatus(_ status: Medication.Status, for medicationID: UUID, in context: ModelContext) {
         guard let record = medicationRecord(medicationID, in: context) else { return }

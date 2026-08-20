@@ -18,6 +18,7 @@ struct MedicationsView: View {
     private var prescriptionRecords: [PrescriptionRecord]
 
     @State private var isShowingAddFlow = false
+    @State private var isShowingPrescription = false
     @State private var pendingDeletion: Row?
 
     private var today: Date { Date() }
@@ -26,6 +27,7 @@ struct MedicationsView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    prescriptionCard
                     if sections.isEmpty {
                         emptyCard
                     }
@@ -51,6 +53,17 @@ struct MedicationsView: View {
             }
             .sheet(isPresented: $isShowingAddFlow) {
                 AddMedicationEntryView()
+            }
+            .sheet(isPresented: $isShowingPrescription) {
+                NavigationStack {
+                    PrescriptionFormView { isShowingPrescription = false }
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("닫기") { isShowingPrescription = false }
+                                    .foregroundStyle(Color.ink)
+                            }
+                        }
+                }
             }
             .confirmationDialog(
                 "이 약의 기록을 모두 지울까요?",
@@ -136,6 +149,47 @@ struct MedicationsView: View {
     }
 
     // MARK: - 조각
+
+    /// 다음 진료와 처방 기록 입구.
+    ///
+    /// 검은 원 버튼은 화면당 하나(약 추가)라서 여기서는 흰 알약을 쓴다(설계 02절).
+    private var prescriptionCard: some View {
+        JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(nextVisitText)
+                        .font(JanjanFont.body(15, weight: .medium))
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: 0)
+                }
+
+                Text(nextVisit == nil
+                     ? "진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요."
+                     : "다음 진료 전에 모자라는 약이 있으면 약 줄에 함께 보여요.")
+                    .font(JanjanFont.body(12))
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                WhitePillButton(title: "처방 기록하기", systemImage: "doc.text") {
+                    isShowingPrescription = true
+                }
+                .overlay(
+                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                )
+            }
+        }
+        .padding(.top, CGFloat(JanjanSpacing.s))
+    }
+
+    private var nextVisitText: String {
+        guard let nextVisit else { return "다음 진료 미정" }
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: today),
+            to: Calendar.current.startOfDay(for: nextVisit)
+        ).day ?? 0
+        return days == 0 ? "오늘 진료" : "다음 진료 D-\(days)"
+    }
 
     private var emptyCard: some View {
         JanjanCard {

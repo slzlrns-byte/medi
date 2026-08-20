@@ -24,6 +24,13 @@ struct TodayView: View {
     private var prescriptionRecords: [PrescriptionRecord]
 
     @State private var openSlot: SlotSelection?
+    @State private var safetyReason: SafetyReason?
+
+    /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
+    private struct SafetyReason: Identifiable {
+        let id = UUID()
+        let reason: SafetyTrigger.Reason
+    }
 
     /// 시트에는 값이 아니라 열쇠만 들고 간다. 값을 들고 가면 기록한 뒤에도
     /// 시트가 기록 전의 옛 줄을 계속 보여 준다.
@@ -88,6 +95,9 @@ struct TodayView: View {
                     }
                     .accessibilityLabel(Text("설정"))
                 }
+            }
+            .sheet(item: $safetyReason) { _ in
+                SafetyCardView()
             }
             .sheet(item: $openSlot) { selection in
                 if let line = plan.first(where: { $0.slotKey == selection.id }) {
@@ -232,8 +242,7 @@ struct TodayView: View {
     private func moodDot(_ score: Int) -> some View {
         let isChosen = todaysMoodScore == score
         return Button {
-            CheckInRecorder.recordMood(score: score, on: today, in: context)
-            save()
+            recordMood(score)
         } label: {
             Circle()
                 .fill(Color.mood(score))
@@ -314,6 +323,22 @@ struct TodayView: View {
             in: context
         )
         save()
+    }
+
+    /// 오늘 화면에서도 기분을 고를 수 있으므로 안전 카드 판단이 여기에도 있어야 한다.
+    /// 판단 자체는 기록 탭과 같은 `SafetyTrigger` 가 한다.
+    private func recordMood(_ score: Int) {
+        let saved = CheckInRecorder.recordMood(score: score, on: today, in: context)
+        save()
+
+        var checkIns = checkInRecords
+            .filter { !Calendar.current.isDate($0.date, inSameDayAs: today) }
+            .map(\.core)
+        checkIns.append(saved.core)
+
+        if let reason = SafetyTrigger.reason(forCheckIns: checkIns, endingAt: today) {
+            safetyReason = SafetyReason(reason: reason)
+        }
     }
 
     private func save() {

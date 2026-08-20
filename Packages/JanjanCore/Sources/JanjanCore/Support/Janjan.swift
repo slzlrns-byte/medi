@@ -58,7 +58,28 @@ public enum Janjan {
         )
     ]
 
+    /// 지역별 위기 상담 연락처.
+    ///
+    /// **검증한 번호만 싣는다.** 틀린 번호를 내미는 것은 아무 번호도 없는 것보다 나쁘다.
+    /// 아직 한국만 확인했고, 다른 지역에서는 빈 목록을 돌려주고 화면이
+    /// `safetyCardWithoutContactsKo` 로 떨어진다.
+    public static func crisisContacts(regionCode: String?) -> [CrisisContact] {
+        switch regionCode?.uppercased() {
+        case "KR": return crisisContactsKR
+        default: return []
+        }
+    }
+
+    /// 기기의 지역 설정에 맞는 연락처.
+    public static var crisisContactsForCurrentRegion: [CrisisContact] {
+        crisisContacts(regionCode: Locale.current.region?.identifier)
+    }
+
     /// 안전 카드에 쓰는 문구. 경고도 진단도 아니고, 연락처를 조용히 내미는 한 문장.
     public static let safetyCardMessageKo =
         "기록은 그대로 저장됐어요. 지금 이야기할 곳이 필요하면 여기로 연락할 수 있어요."
+
+    /// 번호를 확인하지 못한 지역에서 쓰는 문장. 번호를 지어내지 않는다.
+    public static let safetyCardWithoutContactsKo =
+        "기록은 그대로 저장됐어요. 지금 이야기할 곳이 필요하면 지역의 응급 번호로 연락할 수 있어요."
 }

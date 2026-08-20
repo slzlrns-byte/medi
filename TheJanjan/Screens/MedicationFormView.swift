@@ -183,34 +183,14 @@ struct MedicationFormView: View {
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
     }
 
-    /// 1회 개수 조절. 시스템 Stepper 는 회색 시스템 컨트롤이라
-    /// "칩과 버튼은 완전한 알약" 규칙(설계 02절)과 어긋나서 직접 짠다.
     private func doseStepper(_ index: Int) -> some View {
-        HStack(spacing: CGFloat(JanjanSpacing.s)) {
-            stepButton("minus", label: "개수 줄이기") { adjust(index, by: -doseStep) }
-
-            Text("1회 \(DecimalQuantity.display(drafts[index].dose))정")
-                .font(JanjanFont.body(14))
-                .foregroundStyle(Color.ink2)
-                .monospacedDigit()
-
-            stepButton("plus", label: "개수 늘리기") { adjust(index, by: doseStep) }
-
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private func stepButton(
-        _ systemImage: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            CircleGlyph(systemImage: systemImage, background: .surface2, diameter: 30)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(label))
+        CountStepper(
+            text: "1회 \(DecimalQuantity.display(drafts[index].dose))정",
+            decreaseLabelKo: "개수 줄이기",
+            increaseLabelKo: "개수 늘리기",
+            onDecrease: { adjust(index, by: -doseStep) },
+            onIncrease: { adjust(index, by: doseStep) }
+        )
     }
 
     private var weekdayCard: some View {
