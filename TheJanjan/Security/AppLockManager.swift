@@ -85,18 +85,19 @@ final class AppLockManager: ObservableObject {
     // 화면을 다시 그릴 때마다 되풀이된다. 앱 밖(기기 설정)에서만 바뀌는 값이라
     // 한 번 재어 두고 앱이 앞으로 나올 때 다시 잰다.
 
-    @Published private(set) var canRecoverWithDevice: Bool = Self.deviceAuthAvailable()
-    @Published private(set) var biometrySymbolName: String = Self.biometrySymbol()
-    @Published private(set) var hasBiometry: Bool = Self.biometryAvailable()
+    // 초깃값에서는 `Self.` 를 쓸 수 없어(final 이어도 막힌다) 타입 이름을 그대로 적는다.
+    @Published private(set) var canRecoverWithDevice = AppLockManager.deviceAuthAvailable()
+    @Published private(set) var biometrySymbolName = AppLockManager.biometrySymbol()
+    @Published private(set) var hasBiometry = AppLockManager.biometryAvailable()
 
     /// 생체인식을 지금 쓸 수 있는가. 설정에서 껐거나 등록돼 있지 않으면 거짓.
     var canUseBiometricsNow: Bool { storedUsesBiometrics && hasBiometry }
 
     /// 기기 설정에서 Face ID 를 등록하거나 암호를 지우고 돌아왔을 수 있다.
     func refreshDeviceCapabilities() {
-        canRecoverWithDevice = Self.deviceAuthAvailable()
-        biometrySymbolName = Self.biometrySymbol()
-        hasBiometry = Self.biometryAvailable()
+        canRecoverWithDevice = AppLockManager.deviceAuthAvailable()
+        biometrySymbolName = AppLockManager.biometrySymbol()
+        hasBiometry = AppLockManager.biometryAvailable()
     }
 
     // 아래 셋은 프로퍼티 초깃값에서 불린다. @MainActor 클래스의 static 은 기본으로

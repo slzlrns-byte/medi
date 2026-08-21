@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import JanjanCore
 
@@ -57,9 +58,9 @@ struct PasscodeField: View {
 
     private var pad: some View {
         VStack(spacing: CGFloat(JanjanSpacing.m)) {
-            ForEach(Array(keys.enumerated()), id: \.offset) { _, row in
+            ForEach(keys.indices, id: \.self) { row in
                 HStack(spacing: CGFloat(JanjanSpacing.xl)) {
-                    ForEach(row, id: \.self) { key in
+                    ForEach(keys[row], id: \.self) { key in
                         keyButton(key)
                     }
                 }
