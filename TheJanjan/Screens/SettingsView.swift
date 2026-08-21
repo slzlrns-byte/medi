@@ -9,6 +9,9 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var lock: AppLockManager
+
+    /// 번호를 정하는 화면을 띄울 이유. nil 이면 닫혀 있다.
+    @State private var setupMode: PasscodeSetupView.Mode?
     @EnvironmentObject private var pro: ProStore
 
     @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
@@ -52,6 +55,10 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $isShowingLicenses) {
                 LicenseNoticeView()
+            }
+            .sheet(item: $setupMode) { mode in
+                PasscodeSetupView(mode: mode) { setupMode = nil }
+                    .environmentObject(lock)
             }
         }
     }
@@ -116,10 +123,13 @@ struct SettingsView: View {
 
     private var securitySection: some View {
         Section {
-            Toggle("앱 잠금 (Face ID / 암호)", isOn: appLockBinding)
+            Toggle("앱 잠금 (네 자리 번호)", isOn: appLockBinding)
 
             if lock.isEnabled {
-                Toggle("일기만 잠그기", isOn: diaryOnlyBinding)
+                Button("번호 바꾸기") { setupMode = .change }
+                    .foregroundStyle(Color.ink)
+
+                Toggle("생체인식으로도 열기", isOn: biometricsBinding)
 
                 Picker("다시 잠그기", selection: graceSecondsBinding) {
                     ForEach(LockPolicy.allowedGraceSeconds, id: \.self) { seconds in
@@ -134,19 +144,25 @@ struct SettingsView: View {
         }
     }
 
-    /// 켤 때는 먼저 한 번 열어 본다. 열리지 않으면 켜지 않는다 —
-    /// 잠금 방법이 없는 기기에서 사용자가 자기 기록에서 잠겨 나가는 일을 막는다.
+    /// 켤 때는 번호를 정하는 화면을 띄우고, 그 화면이 성공해야 켜진다.
+    /// 끌 때는 지금 열려 있는 사람이 누르는 것이므로 곧바로 끈다.
     private var appLockBinding: Binding<Bool> {
         Binding(
             get: { lock.isEnabled },
-            set: { wanted in Task { await lock.setEnabled(wanted) } }
+            set: { wanted in
+                if wanted {
+                    setupMode = .create
+                } else {
+                    lock.disable()
+                }
+            }
         )
     }
 
-    private var diaryOnlyBinding: Binding<Bool> {
+    private var biometricsBinding: Binding<Bool> {
         Binding(
-            get: { lock.diaryOnly },
-            set: { lock.diaryOnly = $0 }
+            get: { lock.usesBiometrics },
+            set: { lock.usesBiometrics = $0 }
         )
     }
 
@@ -160,9 +176,12 @@ struct SettingsView: View {
     private var securityFooterKo: String {
         if let message = lock.failureMessageKo { return message }
         if lock.isEnabled {
-            return "Face ID · Touch ID 또는 기기 암호로 열립니다. 일기만 잠그면 오늘 · 약 · 리포트는 그대로 열립니다."
+            guard lock.canRecoverWithDevice else {
+                return "앱을 열 때 네 자리 번호를 누릅니다. 이 기기에는 기기 암호가 없어서, 번호를 잊으면 기록을 열 방법이 없습니다."
+            }
+            return "앱을 열 때 네 자리 번호를 누릅니다. 번호를 잊으면 Face ID · Touch ID 또는 기기 암호로 되찾을 수 있습니다."
         }
-        return "Face ID · Touch ID 또는 기기 암호로 열립니다. 켤 때 한 번 확인해서, 열 수 없는 상태로 잠기는 일을 막습니다."
+        return "켜면 앱을 열 때 네 자리 번호를 누릅니다. 번호는 이 기기에만 저장되고 다른 기기로 따라가지 않습니다."
     }
 
     // MARK: - 개인정보
@@ -278,6 +297,10 @@ struct SettingsView: View {
         //  · 진료 질문 메모 — iCloud 로 안 넘어가는 대신 이 기기에 남는다.
         ReportPDF.removeExportedFiles()
         UserDefaults.standard.removeObject(forKey: ReportView.questionsDefaultsKey)
+
+        // 잠금 번호도 설정이다. "설정이 모두 사라집니다" 라고 적어 놓고 남기지 않는다.
+        // 키체인 항목은 앱을 지워도 남으므로, 여기서 걷지 않으면 새로 깔아도 따라온다.
+        lock.disable()
 
         AppServices.shared.pushWatchSnapshot()
     }

@@ -104,10 +104,11 @@ swift test --package-path Packages/JanjanCore
   상품을 못 불러와도 크래시하지 않고 `storeUnavailable` 로 알립니다(무료 기능은 그대로).
   상품 ID·Pro 경계·문구는 `JanjanCore/Pro/ProFeature.swift` 한 곳에만 있습니다.
   페이월은 `TheJanjan/Pro/PaywallView.swift`, 게이팅은 `.proGated(_:)` 한 줄입니다.
-- **`TheJanjan/Security/AppLockManager.swift`** — 앱 잠금(Face ID · Touch ID · 기기 암호).
-  앱 전용 비밀번호를 만들지 않고 `deviceOwnerAuthentication` 하나만 씁니다.
-  켤 때 먼저 인증해서 "열 수 없는 기기에서 잠겨 나가는" 경로를 막고,
-  다시 잠글 시점 판단은 `JanjanCore/Security/LockPolicy.swift` 의 순수 함수가 합니다.
+- **`TheJanjan/Security/AppLockManager.swift`** — 앱 잠금. 앱을 열면 네 자리 번호를 누른다.
+  번호는 저장하지 않고 소금 붙여 12만 번 해싱한 값만 키체인에 남긴다(`PasscodeStore.swift`).
+  **번호를 잊으면 Face ID · Touch ID · 기기 암호로 되찾는다** — 서버가 없어서 그 길이 막히면
+  기록을 영영 잃는다. 저장된 항목이 있다는 것이 곧 잠금이 켜져 있다는 뜻이라 둘이 어긋날 수 없다.
+  틀렸을 때의 기다림과 번호의 모양은 `JanjanCore/Security/Passcode.swift` 의 순수 함수가 정한다.
 
 ## 면책
 

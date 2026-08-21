@@ -6,12 +6,16 @@ import JanjanCore
 
 /// 앱 잠금. 무료 기능이고, 켤지 말지는 사용자가 고른다(설계 06절 무료/Pro 경계).
 ///
-/// 앱만의 비밀번호를 따로 만들지 않는다. `.deviceOwnerAuthentication` 정책 하나로
-/// Face ID · Touch ID 를 먼저 띄우고, 안 되면 기기 암호로 떨어진다. 그래서 사용자가
-/// 외울 것이 없고, 생체 정보는 앱에 들어오지 않는다(성공·실패만 받는다).
+/// 앱을 열면 **네 자리 번호**를 누른다. Face ID · Touch ID 는 매번 누르지 않아도 되게
+/// 해 주는 지름길이고, 동시에 **번호를 잊었을 때 되찾는 길**이다.
 ///
-/// "다시 잠글 때가 되었는지"의 판단은 JanjanCore 의 `LockPolicy` 가 하고,
-/// 여기서는 LocalAuthentication 과 앱 생애주기만 다룬다.
+/// 되찾는 길이 이 파일에서 가장 중요하다. 이 앱에는 서버도 계정도 없어서
+/// 잠긴 것을 풀어 줄 곳이 없다. 번호만 있고 되찾을 길이 없으면, 번호를 잊은 사람은
+/// 자기 투약 기록을 영영 잃는다. 그래서 기기 인증을 늘 곁문으로 열어 둔다 —
+/// 기기가 곧 열쇠라 사용자가 새로 외울 것은 늘지 않는다.
+///
+/// "다시 잠글 때가 되었는지" 는 `LockPolicy`, 번호의 모양과 기다림은 `Passcode` ·
+/// `PasscodeThrottle` 가 판단한다. 여기서는 키체인·LocalAuthentication·생애주기만 다룬다.
 @MainActor
 final class AppLockManager: ObservableObject {
 
@@ -22,19 +26,31 @@ final class AppLockManager: ObservableObject {
     // 계산 프로퍼티로 감싸 쓸 때마다 직접 알린다. 이걸 빼먹으면 설정 화면의 토글이
     // 손가락을 따라오지 않는다.
 
-    @AppStorage("appLockEnabled") private var storedIsEnabled = false
-    @AppStorage("appLockDiaryOnly") private var storedDiaryOnly = false
     @AppStorage("appLockGraceSeconds") private var storedGraceSeconds = LockPolicy.defaultGraceSeconds
+    @AppStorage("appLockUsesBiometrics") private var storedUsesBiometrics = true
+
+    /// 틀린 횟수와 마지막으로 틀린 시각. 앱을 껐다 켜도 기다림이 이어지도록 남긴다.
+    @AppStorage("appLockFailedAttempts") private var storedFailedAttempts = 0
+    @AppStorage("appLockLastFailureAt") private var storedLastFailureAt = 0.0
+
+    /// 잠금이 켜져 있는가. **저장된 번호가 있다는 것이 곧 켜져 있다는 뜻이다.**
+    /// 켜짐 여부를 따로 두면 둘이 어긋나는 날이 오고, 그날 사용자는 열 수 없는 잠금 앞에 선다.
+    ///
+    /// 키체인을 뷰 본문에서 매번 읽지 않으려고 값을 들고 있는다. 번호를 정하거나 끌 때만
+    /// 바뀌므로 그 두 곳에서만 다시 맞춘다.
+    @Published private(set) var isEnabled: Bool = PasscodeStore.isSet
 
     /// 잠금이 켜져 있던 채로 앱이 새로 떴다면 잠긴 상태로 시작한다.
-    /// 위 `appLockEnabled` 와 같은 키다 — 한쪽만 고치지 말 것.
-    @Published var isLocked: Bool = UserDefaults.standard.bool(forKey: "appLockEnabled")
+    @Published var isLocked: Bool = PasscodeStore.isSet
 
     /// 인증 시트가 떠 있는 동안 두 번 띄우지 않기 위한 표시.
     @Published private(set) var isAuthenticating = false
 
     /// 사용자에게 보여 줄 만한 실패 사유. 스스로 취소한 경우에는 아무 말도 하지 않는다(`nil`).
     @Published private(set) var failureMessageKo: String?
+
+    /// 기기 인증으로 되찾아 들어왔다. 새 번호를 정해야 한다.
+    @Published var needsNewPasscode = false
 
     /// 마지막으로 화면에서 사라진 시각. 유예 시간을 재는 기준점.
     private var lastBackgroundedAt: Date?
@@ -45,15 +61,12 @@ final class AppLockManager: ObservableObject {
 
     // MARK: - 바깥에 내보내는 설정
 
-    /// 잠금이 켜져 있는지. 켜고 끄는 것은 `setEnabled(_:)` 로만 — 켤 때 확인이 필요하다.
-    var isEnabled: Bool { storedIsEnabled }
-
-    /// 켜면 기록(일기) 탭만 잠근다. 오늘·약·리포트는 그대로 열린다.
-    var diaryOnly: Bool {
-        get { storedDiaryOnly }
+    /// Face ID · Touch ID 로도 열지. 꺼도 번호로는 언제나 열린다.
+    var usesBiometrics: Bool {
+        get { storedUsesBiometrics }
         set {
             objectWillChange.send()
-            storedDiaryOnly = newValue
+            storedUsesBiometrics = newValue
         }
     }
 
@@ -66,8 +79,38 @@ final class AppLockManager: ObservableObject {
         }
     }
 
-    /// 잠금 화면 버튼에 쓸 SF Symbol.
-    var biometrySymbolName: String {
+    // MARK: - 기기가 할 수 있는 것
+    //
+    // LAContext 를 만들고 canEvaluatePolicy 를 부르는 일을 뷰 본문에서 하면
+    // 화면을 다시 그릴 때마다 되풀이된다. 앱 밖(기기 설정)에서만 바뀌는 값이라
+    // 한 번 재어 두고 앱이 앞으로 나올 때 다시 잰다.
+
+    @Published private(set) var canRecoverWithDevice: Bool = Self.deviceAuthAvailable()
+    @Published private(set) var biometrySymbolName: String = Self.biometrySymbol()
+    @Published private(set) var hasBiometry: Bool = Self.biometryAvailable()
+
+    /// 생체인식을 지금 쓸 수 있는가. 설정에서 껐거나 등록돼 있지 않으면 거짓.
+    var canUseBiometricsNow: Bool { storedUsesBiometrics && hasBiometry }
+
+    /// 기기 설정에서 Face ID 를 등록하거나 암호를 지우고 돌아왔을 수 있다.
+    func refreshDeviceCapabilities() {
+        canRecoverWithDevice = Self.deviceAuthAvailable()
+        biometrySymbolName = Self.biometrySymbol()
+        hasBiometry = Self.biometryAvailable()
+    }
+
+    // 아래 셋은 프로퍼티 초깃값에서 불린다. @MainActor 클래스의 static 은 기본으로
+    // 메인 액터에 묶이는데, nonisolated init 에서는 그것을 부를 수 없어 풀어 둔다.
+
+    private nonisolated static func deviceAuthAvailable() -> Bool {
+        LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
+    }
+
+    private nonisolated static func biometryAvailable() -> Bool {
+        LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+    }
+
+    private nonisolated static func biometrySymbol() -> String {
         let context = LAContext()
         // biometryType 은 canEvaluatePolicy 를 한 번 부른 뒤에야 채워진다.
         _ = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
@@ -78,11 +121,29 @@ final class AppLockManager: ObservableObject {
         }
     }
 
+    // MARK: - 기다림
+
+    private var lastFailureAt: Date? {
+        storedLastFailureAt > 0 ? Date(timeIntervalSince1970: storedLastFailureAt) : nil
+    }
+
+    /// 지금 몇 초를 더 기다려야 하는가.
+    var remainingLockout: TimeInterval {
+        PasscodeThrottle.remainingLockout(
+            now: Date(),
+            lastFailureAt: lastFailureAt,
+            failedAttempts: storedFailedAttempts
+        )
+    }
+
+    var isThrottled: Bool { remainingLockout > 0 }
+
     // MARK: - 앱 생애주기
 
     /// 씬 단계가 바뀔 때 한 곳에서 받는다.
     func handle(scenePhase phase: ScenePhase) {
         if phase == .active {
+            refreshDeviceCapabilities()
             lockIfGracePassed()
         } else {
             lockIfNeeded()
@@ -94,7 +155,7 @@ final class AppLockManager: ObservableObject {
     /// 나간 시각은 처음 한 번만 적는다. 다시 앞으로 나올 때도
     /// `.inactive` 를 한 번 거치는데, 그때 덮어써 버리면 유예를 영원히 다시 세게 된다.
     func lockIfNeeded() {
-        guard storedIsEnabled else { return }
+        guard isEnabled else { return }
 
         let now = Date()
         if lastBackgroundedAt == nil {
@@ -105,13 +166,13 @@ final class AppLockManager: ObservableObject {
             lastBackgroundedAt: lastBackgroundedAt,
             graceSeconds: TimeInterval(storedGraceSeconds)
         ) {
-            isLocked = true
+            lock()
         }
     }
 
     /// 다시 앞으로 나올 때. 유예가 지났으면 잠근다.
     func lockIfGracePassed() {
-        guard storedIsEnabled else {
+        guard isEnabled else {
             lastBackgroundedAt = nil
             return
         }
@@ -123,17 +184,71 @@ final class AppLockManager: ObservableObject {
             lastBackgroundedAt: leftAt,
             graceSeconds: TimeInterval(storedGraceSeconds)
         ) {
-            isLocked = true
+            lock()
         }
         // 다음 외출은 새 시계로 잰다.
         lastBackgroundedAt = nil
     }
 
-    // MARK: - 잠금 해제
+    private func lock() {
+        isLocked = true
+        // 잠글 때 하던 말은 지운다. 다음에 열 때 지난번 실패 문구가 남아 있으면
+        // 방금 무언가 잘못한 것처럼 보인다.
+        failureMessageKo = nil
+    }
 
-    /// 성공하면 잠금을 푼다. 실패해도 던지지 않는다 — 잠금 화면이 그대로 남아 있으면 된다.
+    // MARK: - 번호로 열기
+
+    /// 네 자리를 받아 연다.
+    ///
+    /// 기다리는 중이면 세어 보지도 않는다 — 기다림을 눌러서 넘길 수 없어야 한다.
     @discardableResult
-    func authenticate() async -> Bool {
+    func unlock(with pin: String) -> Bool {
+        guard !isThrottled else {
+            failureMessageKo = PasscodeThrottle.messageKo(forRemaining: remainingLockout)
+            return false
+        }
+
+        guard PasscodeStore.verify(pin) else {
+            recordFailure()
+            return false
+        }
+
+        clearFailures()
+        failureMessageKo = nil
+        lastBackgroundedAt = nil
+        isLocked = false
+        return true
+    }
+
+    private func recordFailure() {
+        objectWillChange.send()
+        storedFailedAttempts += 1
+        storedLastFailureAt = Date().timeIntervalSince1970
+
+        let waiting = remainingLockout
+        if let message = PasscodeThrottle.messageKo(forRemaining: waiting) {
+            failureMessageKo = message
+        } else {
+            // 남은 횟수를 세어 보이지 않는다. 세어 보이면 재촉이 되고,
+            // 곁에서 보는 사람에게는 얼마나 더 눌러 볼 수 있는지 알려 주는 셈이 된다.
+            failureMessageKo = "번호가 맞지 않아요."
+        }
+    }
+
+    private func clearFailures() {
+        objectWillChange.send()
+        storedFailedAttempts = 0
+        storedLastFailureAt = 0
+    }
+
+    // MARK: - 기기 인증으로 열기 · 되찾기
+
+    /// Face ID · Touch ID · 기기 암호로 연다.
+    ///
+    /// - Parameter forRecovery: 번호를 잊어 되찾는 길로 들어온 경우. 열리면 새 번호를 정하게 한다.
+    @discardableResult
+    func unlockWithDevice(forRecovery: Bool = false) async -> Bool {
         guard !isAuthenticating else { return false }
         isAuthenticating = true
         defer { isAuthenticating = false }
@@ -141,67 +256,66 @@ final class AppLockManager: ObservableObject {
         let context = LAContext()
         context.localizedCancelTitle = "취소"
 
-        // 생체인식이 없거나 등록되지 않아도 이 정책이면 기기 암호로 떨어진다.
-        // 그래서 여기서 false 가 나오는 경우는 사실상 "기기 암호조차 없다" 하나뿐이다.
-        // 그 기기에서 잠금을 붙잡고 있으면 사용자가 자기 기록에서 잠겨 나가므로,
-        // 잠금을 풀고 설정도 끈다.
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
-            failureMessageKo = "이 기기에는 잠금을 열 방법이 없어요. 기기 설정에서 암호를 먼저 만들어 주세요."
-            store(isEnabled: false)
-            isLocked = false
-            lastBackgroundedAt = nil
+            failureMessageKo = forRecovery
+                ? "이 기기에는 잠금을 열 방법이 없어요. 번호로 열어 주세요."
+                : nil
             return false
         }
 
         do {
-            // 성공하면 그대로 돌아오고, 실패·취소는 LAError 로 던져진다.
-            // (돌려주는 Bool 은 오류 없이 false 가 되는 경우가 없어 쓰지 않는다.)
             _ = try await context.evaluatePolicy(
                 .deviceOwnerAuthentication,
-                localizedReason: "더잔잔 잠금을 해제합니다"
+                localizedReason: forRecovery ? "새 번호를 정하기 위해 확인합니다" : "더잔잔 잠금을 해제합니다"
             )
+            clearFailures()
             failureMessageKo = nil
             lastBackgroundedAt = nil
             isLocked = false
+            // 되찾아 들어왔으면 새 번호를 정하게 한다. 잊은 번호를 그대로 두면
+            // 다음에 앱을 열 때 같은 자리에서 또 막힌다.
+            if forRecovery { needsNewPasscode = true }
             return true
         } catch let error as LAError {
             failureMessageKo = Self.messageKo(forCode: error.code)
             return false
         } catch {
-            failureMessageKo = "지금은 잠금을 해제할 수 없어요. 잠시 후 다시 시도해 주세요."
+            failureMessageKo = "지금은 확인할 수 없어요. 잠시 후 다시 해 주세요."
             return false
         }
     }
 
-    /// 설정에서 잠금을 켜고 끈다.
-    ///
-    /// 켤 때는 먼저 한 번 열어 본다. 열리지 않는 기기에서 잠금이 켜지면
-    /// 사용자가 자기 기록에서 잠겨 나가기 때문이다. 확인에 실패하면 켜지 않는다.
-    func setEnabled(_ enabled: Bool) async {
-        guard enabled != storedIsEnabled else { return }
+    // MARK: - 번호 정하기 · 끄기
 
-        if enabled {
-            if await authenticate() {
-                store(isEnabled: true)
-                isLocked = false
-            } else {
-                // 켜지 않는다. 토글이 제자리로 돌아가도록 화면을 한 번 다시 그린다.
-                objectWillChange.send()
-            }
-        } else {
-            store(isEnabled: false)
-            failureMessageKo = nil
-            isLocked = false
-            lastBackgroundedAt = nil
+    /// 번호를 새로 정하거나 바꾼다. 성공하면 잠금이 켜진다.
+    @discardableResult
+    func setPasscode(_ pin: String) -> Bool {
+        guard Passcode.validate(pin) == .ok else { return false }
+        guard PasscodeStore.save(pin) else {
+            failureMessageKo = "번호를 저장하지 못했어요. 잠시 후 다시 해 주세요."
+            return false
         }
+        clearFailures()
+        isEnabled = true
+        failureMessageKo = nil
+        needsNewPasscode = false
+        isLocked = false
+        lastBackgroundedAt = nil
+        return true
+    }
+
+    /// 잠금을 끈다. 지금 열려 있는 상태에서만 부른다.
+    func disable() {
+        PasscodeStore.remove()
+        clearFailures()
+        isEnabled = false
+        failureMessageKo = nil
+        needsNewPasscode = false
+        isLocked = false
+        lastBackgroundedAt = nil
     }
 
     // MARK: - 안쪽
-
-    private func store(isEnabled: Bool) {
-        objectWillChange.send()
-        storedIsEnabled = isEnabled
-    }
 
     /// LAError 는 사용자가 취소한 것까지 오류로 알려 준다. 취소는 잘못이 아니므로 `nil`.
     private static func messageKo(forCode code: LAError.Code) -> String? {
@@ -209,15 +323,15 @@ final class AppLockManager: ObservableObject {
         case .userCancel, .appCancel, .systemCancel:
             return nil
         case .authenticationFailed:
-            return "확인하지 못했어요. 다시 시도하거나 기기 암호로 열어 주세요."
+            return "확인하지 못했어요. 번호로 열어 주세요."
         case .biometryLockout:
-            return "생체인식이 잠겼어요. 기기 암호로 열어 주세요."
+            return "생체인식이 잠겼어요. 번호나 기기 암호로 열어 주세요."
         case .biometryNotAvailable, .biometryNotEnrolled:
-            return "이 기기에서는 기기 암호로 열어 주세요."
+            return "이 기기에서는 번호로 열어 주세요."
         case .passcodeNotSet:
-            return "기기 설정에서 암호를 먼저 만들어 주세요."
+            return "이 기기에는 암호가 없어요. 번호로 열어 주세요."
         default:
-            return "지금은 잠금을 해제할 수 없어요. 잠시 후 다시 시도해 주세요."
+            return "지금은 확인할 수 없어요. 잠시 후 다시 해 주세요."
         }
     }
 }

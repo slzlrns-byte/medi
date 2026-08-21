@@ -18,7 +18,7 @@ struct TheJanjanApp: App {
     /// 앱 전체를 덮어야 하는 상태인가. 잠금은 사용자가 푸는 것이라 되돌리는 쪽은 비워 둔다.
     private var isFullyLocked: Binding<Bool> {
         Binding(
-            get: { appLock.isEnabled && appLock.isLocked && !appLock.diaryOnly },
+            get: { appLock.isEnabled && appLock.isLocked },
             set: { _ in }
         )
     }
@@ -41,10 +41,14 @@ struct TheJanjanApp: App {
                 // 그 시트가 그대로 보이고 잠금 화면은 시트 뒤에 숨는다.
                 // fullScreenCover 는 모달 계층의 맨 위로 올라가서 그 경로를 막는다.
                 //
-                // "일기만 잠그기" 를 켠 경우에는 앱 전체를 덮지 않고,
-                // RootTabView 의 기록 탭 안에서만 덮는다.
                 .fullScreenCover(isPresented: isFullyLocked) {
                     LockScreenView()
+                        .environmentObject(appLock)
+                }
+                // 기기 인증으로 되찾아 들어왔으면 새 번호를 정하게 한다.
+                // 잊은 번호를 그대로 두면 다음에 앱을 열 때 같은 자리에서 또 막힌다.
+                .fullScreenCover(isPresented: $appLock.needsNewPasscode) {
+                    PasscodeSetupView(mode: .reset) {}
                         .environmentObject(appLock)
                 }
                 .environmentObject(appLock)
