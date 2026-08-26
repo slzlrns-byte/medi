@@ -14,13 +14,17 @@ on:
   # 아직 main 에 없으므로, 그때까지는 작업 브랜치에 이 기계를 건드려 밀 때 돈다.
   # main 에 들어간 뒤로는 Actions 탭에서 손으로 부르면 된다.
   workflow_dispatch:
+  # **이 워크플로가 가장 비싸다.** UI 테스트라 8분쯤 걸리고 macOS 는 10배 청구라
+  # 한 번에 80분이 깎인다. 그래서 이 파일을 **일부러 건드릴 때만** 돈다.
+  #
+  # 앱 코드나 UI 테스트가 바뀌었다고 자동으로 돌지 않는다 — 그렇게 뒀더니
+  # 화면을 볼 생각이 없는 커밋에서도 두 번 돌아 한도를 먹었다.
+  # main 에 들어간 뒤로는 Actions 탭에서 손으로 부르면 된다.
   push:
     branches:
       - claude/local-work-app-integration-5fnhoc
     paths:
       - '.github/workflows/screenshots.yml'
-      - 'TheJanjanUITests/**'
-      - 'TheJanjan/Persistence/DemoSeed.swift'
 
 concurrency:
   group: screenshots
@@ -33,7 +37,8 @@ jobs:
   capture:
     name: 화면 찍기
     runs-on: macos-15
-    timeout-minutes: 45
+    # 실제로는 7~9분. 45분으로 두면 매달릴 때 450분이 깎인다.
+    timeout-minutes: 30
 
     steps:
       - name: 체크아웃

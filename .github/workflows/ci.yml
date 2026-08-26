@@ -2,14 +2,33 @@
 #
 # 개발자에게 맥이 없다. 컴파일러는 이 워크플로다.
 # 시크릿을 하나도 쓰지 않으므로 포크에서도 그대로 돈다.
+#
+# ── 분(minute) 아끼기 ────────────────────────────────────────────────────
+# **macOS 러너는 분당 10배로 청구된다.** 한 번 도는 데 5~8분이면 50~80분이
+# 깎이고, 비공개 저장소 무료 한도는 월 2,000분이다. 하루에 스무 번 돌리면
+# 그것만으로 한도가 사라진다(2026-08-26 에 실제로 그렇게 됐다).
+#
+# 그래서 셋을 지킨다.
+#   1. 순수 로직은 리눅스에서 본다(1배). macOS 는 시뮬레이터가 필요한 것만.
+#   2. 문서·데이터만 바뀌면 아예 돌리지 않는다.
+#   3. 커밋마다 부르지 않는다 — 묶어서 한 번.
+# 화면 찍기(screenshots.yml)는 이보다 더 비싸므로 손으로만 부른다.
 
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'data/**'
+      - '**.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'data/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
@@ -44,7 +63,8 @@ jobs:
   build-and-test:
     name: 빌드와 테스트
     runs-on: macos-15
-    timeout-minutes: 45
+    # 실제로는 5~8분이면 끝난다. 45분으로 두면 한 번 매달릴 때 450분이 깎인다.
+    timeout-minutes: 25
 
     env:
       SCHEME: TheJanjan
@@ -101,8 +121,9 @@ jobs:
             echo "ok $f"
           done
 
-      - name: 순수 로직 테스트 (JanjanCore)
-        run: swift test --package-path Packages/JanjanCore
+      # JanjanCore 테스트는 리눅스 잡(core-tests)이 1배로 돌린다.
+      # 여기서 또 돌리면 같은 것을 10배로 사는 셈이다.
+      # 시뮬레이터 빌드가 JanjanCore 를 iOS 로 컴파일하므로 빌드 오류는 여기서 잡힌다.
 
       # 기기 이름을 못 박지 않는다. 러너 이미지마다 깔린 시뮬레이터가 달라서
       # "iPhone 16" 같은 이름은 언젠가 반드시 없어진다(실제로 없어져서 CI가 깨졌다).
