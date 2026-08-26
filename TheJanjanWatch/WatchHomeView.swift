@@ -10,6 +10,11 @@ struct WatchHomeView: View {
     @State private var isShowingSymptom = false
     @State private var isShowingMood = false
 
+    #if DEBUG
+    /// 화면 찍기용 시트를 두 번 열지 않기 위한 표시.
+    @State private var hasOpenedRequestedScreen = false
+    #endif
+
     var body: some View {
         NavigationStack {
             List {
@@ -46,11 +51,22 @@ struct WatchHomeView: View {
             .onAppear {
                 // watchOS 는 XCUITest 가 없어 눌러서 열 수 없다. 화면을 찍을 때만
                 // 실행 인자로 어느 시트를 열지 고른다.
+                //
+                // onAppear 안에서 곧바로 시트를 켜면 계층이 자리를 잡기 전이라
+                // SwiftUI 가 그 표시를 흘려보낸다. 한 박자 뒤로 미룬다.
+                // onAppear 는 시트를 닫고 돌아올 때도 다시 불리므로 한 번만 연다.
                 #if DEBUG
-                switch WatchDemoSeed.requestedScreen {
-                case .home: break
-                case .mood: isShowingMood = true
-                case .symptom: isShowingSymptom = true
+                guard !hasOpenedRequestedScreen else { return }
+                hasOpenedRequestedScreen = true
+                let screen = WatchDemoSeed.requestedScreen
+                guard screen != .home else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    switch screen {
+                    case .home: break
+                    case .mood: isShowingMood = true
+                    case .symptom: isShowingSymptom = true
+                    }
                 }
                 #endif
             }

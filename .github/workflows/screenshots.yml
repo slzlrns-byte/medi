@@ -254,14 +254,27 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
 
           mkdir -p build/named
+
+          # 한 화면이 실패해도 나머지는 찍는다. 여기서 죽으면 세 장을 다 잃는데,
+          # 워치 사진은 한 번 찍는 데 macOS 러너 몇 분이 든다.
           capture () {
             name="$1"; screen="$2"
             xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
-            xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"
-            # 화면이 자리를 잡을 틈. 워치는 폰보다 느리게 뜬다.
+            if ! xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"; then
+              echo "::warning::${name} 을 띄우지 못했습니다. 다음 화면으로 넘어갑니다."
+              return 0
+            fi
+            # 화면이 자리를 잡을 틈. 워치는 폰보다 느리게 뜨고,
+            # 시트는 뜬 뒤에 한 박자 늦게 올라온다.
             sleep 6
-            xcrun simctl io "$UDID" screenshot "build/named/${name}.png"
+            xcrun simctl io "$UDID" screenshot "build/named/${name}.png" \
+              || echo "::warning::${name} 을 찍지 못했습니다."
           }
+
+          # 설치 직후 첫 실행은 느리다. 그 느린 실행이 첫 사진이 되지 않도록
+          # 한 번 버리고 시작한다.
+          xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData >/dev/null 2>&1 || true
+          sleep 8
 
           capture "11-워치-홈" home
           capture "12-워치-기분" mood
