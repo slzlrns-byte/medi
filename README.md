@@ -104,6 +104,11 @@ swift test --package-path Packages/JanjanCore
   상품을 못 불러와도 크래시하지 않고 `storeUnavailable` 로 알립니다(무료 기능은 그대로).
   상품 ID·Pro 경계·문구는 `JanjanCore/Pro/ProFeature.swift` 한 곳에만 있습니다.
   페이월은 `TheJanjan/Pro/PaywallView.swift`, 게이팅은 `.proGated(_:)` 한 줄입니다.
+- **`Packages/JanjanCore/Sources/JanjanCore/Models/MedicationNote.swift`**
+  약에 딸린 한 줄 메모 — 진료에서 들은 것, 다음에 여쭤볼 것.
+  식약처 이상반응 원문을 싣지 않기로 한 자리에 이것이 들어간다(2026-08-26 결정).
+  증상 카탈로그와 이어 두면 리포트에서 실제 기록과 나란히 나간다. **세기만 하고 판단하지 않는다.**
+
 - **`TheJanjan/Security/AppLockManager.swift`** — 앱 잠금. 앱을 열면 네 자리 번호를 누른다.
   번호는 저장하지 않고 소금 붙여 12만 번 해싱한 값만 키체인에 남긴다(`PasscodeStore.swift`).
   **번호를 잊으면 Face ID · Touch ID · 기기 암호로 되찾는다** — 서버가 없어서 그 길이 막히면
