@@ -15,6 +15,11 @@ struct TheJanjanWatchApp: App {
                 .environmentObject(session)
                 .onAppear {
                     session.activate()
+                    // 예시 스냅샷은 활성화 뒤에 넣는다. 순서가 바뀌면
+                    // 활성화가 placeholder 로 덮어쓸 수 있다.
+                    #if DEBUG
+                    WatchDemoSeed.applyIfRequested(to: session)
+                    #endif
                 }
         }
     }

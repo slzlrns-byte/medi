@@ -228,6 +228,13 @@ targets:
 # UI 테스트를 기본 스킴에 넣지 않는 이유: 느리다. 평소 CI 는 컴파일과 단위 테스트만
 # 보면 되고, 화면은 필요할 때 screenshots.yml 로 따로 부른다.
 schemes:
+  # 워치 앱을 따로 빌드해 시뮬레이터에 설치하려면 스킴이 필요하다.
+  # watchOS 는 XCUITest 가 없어서 simctl 로 띄우고 찍는다.
+  TheJanjanWatch:
+    build:
+      targets:
+        TheJanjanWatch: all
+
   Screenshots:
     build:
       targets:

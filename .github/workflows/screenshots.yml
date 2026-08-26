@@ -171,6 +171,97 @@ jobs:
 
           ls -la build/named
 
+      # ── 워치 ────────────────────────────────────────────────────────────
+      # watchOS 는 XCUITest 를 지원하지 않는다. 눌러 가며 찍을 수 없으므로
+      # simctl 로 앱을 띄우되 어느 화면으로 열지는 실행 인자로 고른다.
+      #
+      # 아래 세 단계는 실패해도 멈추지 않는다(continue-on-error). 워치가 안 되더라도
+      # 이미 찍은 아이폰 사진은 올려야 한다 — 빈 손으로 끝나는 것이 가장 나쁘다.
+
+      - name: 워치 시뮬레이터 고르기
+        id: watch
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          best = None
+          for identifier, devices in runtimes.items():
+              if "watchOS" not in identifier:
+                  continue
+              watches = [d for d in devices if d.get("isAvailable") and "Apple Watch" in d["name"]]
+              if not watches:
+                  continue
+              candidate = (version(identifier), identifier, watches[0])
+              if best is None or candidate[0] > best[0]:
+                  best = candidate
+
+          if best is None:
+              sys.exit("사용할 수 있는 Apple Watch 시뮬레이터가 없습니다.")
+
+          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
+          print(best[2]["udid"])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: 워치 앱 빌드
+        if: steps.watch.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme TheJanjanWatch \
+            -destination "id=${{ steps.watch.outputs.udid }}" \
+            -derivedDataPath build/watch-dd \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: 워치 화면 찍기
+        if: steps.watch.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          UDID="${{ steps.watch.outputs.udid }}"
+          BUNDLE="com.thejanjan.app.watchkitapp"
+
+          APP=$(find build/watch-dd/Build/Products -name 'TheJanjanWatch.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::빌드된 워치 앱을 찾지 못했습니다."
+            find build/watch-dd/Build/Products -maxdepth 2 -type d || true
+            exit 1
+          fi
+          echo "앱: $APP"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          mkdir -p build/named
+          capture () {
+            name="$1"; screen="$2"
+            xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+            xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"
+            # 화면이 자리를 잡을 틈. 워치는 폰보다 느리게 뜬다.
+            sleep 6
+            xcrun simctl io "$UDID" screenshot "build/named/${name}.png"
+          }
+
+          capture "11-워치-홈" home
+          capture "12-워치-기분" mood
+          capture "13-워치-증상" symptom
+
+          ls -la build/named
+
       - name: ci/screenshots 브랜치에 올리기
         run: |
           set -e

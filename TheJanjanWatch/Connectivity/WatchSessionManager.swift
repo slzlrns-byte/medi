@@ -29,6 +29,15 @@ final class WatchSessionManager: NSObject, ObservableObject {
         super.init()
     }
 
+    #if DEBUG
+    /// 화면을 찍기 위해 스냅샷을 직접 넣는다. `WatchDemoSeed` 만 부른다.
+    /// 시뮬레이터에는 짝지어진 아이폰이 없어 그냥 두면 placeholder 만 보인다.
+    @MainActor
+    func applyDemoSnapshot(_ snapshot: WatchSnapshot) {
+        self.snapshot = snapshot
+    }
+    #endif
+
     func activate() {
         guard WCSession.isSupported() else { return }
         let session = WCSession.default

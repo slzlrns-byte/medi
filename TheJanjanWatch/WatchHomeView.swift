@@ -43,6 +43,17 @@ struct WatchHomeView: View {
                     .listRowBackground(Color.clear)
             }
             .navigationTitle(navigationTitleText)
+            .onAppear {
+                // watchOS 는 XCUITest 가 없어 눌러서 열 수 없다. 화면을 찍을 때만
+                // 실행 인자로 어느 시트를 열지 고른다.
+                #if DEBUG
+                switch WatchDemoSeed.requestedScreen {
+                case .home: break
+                case .mood: isShowingMood = true
+                case .symptom: isShowingSymptom = true
+                }
+                #endif
+            }
             .sheet(isPresented: $isShowingSymptom) {
                 SymptomQuickEntryView()
                     .environmentObject(session)
