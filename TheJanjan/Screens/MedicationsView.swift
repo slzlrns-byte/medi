@@ -24,6 +24,9 @@ struct MedicationsView: View {
 
     private var today: Date { Date() }
 
+    /// 떠 있는 검은 원 버튼의 지름. 목록 아래 여백이 이 값을 따라간다.
+    private let blackButtonDiameter: CGFloat = 64
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -46,14 +49,20 @@ struct MedicationsView: View {
                     }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
-                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+                // 검은 원 버튼이 목록 위에 떠 있다(overlay). 그 지름과 여백만큼
+                // 아래를 비우지 않으면 끝까지 내렸을 때 마지막 약의 남은 개수를 가린다.
+                .padding(.bottom, blackButtonDiameter + CGFloat(JanjanSpacing.l) * 2)
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
             .navigationTitle("약")
             .navigationBarTitleDisplayMode(.large)
             .overlay(alignment: .bottomTrailing) {
-                BlackCircleButton(systemImage: "plus", accessibilityLabelKo: "약 추가") {
+                BlackCircleButton(
+                    systemImage: "plus",
+                    accessibilityLabelKo: "약 추가",
+                    diameter: blackButtonDiameter
+                ) {
                     isShowingAddFlow = true
                 }
                 .padding(CGFloat(JanjanSpacing.l))

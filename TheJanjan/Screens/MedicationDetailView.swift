@@ -210,7 +210,9 @@ struct MedicationDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let symptomID = note.symptomID,
                    let name = Catalogs.symptoms.symptom(id: symptomID)?.nameKo {
-                    Text("증상 \(name) 과 이어 둠")
+                    // 이름 뒤에 "과/와" 를 직접 붙이면 받침에 따라 틀린다.
+                    // 조사를 이름에서 떼어 내 그 문제를 아예 없앤다.
+                    Text("\(name) 증상과 이어 둠")
                         .font(JanjanFont.body(12))
                         .foregroundStyle(Color.muted)
                 }

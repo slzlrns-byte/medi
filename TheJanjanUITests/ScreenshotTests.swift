@@ -47,6 +47,9 @@ final class ScreenshotTests: XCTestCase {
         let expand = app.buttons["더 남기기"]
         if expand.waitForExistence(timeout: 5) {
             expand.tap()
+            // 펼치는 애니메이션이 끝나기를 기다린다. 바로 찍으면 "접기" 와
+            // "더 남기기" 가 겹친 채로 남는다(실제로 그렇게 찍혔다).
+            Thread.sleep(forTimeInterval: 1.5)
             capture("05-기록-펼침")
         }
 

@@ -225,6 +225,13 @@ struct ReportView: View {
                                 .padding(.leading, 5)
                         }
                     }
+                    // 바탕이 없으면 글자만 떠 있어 입력칸으로 보이지 않고,
+                    // TextEditor 의 안쪽 여백 때문에 위 제목과 어긋나 보인다.
+                    .padding(CGFloat(JanjanSpacing.xxs))
+                    .background(
+                        RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                            .fill(Color.janjan(.surface2))
+                    )
 
                 Text("이 메모는 이 기기에만 남고 iCloud 로 넘어가지 않아요.")
                     .font(JanjanFont.body(12))
