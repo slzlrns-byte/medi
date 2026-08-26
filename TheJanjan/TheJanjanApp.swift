@@ -13,6 +13,17 @@ struct TheJanjanApp: App {
 
     init() {
         modelContainer = JanjanModelContainer.make()
+
+        // 화면을 찍기 위한 예시 기록. 실행 인자가 있을 때만, 그리고 DEBUG 에서만 돈다.
+        // 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없으므로,
+        // CI 의 macOS 러너가 이 데이터를 심은 앱을 띄우고 화면을 찍는다.
+        #if DEBUG
+        if DemoSeed.isRequested {
+            MainActor.assumeIsolated {
+                DemoSeed.apply(to: modelContainer.mainContext)
+            }
+        }
+        #endif
     }
 
     /// 앱 전체를 덮어야 하는 상태인가. 잠금은 사용자가 푸는 것이라 되돌리는 쪽은 비워 둔다.

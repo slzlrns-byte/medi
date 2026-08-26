@@ -41,6 +41,7 @@ struct MedicationsView: View {
                                 medicationRow(row)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("medicationRow")
                         }
                     }
                 }

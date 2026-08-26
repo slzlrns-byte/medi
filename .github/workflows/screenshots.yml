@@ -1,0 +1,184 @@
+# 더잔잔 — 화면 찍기
+#
+# 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없다. 이 워크플로가 macOS 러너에서
+# 예시 기록을 심은 앱을 띄우고 화면마다 사진을 찍어, PNG 를 `ci/screenshots` 브랜치에
+# 올린다. 아티팩트가 아니라 브랜치인 이유: 아티팩트 저장소(blob.core.windows.net)는
+# 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
+#
+# 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
+
+name: Screenshots
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: 화면 찍기
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Xcode 선택 (latest-stable)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: 시뮬레이터 고르기
+        id: simulator
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          best = None
+          for identifier, devices in runtimes.items():
+              if "iOS" not in identifier:
+                  continue
+              phones = [d for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not phones:
+                  continue
+              candidate = (version(identifier), identifier, phones[0])
+              if best is None or candidate[0] > best[0]:
+                  best = candidate
+
+          if best is None:
+              sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
+
+          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
+          print(best[2]["udid"])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: UI 테스트로 화면 찍기
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -resultBundlePath build/Screenshots.xcresult \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: 첨부에서 PNG 꺼내기
+        run: |
+          set -o pipefail
+          mkdir -p build/shots
+
+          # Xcode 판에 따라 이 하위 명령이 없을 수 있다. 없으면 무엇이 있는지 찍어 두고
+          # 멈춘다 - 조용히 빈 손으로 끝나면 왜 사진이 없는지 알 길이 없다.
+          if ! xcrun xcresulttool export attachments \
+              --path build/Screenshots.xcresult \
+              --output-path build/shots; then
+            echo "::error::xcresulttool export attachments 가 실패했습니다. 쓸 수 있는 하위 명령:"
+            xcrun xcresulttool --help || true
+            exit 1
+          fi
+
+          ls -la build/shots || true
+
+          # export 는 파일을 해시 이름으로 떨구고 manifest.json 에 원래 이름을 적어 둔다.
+          # 사람이 읽을 이름으로 바꾸되, manifest 형식이 달라지면 이름만 포기하고
+          # 사진은 건진다 - 이름 때문에 빈 손으로 끝나는 것이 가장 나쁘다.
+          python3 - <<'PY'
+          import json, os, shutil
+
+          root = "build/shots"
+          out = "build/named"
+          os.makedirs(out, exist_ok=True)
+
+          def copy(source, stem):
+              shutil.copyfile(source, os.path.join(out, stem + ".png"))
+
+          named = 0
+          manifest_path = os.path.join(root, "manifest.json")
+
+          if os.path.exists(manifest_path):
+              try:
+                  with open(manifest_path, encoding="utf-8") as handle:
+                      manifest = json.load(handle)
+                  entries = manifest if isinstance(manifest, list) else [manifest]
+                  for test in entries:
+                      for attachment in (test or {}).get("attachments", []):
+                          exported = attachment.get("exportedFileName")
+                          if not exported:
+                              continue
+                          source = os.path.join(root, exported)
+                          if not os.path.exists(source):
+                              continue
+                          label = (
+                              attachment.get("suggestedHumanReadableName")
+                              or attachment.get("name")
+                              or exported
+                          )
+                          copy(source, os.path.splitext(label)[0])
+                          named += 1
+              except Exception as error:
+                  print("manifest 를 읽지 못했습니다:", error)
+
+          if named == 0:
+              # 이름 붙이기에 실패했으면 있는 파일을 그대로 가져온다.
+              for entry in sorted(os.listdir(root)):
+                  if entry.lower().endswith(".png"):
+                      copy(os.path.join(root, entry), os.path.splitext(entry)[0])
+                      named += 1
+
+          print("사진 {}장".format(named))
+          if named == 0:
+              raise SystemExit("첨부에서 사진을 하나도 꺼내지 못했습니다.")
+          PY
+
+          ls -la build/named
+
+      - name: ci/screenshots 브랜치에 올리기
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p /tmp/shots
+          cp build/named/*.png /tmp/shots/
+
+          git checkout --orphan screenshots-tmp
+          git rm -rf --cached . > /dev/null
+          rm -rf shots
+          mkdir -p shots
+          cp /tmp/shots/*.png shots/
+
+          {
+            echo "# 시뮬레이터 화면"
+            echo
+            echo "\`screenshots.yml\` 이 macOS 러너에서 찍어 올린 것입니다. 손으로 고치지 마세요."
+            echo
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo "- 찍은 때: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          } > README.md
+
+          git add -f shots README.md
+          git commit -q -m "화면 ${GITHUB_SHA:0:7}"
+          git push -f origin HEAD:ci/screenshots

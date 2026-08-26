@@ -185,6 +185,25 @@ targets:
         Release:
           CODE_SIGN_ENTITLEMENTS: TheJanjanWatch/TheJanjanWatch.entitlements
 
+  # ── iOS UI 테스트 (화면 찍기) ──────────────────────────────────────────
+  # 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없다. 이 타깃이 CI 의 macOS
+  # 러너에서 앱을 띄우고 화면마다 사진을 찍어 첨부로 남긴다(screenshots.yml).
+  # 평소 CI 에는 들어가지 않는다 — 느리고, 컴파일 확인은 단위 테스트로 충분하다.
+  TheJanjanUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - TheJanjanUITests
+    dependencies:
+      - target: TheJanjan
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: TheJanjan
+        CODE_SIGN_STYLE: Automatic
+
   # ── iOS 단위 테스트 ────────────────────────────────────────────────────
   # 순수 로직 테스트는 Packages/JanjanCore 의 swift test 가 담당하고,
   # 여기서는 앱 계층(레코드 매핑·토큰 파싱)만 얇게 확인한다.
@@ -204,3 +223,17 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TheJanjan.app/TheJanjan"
         BUNDLE_LOADER: "$(TEST_HOST)"
         CODE_SIGN_STYLE: Automatic
+
+# ── 화면 찍기 전용 스킴 ──────────────────────────────────────────────────
+# UI 테스트를 기본 스킴에 넣지 않는 이유: 느리다. 평소 CI 는 컴파일과 단위 테스트만
+# 보면 되고, 화면은 필요할 때 screenshots.yml 로 따로 부른다.
+schemes:
+  Screenshots:
+    build:
+      targets:
+        TheJanjan: all
+        TheJanjanUITests: [test]
+    test:
+      targets:
+        - TheJanjanUITests
+      gatherCoverageData: false
