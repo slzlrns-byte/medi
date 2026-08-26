@@ -178,7 +178,11 @@ enum ReportPDF {
     private static func attributed(_ text: String, style: TextStyle) -> NSAttributedString {
         let typeface = font(style)
         let size = Double(typeface.pointSize)
-        let role: JanjanTypography.Role = (style == .title) ? .display : .body
+        let role: JanjanTypography.Role
+        switch style {
+        case .title: role = .display
+        case .heading, .body, .caption: role = .body
+        }
 
         let paragraph = NSMutableParagraphStyle()
         // 화면과 같은 규칙을 쓴다. 종이만 행간이 다르면 그것도 어긋남이다.
