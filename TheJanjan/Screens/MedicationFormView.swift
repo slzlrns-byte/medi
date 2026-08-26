@@ -24,6 +24,8 @@ struct MedicationFormView: View {
     @State private var stockText = ""
     @State private var drafts: [SlotDraft] = SlotDraft.presets()
     @State private var isSaving = false
+    /// 알림 권한을 묻는 화면. 시간이 있는 약을 저장한 직후에만 올라온다.
+    @State private var isAskingNotification = false
 
     /// - Parameter prefill: 약봉투 스캔이 읽어 온 값. 채워만 두고 사용자가 고칠 수 있다 —
     ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
@@ -88,6 +90,16 @@ struct MedicationFormView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle("직접 입력")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $isAskingNotification) {
+            NotificationPermissionView {
+                NotificationPermissionGate.hasAsked = true
+                // 권한을 받은 뒤에 다시 깔아야 방금 등록한 약의 알림이 실제로 예약된다.
+                Task {
+                    await ReminderPlanner.reschedule(using: context)
+                    onSaved()
+                }
+            }
+        }
     }
 
     // MARK: - 카드
@@ -309,6 +321,14 @@ struct MedicationFormView: View {
             await ReminderPlanner.reschedule(using: context)
             AppServices.shared.pushWatchSnapshot()
             isSaving = false
+
+            // 시간이 있는 약을 처음 넣었다면 여기서 알림 권한을 묻는다.
+            // 이 자리가 아니면 물어볼 자리가 없다 — 알림이 처음으로 뜻을 갖는 순간이다.
+            if !schedules.isEmpty, await NotificationPermissionGate.shouldAsk() {
+                isAskingNotification = true
+                return
+            }
+
             // 닫는 일은 바깥에 맡긴다. 폼이 스스로 pop 하면서 시트까지 닫으면
             // 화면이 두 번 사라지며 애니메이션이 엉킨다.
             onSaved()

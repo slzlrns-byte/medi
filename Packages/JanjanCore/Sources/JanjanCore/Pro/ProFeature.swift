@@ -30,13 +30,19 @@ public enum ProFeature: String, CaseIterable, Sendable {
         }
     }
 
-    /// 페이월에 적는 4줄. App Store Connect 의 구독 설명이 약속한 것과 같은 4개다
-    /// (docs/decisions.md 2026-08-17 "Pro 구독 설명"). 순서까지 그 문장을 따른다.
+    /// 페이월에 적는 줄. **여기 적은 것은 앱에서 실제로 잠겨 있어야 한다.**
+    ///
+    /// 원래 넷이었는데(2026-08-17 결정) 둘을 뺐다.
+    ///   · 자세한 기분일기 — 잠그지 않기로 했다. 정신과 기록 앱에서 기분 기록을
+    ///     잠그면 이 앱이 있는 이유와 부딪힌다. 무료로 열어 둔다.
+    ///   · 약 알아보기 — v1 에 없다. 없는 것을 페이월에 적으면 2.3.1 이다.
+    ///
+    /// **App Store Connect 의 구독 설명도 이 목록과 같아야 한다.** 한쪽만 고치면
+    /// 앱과 스토어가 서로 다른 약속을 하게 된다.
     public static let launchHighlights: [ProFeature] = [
         .pharmacyScan,
         .runOutForecast,
-        .detailedMoodDiary,
-        .drugLookup
+        .reports
     ]
 }
 

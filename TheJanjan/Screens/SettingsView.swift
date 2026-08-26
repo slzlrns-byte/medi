@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import UIKit
+import UserNotifications
 import JanjanCore
 
 /// 설정 — 오늘 탭 우상단 톱니에서 올라온다 (설계 03절).
@@ -12,6 +14,9 @@ struct SettingsView: View {
 
     /// 번호를 정하는 화면을 띄울 이유. nil 이면 닫혀 있다.
     @State private var setupMode: PasscodeSetupView.Mode?
+
+    @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isAskingNotification = false
     @EnvironmentObject private var pro: ProStore
 
     @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
@@ -32,6 +37,7 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.fog.ignoresSafeArea())
+            .task { await refreshNotificationStatus() }
             .navigationTitle("설정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -55,6 +61,15 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $isShowingLicenses) {
                 LicenseNoticeView()
+            }
+            .fullScreenCover(isPresented: $isAskingNotification) {
+                NotificationPermissionView {
+                    NotificationPermissionGate.hasAsked = true
+                    Task {
+                        await refreshNotificationStatus()
+                        await ReminderPlanner.reschedule(using: context)
+                    }
+                }
             }
             .sheet(item: $setupMode) { mode in
                 PasscodeSetupView(mode: mode) { setupMode = nil }
@@ -107,6 +122,22 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         Section {
+            // 권한이 없으면 알림은 한 건도 뜨지 않는다. 그 사실과 켜는 길이
+            // 여기 없으면 사용자는 왜 안 오는지 영영 알 수 없다.
+            switch notificationStatus {
+            case .notDetermined:
+                Button("알림 켜기") { isAskingNotification = true }
+                    .foregroundStyle(Color.ink)
+            case .denied:
+                Button("iOS 설정에서 알림 켜기") { openSystemSettings() }
+                    .foregroundStyle(Color.ink)
+            default:
+                LabeledContent("복용 알림") {
+                    Text("켜져 있어요")
+                        .foregroundStyle(Color.muted)
+                }
+            }
+
             Toggle("잠금화면에서 약 이름 숨기기", isOn: $hidesMedicationNames)
                 .onChange(of: hidesMedicationNames) { _, _ in
                     // 이미 예약된 알림은 문구가 구워진 채로 남아 있다. 다시 깔아야 바뀐다.
@@ -115,8 +146,28 @@ struct SettingsView: View {
         } header: {
             Text("알림")
         } footer: {
-            Text("켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다.")
+            Text(notificationFooterKo)
         }
+    }
+
+    private var notificationFooterKo: String {
+        switch notificationStatus {
+        case .denied:
+            return "iOS 설정에서 알림을 꺼 두셔서 복용 알림이 오지 않습니다. 기록은 앱에서 직접 남길 수 있어요."
+        case .notDetermined:
+            return "켜면 약 시간에 알려드리고, 알림에서 바로 복용함·건너뜀을 누를 수 있어요."
+        default:
+            return "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다."
+        }
+    }
+
+    private func refreshNotificationStatus() async {
+        notificationStatus = await NotificationManager.shared.authorizationStatus()
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(url)
     }
 
     // MARK: - 보안

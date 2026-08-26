@@ -5,13 +5,21 @@ import XCTest
 /// 값이 하나뿐이라 테스트도 세 줄짜리로 충분하다.
 final class ProFeatureTests: XCTestCase {
 
-    func testLaunchHighlightsAreTheFourPromisedInTheStoreDescription() {
-        XCTAssertEqual(ProFeature.launchHighlights.count, 4)
+    func testLaunchHighlightsAreWhatTheAppActuallyLocks() {
         XCTAssertEqual(
             ProFeature.launchHighlights,
-            [.pharmacyScan, .runOutForecast, .detailedMoodDiary, .drugLookup]
+            [.pharmacyScan, .runOutForecast, .reports]
         )
         XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "약봉투 스캔")
+    }
+
+    /// 페이월에 적은 것은 앱에서 실제로 잠겨 있어야 한다(2.3.1 · 3.1.2).
+    /// 아직 만들지 않은 기능과 무료로 열어 둔 기능은 여기 들어오면 안 된다.
+    func testUnbuiltAndFreeFeaturesAreNotAdvertised() {
+        // 약 알아보기는 v1 에 없다. 만들기 전에는 페이월에 적지 않는다.
+        XCTAssertFalse(ProFeature.launchHighlights.contains(.drugLookup))
+        // 기분 기록은 잠그지 않기로 했다. 잠그지 않은 것을 팔지 않는다.
+        XCTAssertFalse(ProFeature.launchHighlights.contains(.detailedMoodDiary))
     }
 
     func testProductIdentifiersMatchAppStoreConnectExactly() {
