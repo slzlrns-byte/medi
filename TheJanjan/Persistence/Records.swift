@@ -482,6 +482,56 @@ final class PrescriptionRecord {
     }
 }
 
+@Model
+final class MedicationNoteRecord {
+
+    var id: UUID = UUID()
+    var medicationID: UUID = UUID()
+    var kindRaw: String = MedicationNote.Kind.heardFromDoctor.rawValue
+    var text: String = ""
+    /// 증상 카탈로그의 id. 이어 두지 않았으면 nil.
+    var symptomID: String?
+    var createdAt: Date = Date()
+
+    init(
+        id: UUID = UUID(),
+        medicationID: UUID = UUID(),
+        kindRaw: String = MedicationNote.Kind.heardFromDoctor.rawValue,
+        text: String = "",
+        symptomID: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.medicationID = medicationID
+        self.kindRaw = kindRaw
+        self.text = text
+        self.symptomID = symptomID
+        self.createdAt = createdAt
+    }
+
+    static func make(from core: MedicationNote) -> MedicationNoteRecord {
+        MedicationNoteRecord(
+            id: core.id,
+            medicationID: core.medicationID,
+            kindRaw: core.kind.rawValue,
+            text: core.text,
+            symptomID: core.symptomID,
+            createdAt: core.createdAt
+        )
+    }
+
+    var core: MedicationNote {
+        MedicationNote(
+            id: id,
+            medicationID: medicationID,
+            kind: MedicationNote.Kind(rawValue: kindRaw) ?? .heardFromDoctor,
+            text: text,
+            symptomID: symptomID,
+            createdAt: createdAt
+        )
+    }
+}
+
 /// 스키마 한 곳. ModelContainer 와 테스트가 같은 목록을 쓴다.
 enum JanjanSchema {
     static let allModels: [any PersistentModel.Type] = [
@@ -491,6 +541,7 @@ enum JanjanSchema {
         StockEventRecord.self,
         CheckInRecord.self,
         SymptomEntryRecord.self,
-        PrescriptionRecord.self
+        PrescriptionRecord.self,
+        MedicationNoteRecord.self
     ]
 }

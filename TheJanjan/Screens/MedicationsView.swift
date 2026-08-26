@@ -35,7 +35,12 @@ struct MedicationsView: View {
                     ForEach(sections, id: \.title) { section in
                         sectionHeader(section.title)
                         ForEach(section.rows) { row in
-                            medicationRow(row)
+                            NavigationLink {
+                                MedicationDetailView(medicationID: row.id)
+                            } label: {
+                                medicationRow(row)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

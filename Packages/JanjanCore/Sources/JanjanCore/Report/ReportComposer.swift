@@ -56,6 +56,8 @@ public enum ReportComposer {
         doseEvents: [DoseEvent],
         stockEvents: [StockEvent],
         checkIns: [CheckIn],
+        medicationNotes: [MedicationNote] = [],
+        symptomEntries: [SymptomEntry] = [],
         nextVisit: Date? = nil,
         questionsKo: String = "",
         calendar: Calendar = .current
@@ -77,6 +79,13 @@ public enum ReportComposer {
             calendar: calendar
         ))
         lines.append(contentsOf: moodLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
+        lines.append(contentsOf: noteLines(
+            notes: medicationNotes,
+            medications: medications,
+            symptomEntries: symptomEntries,
+            from: start,
+            to: end
+        ))
         lines.append(contentsOf: questionLines(questionsKo))
 
         return ReportContent(
@@ -206,6 +215,48 @@ public enum ReportComposer {
             let label = CheckIn.Mood(top.key).labelKo
             lines.append(.init(style: .body, text: "가장 자주 고른 기분: \(label) (\(top.value)일)"))
         }
+        return lines
+    }
+
+    /// 진료에서 들은 것과 실제 기록을 나란히 놓는다.
+    ///
+    /// 세기만 한다. "약 때문이다" 도 "괜찮아졌다" 도 만들지 않는다 —
+    /// 옆에 놓아 주면 해석은 진료실에서 사람이 한다.
+    private static func noteLines(
+        notes: [MedicationNote],
+        medications: [Medication],
+        symptomEntries: [SymptomEntry],
+        from start: Date,
+        to end: Date
+    ) -> [ReportContent.Line] {
+
+        let observations = MedicationNoteDigest.observations(
+            notes: notes,
+            medications: medications,
+            symptomEntries: symptomEntries,
+            from: start,
+            to: end
+        )
+        guard !observations.isEmpty else { return [] }
+
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: "약에 적어 둔 것")]
+        var lastMedication: String?
+
+        for observation in observations {
+            if observation.medicationName != lastMedication {
+                lines.append(.init(style: .body, text: observation.medicationName))
+                lastMedication = observation.medicationName
+            }
+            lines.append(.init(
+                style: .caption,
+                text: "\(observation.note.kind.labelKo) · \(MedicationNoteDigest.lineKo(for: observation))"
+            ))
+        }
+
+        lines.append(.init(
+            style: .caption,
+            text: "옆의 횟수는 그 증상이 기록된 수이고, 원인을 말하지 않습니다."
+        ))
         return lines
     }
 

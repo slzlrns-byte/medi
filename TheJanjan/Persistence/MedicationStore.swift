@@ -104,6 +104,10 @@ enum MedicationStore {
             predicate: #Predicate { $0.medicationID == medicationID }
         ), in: context)
 
+        delete(FetchDescriptor<MedicationNoteRecord>(
+            predicate: #Predicate { $0.medicationID == medicationID }
+        ), in: context)
+
         // 이 약을 가리키던 다른 줄의 손가락도 내려 준다. 관계가 없는 스키마라
         // 아무도 대신 해 주지 않고, 남겨 두면 없는 약을 가리키는 UUID 가 떠돈다.
         let symptoms = FetchDescriptor<SymptomEntryRecord>(
@@ -135,7 +139,7 @@ enum MedicationStore {
         // assert 는 릴리스에서 통째로 빠진다. 여기서 빠지면 "모두 사라집니다" 라고
         // 적어 놓고 한 종류를 남겨 두는 일이 앱스토어 빌드에서만 조용히 일어난다.
         precondition(
-            JanjanSchema.allModels.count == 7,
+            JanjanSchema.allModels.count == 8,
             "모델을 추가했다면 전체 삭제에도 넣어 주세요."
         )
 
@@ -146,6 +150,7 @@ enum MedicationStore {
         wipe(CheckInRecord.self, in: context)
         wipe(SymptomEntryRecord.self, in: context)
         wipe(PrescriptionRecord.self, in: context)
+        wipe(MedicationNoteRecord.self, in: context)
 
         save("전체 삭제", in: context)
     }

@@ -11,7 +11,6 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case pharmacyScan
     case runOutForecast
     case detailedMoodDiary
-    case drugLookup
     case watchApp
     case reports
     case iCloudSync
@@ -22,7 +21,6 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .pharmacyScan: return "약봉투 스캔"
         case .runOutForecast: return "소진 예측과 부족 알림"
         case .detailedMoodDiary: return "자세한 기분일기"
-        case .drugLookup: return "약 알아보기"
         case .watchApp: return "Apple Watch 앱"
         case .reports: return "진료용 리포트"
         case .iCloudSync: return "iCloud 동기화"
@@ -35,7 +33,9 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// 원래 넷이었는데(2026-08-17 결정) 둘을 뺐다.
     ///   · 자세한 기분일기 — 잠그지 않기로 했다. 정신과 기록 앱에서 기분 기록을
     ///     잠그면 이 앱이 있는 이유와 부딪힌다. 무료로 열어 둔다.
-    ///   · 약 알아보기 — v1 에 없다. 없는 것을 페이월에 적으면 2.3.1 이다.
+    ///   · 약 알아보기 — 뺐다. 식약처 이상반응 원문을 펼쳐 보이는 대신
+    ///     담당의에게 들은 몇 줄을 적어 두는 쪽으로 갔다(2026-08-26 결정).
+    ///     `MedicationNote` 가 그 자리를 대신하고, 그것은 무료다.
     ///
     /// **App Store Connect 의 구독 설명도 이 목록과 같아야 한다.** 한쪽만 고치면
     /// 앱과 스토어가 서로 다른 약속을 하게 된다.

@@ -13,6 +13,8 @@ struct ReportView: View {
     @Query private var doseRecords: [DoseEventRecord]
     @Query private var stockRecords: [StockEventRecord]
     @Query private var checkInRecords: [CheckInRecord]
+    @Query private var symptomRecords: [SymptomEntryRecord]
+    @Query(sort: \MedicationNoteRecord.createdAt) private var noteRecords: [MedicationNoteRecord]
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
@@ -67,6 +69,8 @@ struct ReportView: View {
     private var doses: [DoseEvent] { doseRecords.map(\.core) }
     private var stock: [StockEvent] { stockRecords.map(\.core) }
     private var checkIns: [CheckIn] { checkInRecords.map(\.core) }
+    private var symptomEntries: [SymptomEntry] { symptomRecords.map(\.core) }
+    private var medicationNotes: [MedicationNote] { noteRecords.map(\.core) }
 
     private var nextVisit: Date? {
         prescriptionRecords
@@ -243,6 +247,8 @@ struct ReportView: View {
             doseEvents: doses,
             stockEvents: stock,
             checkIns: checkIns,
+            medicationNotes: medicationNotes,
+            symptomEntries: symptomEntries,
             nextVisit: nextVisit,
             questionsKo: questions
         )
