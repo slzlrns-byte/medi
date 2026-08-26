@@ -22,6 +22,9 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
     }
 
+    /// **테스트는 하나뿐이다.** 나눠서 앱을 두 번 띄웠더니 두 번째 실행이
+    /// "Failed to send signal 19" 로 걸려 25분을 멈춰 있었다(2026-08-26).
+    /// 시뮬레이터에서 앱을 다시 띄우는 것이 불안정하므로 한 번 띄우고 다 돈다.
     func testCaptureEveryScreen() throws {
         // 탭 막대가 뜰 때까지 기다린다. 여기서 실패하면 앱이 안 뜬 것이다.
         let tabBar = app.tabBars.firstMatch
@@ -36,8 +39,34 @@ final class ScreenshotTests: XCTestCase {
         let firstMedication = app.buttons.matching(identifier: "medicationRow").firstMatch
         if firstMedication.waitForExistence(timeout: 10) {
             firstMedication.tap()
+            settle()
             capture("03-약-상세")
             back()
+        }
+
+        // 처방 기록. 다음 진료 D- 와 소진 예측이 여기서 살아난다.
+        let prescription = app.buttons["처방 기록하기"]
+        if prescription.waitForExistence(timeout: 10) {
+            prescription.tap()
+            settle()
+            capture("08-처방-기록")
+            dismissSheet()
+        }
+
+        // 약 추가 -> 직접 입력 폼.
+        let add = app.buttons["약 추가"]
+        if add.waitForExistence(timeout: 10) {
+            add.tap()
+            settle()
+            capture("09-약-추가")
+
+            let direct = app.buttons.matching(identifier: "directEntry").firstMatch
+            if direct.waitForExistence(timeout: 5) {
+                direct.tap()
+                settle()
+                capture("10-약-등록-폼")
+            }
+            dismissSheet()
         }
 
         tap(tab: "기록")
@@ -61,42 +90,8 @@ final class ScreenshotTests: XCTestCase {
         let settings = app.buttons["설정"]
         if settings.waitForExistence(timeout: 10) {
             settings.tap()
-            Thread.sleep(forTimeInterval: 1.0)
+            settle()
             capture("07-설정")
-        }
-    }
-
-    /// 약 등록 폼과 처방 기록. 사용자가 처음 만나는 두 입력 화면이라
-    /// 자간·행간이 어긋나면 여기서 가장 먼저 티가 난다.
-    func testCaptureInputScreens() throws {
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 30), "탭 막대가 뜨지 않았습니다")
-
-        tap(tab: "약")
-
-        let prescription = app.buttons["처방 기록하기"]
-        if prescription.waitForExistence(timeout: 10) {
-            prescription.tap()
-            Thread.sleep(forTimeInterval: 1.5)
-            capture("08-처방-기록")
-
-            let close = app.buttons["닫기"]
-            if close.exists { close.tap() }
-            Thread.sleep(forTimeInterval: 1.0)
-        }
-
-        let add = app.buttons["약 추가"]
-        if add.waitForExistence(timeout: 10) {
-            add.tap()
-            Thread.sleep(forTimeInterval: 1.2)
-            capture("09-약-추가")
-
-            let direct = app.buttons.matching(identifier: "directEntry").firstMatch
-            if direct.waitForExistence(timeout: 5) {
-                direct.tap()
-                Thread.sleep(forTimeInterval: 1.5)
-                capture("10-약-등록-폼")
-            }
         }
     }
 
@@ -108,6 +103,22 @@ final class ScreenshotTests: XCTestCase {
         button.tap()
         // 화면이 자리를 잡을 틈을 준다. 애니메이션 도중에 찍으면 흐릿하게 남는다.
         Thread.sleep(forTimeInterval: 1.2)
+    }
+
+    /// 화면이 자리를 잡을 틈. 애니메이션 도중에 찍으면 흐릿하게 남는다.
+    private func settle() {
+        Thread.sleep(forTimeInterval: 1.2)
+    }
+
+    /// 시트를 닫는다. "닫기" 가 없으면 아래로 밀어 내린다.
+    private func dismissSheet() {
+        let close = app.buttons["닫기"].firstMatch
+        if close.waitForExistence(timeout: 3) {
+            close.tap()
+        } else {
+            app.swipeDown()
+        }
+        settle()
     }
 
     private func back() {

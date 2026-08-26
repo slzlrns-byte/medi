@@ -98,10 +98,16 @@ jobs:
             -destination "id=${{ steps.simulator.outputs.udid }}" \
             -resultBundlePath build/Screenshots.xcresult \
             -skipPackagePluginValidation \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 480 \
             CODE_SIGNING_ALLOWED=NO \
             test
 
       - name: 첨부에서 PNG 꺼내기
+        # 테스트가 걸려 죽어도 이미 찍힌 것은 꺼낸다. 지난번에 이게 없어서
+        # 25분 멈춘 뒤 찍어 둔 사진까지 통째로 잃었다.
+        if: always()
+        continue-on-error: true
         run: |
           set -o pipefail
           mkdir -p build/shots
@@ -180,6 +186,7 @@ jobs:
 
       - name: 워치 시뮬레이터 고르기
         id: watch
+        if: always()
         continue-on-error: true
         run: |
           set -o pipefail
@@ -213,7 +220,7 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: 워치 앱 빌드
-        if: steps.watch.outcome == 'success'
+        if: always() && steps.watch.outcome == 'success'
         continue-on-error: true
         run: |
           set -o pipefail
@@ -227,7 +234,7 @@ jobs:
             build
 
       - name: 워치 화면 찍기
-        if: steps.watch.outcome == 'success'
+        if: always() && steps.watch.outcome == 'success'
         continue-on-error: true
         run: |
           set -o pipefail
@@ -263,8 +270,16 @@ jobs:
           ls -la build/named
 
       - name: ci/screenshots 브랜치에 올리기
+        if: always()
         run: |
           set -e
+
+          # 한 장도 못 찍었으면 브랜치를 건드리지 않는다. 지난 사진을 빈 것으로
+          # 덮어쓰면 그나마 있던 것도 잃는다.
+          if ! ls build/named/*.png >/dev/null 2>&1; then
+            echo "::warning::찍힌 사진이 없어 브랜치를 그대로 둡니다."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
