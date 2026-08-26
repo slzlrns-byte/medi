@@ -91,7 +91,7 @@ final class ScreenshotTests: XCTestCase {
             Thread.sleep(forTimeInterval: 1.2)
             capture("09-약-추가")
 
-            let direct = app.buttons["직접 입력"].firstMatch
+            let direct = app.buttons.matching(identifier: "directEntry").firstMatch
             if direct.waitForExistence(timeout: 5) {
                 direct.tap()
                 Thread.sleep(forTimeInterval: 1.5)

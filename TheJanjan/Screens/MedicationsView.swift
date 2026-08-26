@@ -333,6 +333,8 @@ private struct AddMedicationEntryView: View {
                 ) {
                     isShowingForm = true
                 }
+                // 카드 안에 글자가 두 줄이라 이름만으로는 UI 테스트가 못 찾는다.
+                .accessibilityIdentifier("directEntry")
 
                 entryRow(
                     title: ProFeature.pharmacyScan.titleKo,
