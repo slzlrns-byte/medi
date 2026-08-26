@@ -91,11 +91,11 @@ struct PasscodeSetupView: View {
     private var header: some View {
         VStack(spacing: CGFloat(JanjanSpacing.xs)) {
             Text(promptKo)
-                .font(JanjanFont.display(22))
+                .janjanDisplay(22)
                 .foregroundStyle(Color.ink)
                 .multilineTextAlignment(.center)
             Text(subtitleKo)
-                .font(JanjanFont.body(13))
+                .janjanBody(13)
                 .foregroundStyle(Color.muted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -126,12 +126,12 @@ struct PasscodeSetupView: View {
         VStack(spacing: CGFloat(JanjanSpacing.xxs)) {
             if let messageKo {
                 Text(messageKo)
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.ink2)
             }
             if isEasyGuess {
                 Text(Passcode.easyGuessMessageKo)
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -148,17 +148,17 @@ struct PasscodeSetupView: View {
             JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                     Text("이 기기에는 되찾을 길이 없어요")
-                        .font(JanjanFont.body(14, weight: .medium))
+                        .janjanBody(14, weight: .medium)
                         .foregroundStyle(Color.ink)
                     Text("기기 암호나 Face ID 가 설정돼 있지 않아서, 번호를 잊으면 기록을 열 방법이 없어요. 기기 설정에서 암호를 먼저 만들어 두시길 권해요.")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         } else {
             Text("번호를 잊으면 \(biometryWordKo)로 되찾을 수 있어요.")
-                .font(JanjanFont.body(12))
+                .janjanBody(12)
                 .foregroundStyle(Color.muted)
                 .multilineTextAlignment(.center)
         }

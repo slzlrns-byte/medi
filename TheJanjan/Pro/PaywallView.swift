@@ -57,7 +57,7 @@ struct PaywallView: View {
     private var topBar: some View {
         ZStack {
             Text(Janjan.appNameKo)
-                .font(JanjanFont.body(12, weight: .medium))
+                .janjanBody(12, weight: .medium)
                 .tracking(1.6)
                 .foregroundStyle(Color.muted)
                 .frame(maxWidth: .infinity)
@@ -84,9 +84,8 @@ struct PaywallView: View {
 
     private var headline: some View {
         Text("더 잔잔한 하루를 위해,\nPro")
-            .font(JanjanFont.display(30, relativeTo: .largeTitle))
+            .janjanDisplay(30, relativeTo: .largeTitle)
             .foregroundStyle(Color.ink)
-            .lineSpacing(5)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -103,7 +102,7 @@ struct PaywallView: View {
                             diameter: 22
                         )
                         Text(feature.titleKo)
-                            .font(JanjanFont.body(16, weight: .medium))
+                            .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                     }
                 }
@@ -139,7 +138,7 @@ struct PaywallView: View {
                 .padding(.top, CGFloat(JanjanSpacing.m) + 2)
 
             Text("무료 기능은 구독 없이 계속 쓸 수 있어요.")
-                .font(JanjanFont.body(11))
+                .janjanBody(11)
                 .foregroundStyle(Color.muted)
                 .multilineTextAlignment(.center)
                 .padding(.top, CGFloat(JanjanSpacing.m))
@@ -179,11 +178,11 @@ struct PaywallView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(JanjanFont.body(15, weight: .semibold))
+                        .janjanBody(15, weight: .semibold)
                         .foregroundStyle(Color.ink)
                     if let subtitle {
                         Text(subtitle)
-                            .font(JanjanFont.body(11))
+                            .janjanBody(11)
                             .foregroundStyle(Color.muted)
                     }
                 }
@@ -192,7 +191,7 @@ struct PaywallView: View {
 
                 if let tag {
                     Text(tag)
-                        .font(JanjanFont.body(11, weight: .semibold))
+                        .janjanBody(11, weight: .semibold)
                         .foregroundStyle(Color.janjan(.lavInk))
                         .padding(.horizontal, CGFloat(JanjanSpacing.s))
                         .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 1)
@@ -263,10 +262,9 @@ struct PaywallView: View {
     /// 자동 갱신 고지. 금액·기간은 상품에서, 해지 방법은 문장으로.
     private var disclosure: some View {
         Text(disclosureText)
-            .font(JanjanFont.body(11))
+            .janjanBody(11)
             .foregroundStyle(Color.muted)
             .multilineTextAlignment(.center)
-            .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, CGFloat(JanjanSpacing.xs))
     }
@@ -304,7 +302,7 @@ struct PaywallView: View {
 
             externalLink("구독 관리", ProProduct.manageSubscriptionsURLString)
         }
-        .font(JanjanFont.body(12))
+        .janjanBody(12)
         .foregroundStyle(Color.ink2)
         .frame(maxWidth: .infinity)
     }
@@ -334,7 +332,7 @@ struct PaywallView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text(ProStore.storeUnavailableMessageKo)
-                    .font(JanjanFont.body(14))
+                    .janjanBody(14)
                     .foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -353,7 +351,7 @@ struct PaywallView: View {
             HStack(spacing: CGFloat(JanjanSpacing.s)) {
                 ProgressView()
                 Text("가격을 불러오는 중이에요.")
-                    .font(JanjanFont.body(14))
+                    .janjanBody(14)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -363,10 +361,10 @@ struct PaywallView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                 Text("Pro 를 쓰고 있어요.")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 Text("기간과 해지는 아래 \"구독 관리\" 에서 확인할 수 있어요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -375,7 +373,7 @@ struct PaywallView: View {
 
     private func errorLine(_ message: String) -> some View {
         Text(message)
-            .font(JanjanFont.body(12))
+            .janjanBody(12)
             .foregroundStyle(Color.janjan(.peachInk))
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)

@@ -119,11 +119,10 @@ struct TodayView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             Text(greetingKo)
-                .font(JanjanFont.display(32))
+                .janjanDisplay(32)
                 .foregroundStyle(Color.ink)
-                .lineSpacing(4)
             Text(subtitleKo)
-                .font(JanjanFont.body(15))
+                .janjanBody(15)
                 .foregroundStyle(Color.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,14 +179,14 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                         Text(line.slot.labelKo)
-                            .font(JanjanFont.display(22))
+                            .janjanDisplay(22)
                             .foregroundStyle(Color.ink)
                         Text(line.time.description)
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.ink2)
                     }
                     Text(line.medicationNames.joined(separator: " · "))
-                        .font(JanjanFont.body(14))
+                        .janjanBody(14)
                         .foregroundStyle(Color.ink2)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -211,10 +210,10 @@ struct TodayView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("아직 등록한 약이 없어요")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text("약 탭에서 하나만 추가해도 오늘 일정이 만들어져요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -226,12 +225,12 @@ struct TodayView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("오늘 기분")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(todaysMoodScore == nil
                      ? "하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요."
                      : "언제든 다시 고를 수 있어요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -273,7 +272,7 @@ struct TodayView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("한눈에")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -368,10 +367,10 @@ private struct SlotGoneSheet: View {
     var body: some View {
         VStack(spacing: CGFloat(JanjanSpacing.m)) {
             Text("이 시간대가 지금은 없어요")
-                .font(JanjanFont.display(22))
+                .janjanDisplay(22)
                 .foregroundStyle(Color.ink)
             Text("다른 기기에서 약이 바뀌었을 수 있어요.")
-                .font(JanjanFont.body(14))
+                .janjanBody(14)
                 .foregroundStyle(Color.muted)
             WhitePillButton(title: "닫기") { dismiss() }
         }
@@ -436,7 +435,7 @@ private struct SlotRecordSheet: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     Text(entry.medicationName)
-                        .font(JanjanFont.body(16, weight: .medium))
+                        .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
                     PillChip(text: "\(DecimalQuantity.display(entry.dose))정")
                     Spacer(minLength: 0)

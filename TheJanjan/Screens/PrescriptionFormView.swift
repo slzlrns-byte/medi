@@ -58,7 +58,7 @@ struct PrescriptionFormView: View {
                 if let warning = staleDateWarning {
                     JanjanCard {
                         Text(warning)
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -93,13 +93,13 @@ struct PrescriptionFormView: View {
                     selection: $visitDate,
                     displayedComponents: .date
                 )
-                .font(JanjanFont.body(15))
+                .janjanBody(15)
                 .tint(Color.ink)
                 .onChange(of: visitDate) { _, _ in refreshSuggestions() }
 
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                     Text("며칠치를 받았어요?")
-                        .font(JanjanFont.body(12, weight: .medium))
+                        .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
                     CountStepper(
                         text: "\(daysSupplied)일치",
@@ -111,7 +111,7 @@ struct PrescriptionFormView: View {
                 }
 
                 Toggle("다음 진료일이 정해졌어요", isOn: $hasNextVisit)
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .tint(Color.ink)
 
                 if hasNextVisit {
@@ -121,7 +121,7 @@ struct PrescriptionFormView: View {
                         in: visitDate...,
                         displayedComponents: .date
                     )
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .tint(Color.ink)
                 }
             }
@@ -132,10 +132,10 @@ struct PrescriptionFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("등록된 약이 없어요")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text("약을 먼저 등록하면 여기서 받아 온 개수를 함께 적을 수 있어요. 진료일만 먼저 남겨도 괜찮아요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -146,7 +146,7 @@ struct PrescriptionFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("이번에 받아 온 약")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 ForEach(activeMedications) { medication in
@@ -190,7 +190,7 @@ struct PrescriptionFormView: View {
                     text: $clinicNote
                 )
                 Text("들은 말을 그대로 적어 두면 다음 진료에서 되짚기 쉬워요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -286,8 +286,13 @@ struct PrescriptionFormView: View {
         )
 
         AppServices.shared.pushWatchSnapshot()
-        isSaving = false
-        onSaved()
+
+        // 다음 진료일이 바뀌었으니 진료 알림도 다시 깐다.
+        Task {
+            await ReminderPlanner.rescheduleAppointments(using: context)
+            isSaving = false
+            onSaved()
+        }
     }
 }
 

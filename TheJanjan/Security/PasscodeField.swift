@@ -82,7 +82,7 @@ struct PasscodeField: View {
                 append(value)
             } label: {
                 Text(value)
-                    .font(JanjanFont.display(30))
+                    .janjanDisplay(30)
                     .foregroundStyle(Color.ink)
                     .frame(width: 72, height: 72)
                     .background(Circle().fill(Color.surface))

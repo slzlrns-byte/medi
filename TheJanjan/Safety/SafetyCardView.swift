@@ -24,9 +24,8 @@ struct SafetyCardView: View {
                     Text(contacts.isEmpty
                          ? Janjan.safetyCardWithoutContactsKo
                          : Janjan.safetyCardMessageKo)
-                        .font(JanjanFont.display(22))
+                        .janjanDisplay(22)
                         .foregroundStyle(Color.ink)
-                        .lineSpacing(5)
                         .fixedSize(horizontal: false, vertical: true)
 
                     ForEach(contacts) { contact in
@@ -34,7 +33,7 @@ struct SafetyCardView: View {
                     }
 
                     Text("응급 상황은 112 · 119.")
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
 
                     MedicalDisclaimer()
@@ -67,15 +66,15 @@ struct SafetyCardView: View {
                     CircleGlyph(systemImage: "phone", background: .sage, foreground: .sageInk)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(contact.titleKo)
-                            .font(JanjanFont.body(16, weight: .medium))
+                            .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                         Text(contact.subtitleKo)
-                            .font(JanjanFont.body(12))
+                            .janjanBody(12)
                             .foregroundStyle(Color.muted)
                     }
                     Spacer(minLength: CGFloat(JanjanSpacing.xs))
                     Text(contact.number)
-                        .font(JanjanFont.body(16, weight: .medium))
+                        .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink2)
                         .monospacedDigit()
                 }

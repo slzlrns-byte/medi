@@ -9,7 +9,7 @@ struct ProBadge: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 9, weight: .regular))
             Text("Pro")
-                .font(JanjanFont.body(11, weight: .semibold))
+                .janjanBody(11, weight: .semibold)
         }
         .foregroundStyle(Color.janjan(.lavInk))
         .padding(.horizontal, CGFloat(JanjanSpacing.xs))

@@ -30,5 +30,28 @@ enum ReminderPlanner {
                 )
             }
         )
+
+        await rescheduleAppointments(using: context)
     }
+
+    /// 진료 알림도 같은 자리에서 다시 깐다. 처방을 저장하거나 설정을 바꾸면
+    /// 이 함수를 부르는 쪽이 하나여야 둘이 어긋나지 않는다.
+    static func rescheduleAppointments(using context: ModelContext) async {
+        let leadDays = UserDefaults.standard.object(forKey: appointmentLeadDaysKey) as? Int
+            ?? AppointmentReminder.defaultLeadDays
+
+        let visits = (try? context.fetch(FetchDescriptor<PrescriptionRecord>()))?
+            .compactMap { $0.nextVisitDate } ?? []
+
+        await NotificationManager.shared.rescheduleAppointmentReminders(
+            AppointmentReminder.reminders(
+                visitDates: visits,
+                leadDays: leadDays,
+                now: Date()
+            )
+        )
+    }
+
+    /// 설정과 여기가 같은 키를 봐야 한다. 한쪽만 고치면 토글이 아무 일도 하지 않는다.
+    static let appointmentLeadDaysKey = "appointmentLeadDays"
 }

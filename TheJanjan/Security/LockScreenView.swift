@@ -46,10 +46,10 @@ struct LockScreenView: View {
     private var wordmark: some View {
         VStack(spacing: CGFloat(JanjanSpacing.xs)) {
             Text(Janjan.appNameKo)
-                .font(JanjanFont.display(36))
+                .janjanDisplay(36)
                 .foregroundStyle(Color.ink)
             Text(Janjan.sloganKo)
-                .font(JanjanFont.body(13))
+                .janjanBody(13)
                 .foregroundStyle(Color.muted)
         }
     }
@@ -57,7 +57,7 @@ struct LockScreenView: View {
     /// 실패 사유나 남은 기다림. 자리를 늘 비워 두어 글이 뜰 때 화면이 튀지 않게 한다.
     private var message: some View {
         Text(messageText)
-            .font(JanjanFont.body(13))
+            .janjanBody(13)
             .foregroundStyle(Color.ink2)
             .multilineTextAlignment(.center)
             .frame(minHeight: 34)
@@ -83,7 +83,7 @@ struct LockScreenView: View {
                         Image(systemName: lock.biometrySymbolName)
                             .font(.system(size: 16, weight: .regular))
                         Text("생체인식으로 열기")
-                            .font(JanjanFont.body(15, weight: .medium))
+                            .janjanBody(15, weight: .medium)
                     }
                     .foregroundStyle(Color.ink)
                 }
@@ -96,7 +96,7 @@ struct LockScreenView: View {
                 Button("번호를 잊으셨어요?") {
                     Task { await lock.unlockWithDevice(forRecovery: true) }
                 }
-                .font(JanjanFont.body(13))
+                .janjanBody(13)
                 .foregroundStyle(Color.muted)
                 .disabled(lock.isAuthenticating)
             }

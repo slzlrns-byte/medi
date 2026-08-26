@@ -80,3 +80,30 @@ enum JanjanFont {
         return .system(size: size, weight: weight.systemWeight, design: .default)
     }
 }
+
+// MARK: - 서체 + 자간 + 행간을 한 번에
+
+// 서체만 지정하고 자간·행간을 놓치면 한글이 답답하거나 흩어져 보인다. 셋은 늘 함께
+// 가야 하므로 `.font(...)` 를 직접 부르지 않고 아래 두 개만 쓴다.
+// 값은 `JanjanTypography` 가 정하고 테스트로 잠겨 있다.
+
+extension View {
+
+    /// 제목·큰 숫자. SUIT Light + 좁힌 자간.
+    func janjanDisplay(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> some View {
+        font(JanjanFont.display(size, relativeTo: style))
+            .tracking(CGFloat(JanjanTypography.tracking(forSize: Double(size))))
+            .lineSpacing(CGFloat(JanjanTypography.lineSpacing(forSize: Double(size), role: .display)))
+    }
+
+    /// 본문·UI. Pretendard + 한글에 맞춘 행간.
+    func janjanBody(
+        _ size: CGFloat,
+        weight: JanjanFont.BodyWeight = .regular,
+        relativeTo style: Font.TextStyle = .body
+    ) -> some View {
+        font(JanjanFont.body(size, weight: weight, relativeTo: style))
+            .tracking(CGFloat(JanjanTypography.tracking(forSize: Double(size))))
+            .lineSpacing(CGFloat(JanjanTypography.lineSpacing(forSize: Double(size), role: .body)))
+    }
+}

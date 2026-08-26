@@ -96,24 +96,24 @@ struct ReportView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("지난 4주")
-                    .font(JanjanFont.body(13, weight: .medium))
+                    .janjanBody(13, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 if let rate = overallAdherence {
                     let percent = DecimalQuantity.floorToInt(rate * 100)
                     Text("복약률 \(percent)%")
-                        .font(JanjanFont.display(30))
+                        .janjanDisplay(30)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
                     adherenceBar(fraction: (rate as NSDecimalNumber).doubleValue)
                 } else {
                     Text("아직 셀 기록이 없어요.")
-                        .font(JanjanFont.body(15))
+                        .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
 
                 Text("건너뜀도 정상적인 선택으로 함께 셉니다.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
@@ -140,12 +140,12 @@ struct ReportView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("약별 남은 개수")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if activeMedications.isEmpty {
                     Text("등록된 약이 없어요.")
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
 
@@ -167,12 +167,12 @@ struct ReportView: View {
 
         return HStack {
             Text(medication.displayTitle)
-                .font(JanjanFont.body(15))
+                .janjanBody(15)
                 .foregroundStyle(Color.ink2)
             Spacer()
             // 한 번도 세지 않았으면 0정이라고 말하지 않는다.
             Text(counted ? "\(DecimalQuantity.display(remaining))정" : "재고 미기록")
-                .font(JanjanFont.body(15, weight: counted ? .medium : .light))
+                .janjanBody(15, weight: counted ? .medium : .light)
                 .foregroundStyle(counted ? Color.ink : Color.muted)
                 .monospacedDigit()
         }
@@ -183,7 +183,7 @@ struct ReportView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("진료에 가져가기")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {
@@ -196,7 +196,7 @@ struct ReportView: View {
                 .disabled(isExporting)
 
                 Text("만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -207,18 +207,18 @@ struct ReportView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("의사에게 물어볼 것")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 TextEditor(text: $questions)
-                    .font(JanjanFont.body(14))
+                    .janjanBody(14)
                     .foregroundStyle(Color.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 92)
                     .overlay(alignment: .topLeading) {
                         if questions.isEmpty {
                             Text("한 줄에 하나씩 적어 두면 리포트에 함께 나가요.")
-                                .font(JanjanFont.body(14))
+                                .janjanBody(14)
                                 .foregroundStyle(Color.muted)
                                 .allowsHitTesting(false)
                                 .padding(.top, 8)
@@ -234,7 +234,7 @@ struct ReportView: View {
                     )
 
                 Text("이 메모는 이 기기에만 남고 iCloud 로 넘어가지 않아요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
         }

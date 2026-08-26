@@ -174,7 +174,7 @@ struct MedicationsView: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     Text(nextVisitText)
-                        .font(JanjanFont.body(15, weight: .medium))
+                        .janjanBody(15, weight: .medium)
                         .foregroundStyle(Color.ink)
                     Spacer(minLength: 0)
                 }
@@ -182,7 +182,7 @@ struct MedicationsView: View {
                 Text(nextVisit == nil
                      ? "진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요."
                      : "다음 진료 전에 모자라는 약이 있으면 약 줄에 함께 보여요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -211,10 +211,10 @@ struct MedicationsView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("첫 약을 등록해 볼까요")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text("오른쪽 아래 + 를 누르면 이름과 시간만으로 시작할 수 있어요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -223,7 +223,7 @@ struct MedicationsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(JanjanFont.body(13, weight: .medium))
+            .janjanBody(13, weight: .medium)
             .foregroundStyle(Color.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, CGFloat(JanjanSpacing.s))
@@ -236,7 +236,7 @@ struct MedicationsView: View {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                         Text(row.medication.name)
-                            .font(JanjanFont.body(16, weight: .medium))
+                            .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                         if !row.medication.strengthText.isEmpty {
                             PillChip(text: row.medication.strengthText)
@@ -244,7 +244,7 @@ struct MedicationsView: View {
                     }
                     if !row.medication.purposeLine.isEmpty {
                         Text(row.medication.purposeLine)
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
                 }
@@ -254,17 +254,17 @@ struct MedicationsView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
                         Text("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정")
-                            .font(JanjanFont.display(20))
+                            .janjanDisplay(20)
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
                     } else {
                         Text("재고 미기록")
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
                     if let text = runOutText(row) {
                         Text(text)
-                            .font(JanjanFont.body(12))
+                            .janjanBody(12)
                             .foregroundStyle(Color.muted)
                     }
                 }
@@ -377,10 +377,10 @@ private struct AddMedicationEntryView: View {
                     CircleGlyph(systemImage: systemImage)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(JanjanFont.body(16, weight: .medium))
+                            .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                         Text(subtitle)
-                            .font(JanjanFont.body(12))
+                            .janjanBody(12)
                             .foregroundStyle(Color.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }

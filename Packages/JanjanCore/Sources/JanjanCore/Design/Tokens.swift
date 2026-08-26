@@ -230,6 +230,45 @@ public enum JanjanFontName {
 }
 
 /// 기분 7단계의 색과 라벨. 색만으로 상태를 말하지 않으므로 항상 라벨과 짝지어 쓴다.
+/// 자간과 행간 (설계 02절 타이포).
+///
+/// 한글은 라틴 문자보다 글자폭이 고르고 속공간이 넓어서, 라틴 기준 그대로 두면
+/// **큰 제목은 자간이 벌어져 보이고 본문은 행간이 좁아 답답하다.** 크기마다 손으로
+/// 값을 적으면 화면마다 어긋나므로 규칙을 한 곳에 두고 테스트로 잠근다.
+public enum JanjanTypography {
+
+    public enum Role: Sendable {
+        /// 제목·큰 숫자(SUIT Light).
+        case display
+        /// 본문·UI(Pretendard).
+        case body
+    }
+
+    /// 자간. 큰 글자일수록 좁히고, 아주 작은 글자는 오히려 살짝 벌린다.
+    ///
+    /// 작은 글자를 벌리는 이유: 12pt 아래에서 한글 자소가 서로 붙어 보이기 시작한다.
+    public static func tracking(forSize size: Double) -> Double {
+        switch size {
+        case 28...: return -0.6
+        case 22..<28: return -0.4
+        case 18..<22: return -0.2
+        case 14..<18: return 0
+        default: return 0.1
+        }
+    }
+
+    /// 줄 사이에 **더** 넣는 여백. SwiftUI 의 `lineSpacing` 은 기본 행간에 더해지는 값이다.
+    ///
+    /// 본문은 넉넉하게(대략 1.6줄), 제목은 조금만 — 제목을 본문만큼 벌리면
+    /// 한 덩어리로 읽히지 않고 줄이 흩어진다.
+    public static func lineSpacing(forSize size: Double, role: Role) -> Double {
+        switch role {
+        case .display: return (size * 0.18).rounded()
+        case .body: return (size * 0.42).rounded()
+        }
+    }
+}
+
 public enum JanjanMood {
 
     public static let scores: [Int] = [-3, -2, -1, 0, 1, 2, 3]

@@ -49,7 +49,7 @@ struct PillChip: View {
 
     var body: some View {
         Text(text)
-            .font(JanjanFont.body(13, weight: .medium))
+            .janjanBody(13, weight: .medium)
             .foregroundStyle(Color.janjan(textTint))
             .padding(.horizontal, CGFloat(JanjanSpacing.s))
             .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 2)
@@ -94,7 +94,7 @@ struct WhitePillButton: View {
                         .font(.system(size: 14, weight: .regular))
                 }
                 Text(title)
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
             }
             .foregroundStyle(Color.ink)
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
@@ -122,7 +122,7 @@ struct BlackPillButton: View {
                         .tint(Color.janjan(.surface))
                 } else {
                     Text(title)
-                        .font(JanjanFont.body(17, weight: .semibold))
+                        .janjanBody(17, weight: .semibold)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -171,7 +171,7 @@ extension View {
 struct MedicalDisclaimer: View {
     var body: some View {
         Text(Janjan.medicalDisclaimerKo)
-            .font(JanjanFont.body(12))
+            .janjanBody(12)
             .foregroundStyle(Color.muted)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,10 +190,10 @@ struct JanjanField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
             Text(label)
-                .font(JanjanFont.body(12, weight: .medium))
+                .janjanBody(12, weight: .medium)
                 .foregroundStyle(Color.muted)
             TextField(placeholder, text: $text)
-                .font(JanjanFont.body(16))
+                .janjanBody(16)
                 .foregroundStyle(Color.ink)
                 .keyboardType(keyboard)
                 .textInputAutocapitalization(.never)
@@ -214,7 +214,7 @@ struct TogglePill: View {
     var body: some View {
         Button(action: action) {
             Text(text)
-                .font(JanjanFont.body(14, weight: .medium))
+                .janjanBody(14, weight: .medium)
                 .foregroundStyle(Color.janjan(isOn ? .surface : .ink2))
                 .frame(minWidth: 40)
                 .padding(.horizontal, CGFloat(JanjanSpacing.s))
@@ -246,7 +246,7 @@ struct CountStepper: View {
             button("minus", label: decreaseLabelKo, action: onDecrease)
 
             Text(text)
-                .font(JanjanFont.body(14))
+                .janjanBody(14)
                 .foregroundStyle(Color.ink2)
                 .monospacedDigit()
 

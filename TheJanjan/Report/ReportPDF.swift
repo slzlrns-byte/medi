@@ -176,16 +176,23 @@ enum ReportPDF {
     }
 
     private static func attributed(_ text: String, style: TextStyle) -> NSAttributedString {
+        let typeface = font(style)
+        let size = Double(typeface.pointSize)
+        let role: JanjanTypography.Role = (style == .title) ? .display : .body
+
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 3
+        // 화면과 같은 규칙을 쓴다. 종이만 행간이 다르면 그것도 어긋남이다.
+        paragraph.lineSpacing = CGFloat(JanjanTypography.lineSpacing(forSize: size, role: role))
         paragraph.lineBreakMode = .byWordWrapping
 
         return NSAttributedString(
             string: text,
             attributes: [
-                .font: font(style),
+                .font: typeface,
                 .foregroundColor: color(style),
-                .paragraphStyle: paragraph
+                .paragraphStyle: paragraph,
+                // 자간도 화면과 맞춘다. NSAttributedString 은 pt 단위로 받는다.
+                .kern: CGFloat(JanjanTypography.tracking(forSize: size))
             ]
         )
     }

@@ -61,7 +61,42 @@ final class ScreenshotTests: XCTestCase {
         let settings = app.buttons["설정"]
         if settings.waitForExistence(timeout: 10) {
             settings.tap()
+            Thread.sleep(forTimeInterval: 1.0)
             capture("07-설정")
+        }
+    }
+
+    /// 약 등록 폼과 처방 기록. 사용자가 처음 만나는 두 입력 화면이라
+    /// 자간·행간이 어긋나면 여기서 가장 먼저 티가 난다.
+    func testCaptureInputScreens() throws {
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 30), "탭 막대가 뜨지 않았습니다")
+
+        tap(tab: "약")
+
+        let prescription = app.buttons["처방 기록하기"]
+        if prescription.waitForExistence(timeout: 10) {
+            prescription.tap()
+            Thread.sleep(forTimeInterval: 1.5)
+            capture("08-처방-기록")
+
+            let close = app.buttons["닫기"]
+            if close.exists { close.tap() }
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+
+        let add = app.buttons["약 추가"]
+        if add.waitForExistence(timeout: 10) {
+            add.tap()
+            Thread.sleep(forTimeInterval: 1.2)
+            capture("09-약-추가")
+
+            let direct = app.buttons["직접 입력"].firstMatch
+            if direct.waitForExistence(timeout: 5) {
+                direct.tap()
+                Thread.sleep(forTimeInterval: 1.5)
+                capture("10-약-등록-폼")
+            }
         }
     }
 

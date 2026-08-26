@@ -20,6 +20,8 @@ struct SettingsView: View {
     @EnvironmentObject private var pro: ProStore
 
     @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
+    @AppStorage(ReminderPlanner.appointmentLeadDaysKey)
+    private var appointmentLeadDays = AppointmentReminder.defaultLeadDays
 
     @State private var isShowingDeleteConfirmation = false
     @State private var isShowingPaywall = false
@@ -143,6 +145,15 @@ struct SettingsView: View {
                     // 이미 예약된 알림은 문구가 구워진 채로 남아 있다. 다시 깔아야 바뀐다.
                     Task { await ReminderPlanner.reschedule(using: context) }
                 }
+
+            Picker("진료 알림", selection: $appointmentLeadDays) {
+                ForEach(AppointmentReminder.allowedLeadDays, id: \.self) { days in
+                    Text(AppointmentReminder.leadLabelKo(forDays: days)).tag(days)
+                }
+            }
+            .onChange(of: appointmentLeadDays) { _, _ in
+                Task { await ReminderPlanner.rescheduleAppointments(using: context) }
+            }
         } header: {
             Text("알림")
         } footer: {
@@ -157,7 +168,7 @@ struct SettingsView: View {
         case .notDetermined:
             return "켜면 약 시간에 알려드리고, 알림에서 바로 복용함·건너뜀을 누를 수 있어요."
         default:
-            return "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다."
+            return "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다. 진료 알림은 처방에 다음 진료일을 적어 두면 갑니다."
         }
     }
 
@@ -269,7 +280,7 @@ struct SettingsView: View {
                             Text(contact.titleKo)
                                 .foregroundStyle(Color.ink)
                             Text(contact.subtitleKo)
-                                .font(JanjanFont.body(12))
+                                .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                         }
                         Spacer()
@@ -376,7 +387,7 @@ private struct LicenseNoticeView: View {
         NavigationStack {
             ScrollView {
                 Text(noticeText)
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.ink2)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

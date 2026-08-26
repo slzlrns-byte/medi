@@ -24,18 +24,18 @@ struct NotificationPermissionView: View {
 
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 Text("약 시간에 알려드릴까요?")
-                    .font(JanjanFont.display(26))
+                    .janjanDisplay(26)
                     .foregroundStyle(Color.ink)
                     .multilineTextAlignment(.center)
 
                 Text("알림에서 바로 복용함·건너뜀을 누를 수 있어요. 앱을 열지 않아도 기록됩니다.")
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("나중에 설정에서 켜고 끌 수 있어요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
@@ -51,7 +51,7 @@ struct NotificationPermissionView: View {
                 Button("지금은 괜찮아요") {
                     finish()
                 }
-                .font(JanjanFont.body(15))
+                .janjanBody(15)
                 .foregroundStyle(Color.muted)
                 .disabled(isAsking)
             }

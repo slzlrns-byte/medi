@@ -76,20 +76,20 @@ struct PharmacyScanView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("봉투를 평평하게 놓고 찍어 주세요")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text("약 이름과 용량이 적힌 면이 보이면 됩니다.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
                 Text("사진은 글자를 읽는 동안에만 쓰이고 저장되지 않아요. 읽은 내용은 등록 전에 확인할 수 있어요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
 
                 if !CameraPicker.isAvailable {
                     Text("이 기기에는 카메라가 없어서 앨범에서 고르게 됩니다.")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .padding(.top, CGFloat(JanjanSpacing.xxs))
                 }
@@ -103,7 +103,7 @@ struct PharmacyScanView: View {
                 ProgressView()
                     .tint(Color.ink2)
                 Text("글자를 읽고 있어요")
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink2)
             }
         }
@@ -113,10 +113,10 @@ struct PharmacyScanView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("약 이름을 찾지 못했어요")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text("글자가 흐리거나 접힌 부분에 있으면 잘 안 읽혀요. 다시 찍거나 직접 입력해도 괜찮아요.")
-                    .font(JanjanFont.body(13))
+                    .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -126,7 +126,7 @@ struct PharmacyScanView: View {
     private func resultsCards(_ candidates: [PharmacyLabelParser.Candidate]) -> some View {
         VStack(spacing: CGFloat(JanjanSpacing.s)) {
             Text("읽은 내용이 맞는지 확인해 주세요")
-                .font(JanjanFont.body(13))
+                .janjanBody(13)
                 .foregroundStyle(Color.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
@@ -147,7 +147,7 @@ struct PharmacyScanView: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     Text(candidate.name)
-                        .font(JanjanFont.body(16, weight: .medium))
+                        .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
                     if !candidate.strengthText.isEmpty {
                         PillChip(text: candidate.strengthText)
@@ -156,7 +156,7 @@ struct PharmacyScanView: View {
                 }
                 // 무엇을 보고 그렇게 읽었는지 함께 보여 준다. 그래야 고칠 수 있다.
                 Text(candidate.sourceLine)
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .lineLimit(2)
             }

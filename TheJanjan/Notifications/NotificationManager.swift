@@ -190,6 +190,43 @@ final class NotificationManager: NSObject {
         return reminder.medicationNames.joined(separator: " · ")
     }
 
+    // MARK: - 진료 알림
+
+    /// 진료 알림을 통째로 다시 깐다.
+    ///
+    /// 복약 알림과 식별자 앞머리가 다르므로(`visit-` / `dose-`) 서로를 지우지 않는다.
+    /// 반복하지 않는 한 번짜리라, 지난 것은 iOS 가 알아서 치운다.
+    func rescheduleAppointmentReminders(_ reminders: [AppointmentReminder.Reminder]) async {
+        let pending = await center.pendingNotificationRequests()
+        let ourIDs = pending.map(\.identifier).filter { $0.hasPrefix("visit-") }
+        center.removePendingNotificationRequests(withIdentifiers: ourIDs)
+
+        for reminder in reminders {
+            let content = UNMutableNotificationContent()
+            content.title = reminder.titleKo
+            content.body = reminder.bodyKo
+            content.sound = .default
+
+            let components = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute],
+                from: reminder.fireAt
+            )
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+
+            do {
+                try await center.add(
+                    UNNotificationRequest(
+                        identifier: reminder.id,
+                        content: content,
+                        trigger: trigger
+                    )
+                )
+            } catch {
+                logger.error("진료 알림 예약 실패: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     /// 30분 뒤 재알림. 한 번만 걸고 그 뒤로는 홈에 조용히 남긴다.
     func snooze(slotKey: String, medicationIDs: [UUID]) {
         let slot = DoseSlot(storageKey: slotKey)
@@ -240,6 +277,8 @@ final class NotificationManager: NSObject {
         }
     }
 
+    /// 복약·진료 알림을 모두 걷는다. "모든 데이터 삭제" 가 부른다 —
+    /// 지우고 나서도 사라진 약의 알림이 뜨면 안 된다.
     func cancelAllDoseReminders() {
         center.removeAllPendingNotificationRequests()
         // 이미 나가 있는 알림도 함께 걷는다. 전체 삭제를 누른 뒤에도

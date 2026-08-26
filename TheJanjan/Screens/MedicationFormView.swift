@@ -122,7 +122,7 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("어떻게 먹는 약인가요")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -134,7 +134,7 @@ struct MedicationFormView: View {
                 }
 
                 Text("제형")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xs))
 
@@ -148,7 +148,7 @@ struct MedicationFormView: View {
 
                 if !form.isSplittable {
                     Text("이 제형은 쪼개 먹지 않는 것으로 보고 개수를 1정 단위로만 셉니다.")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -160,7 +160,7 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("언제 먹나요")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 ForEach(drafts.indices, id: \.self) { index in
@@ -209,7 +209,7 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("무슨 요일에")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
@@ -222,7 +222,7 @@ struct MedicationFormView: View {
 
                 if weekdays.isEmpty {
                     Text("하루는 골라 주세요. 고른 요일에만 일정이 만들어져요.")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
             }
@@ -239,7 +239,7 @@ struct MedicationFormView: View {
                     text: $stockText
                 )
                 Text("세어 본 개수를 적으면 이 시점이 기준이 돼요. 비워 두면 재고를 세지 않아요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }

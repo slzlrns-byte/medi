@@ -49,7 +49,7 @@ struct MedicationDetailView: View {
                     // 다른 화면에서 지운 뒤 이 화면이 남아 있는 경우.
                     JanjanCard {
                         Text("이 약은 지워졌어요.")
-                            .font(JanjanFont.body(15))
+                            .janjanBody(15)
                             .foregroundStyle(Color.muted)
                     }
                 }
@@ -80,7 +80,7 @@ struct MedicationDetailView: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     Text(medication.name)
-                        .font(JanjanFont.display(24))
+                        .janjanDisplay(24)
                         .foregroundStyle(Color.ink)
                     if !medication.strengthText.isEmpty {
                         PillChip(text: medication.strengthText)
@@ -92,7 +92,7 @@ struct MedicationDetailView: View {
                 }
                 if !medication.purposeLine.isEmpty {
                     Text(medication.purposeLine)
-                        .font(JanjanFont.body(14))
+                        .janjanBody(14)
                         .foregroundStyle(Color.muted)
                         .padding(.top, CGFloat(JanjanSpacing.xxs))
                 }
@@ -116,16 +116,16 @@ struct MedicationDetailView: View {
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("남은 개수")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                 if hasStock {
                     Text("\(DecimalQuantity.display(snapshot.remaining))정")
-                        .font(JanjanFont.display(28))
+                        .janjanDisplay(28)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
                 } else {
                     Text("아직 세지 않았어요")
-                        .font(JanjanFont.body(15))
+                        .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
             }
@@ -141,19 +141,19 @@ struct MedicationDetailView: View {
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("먹는 때")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 if mine.isEmpty {
                     Text("정해 둔 시간이 없어요.")
-                        .font(JanjanFont.body(15))
+                        .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
 
                 ForEach(mine) { schedule in
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                         Text("\(schedule.slot.labelKo) \(schedule.timeOfDay.description)")
-                            .font(JanjanFont.body(15))
+                            .janjanBody(15)
                             .foregroundStyle(Color.ink2)
                         PillChip(text: "\(DecimalQuantity.display(schedule.dosePerIntake))정")
                         Spacer(minLength: 0)
@@ -170,12 +170,12 @@ struct MedicationDetailView: View {
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text(kind.titleKo)
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 if notes.isEmpty {
                     Text(emptyTextKo(kind))
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -205,7 +205,7 @@ struct MedicationDetailView: View {
         HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(note.text)
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
                 if let symptomID = note.symptomID,
@@ -213,7 +213,7 @@ struct MedicationDetailView: View {
                     // 이름 뒤에 "과/와" 를 직접 붙이면 받침에 따라 틀린다.
                     // 조사를 이름에서 떼어 내 그 문제를 아예 없앤다.
                     Text("\(name) 증상과 이어 둠")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
             }
@@ -237,7 +237,7 @@ struct MedicationDetailView: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack {
                     Text("상태")
-                        .font(JanjanFont.body(12, weight: .medium))
+                        .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
                     Spacer()
                     PillChip(text: medication.status.labelKo)
@@ -290,11 +290,11 @@ private struct MedicationNoteComposer: View {
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                             TextField(kind.placeholderKo, text: $text, axis: .vertical)
-                                .font(JanjanFont.body(16))
+                                .janjanBody(16)
                                 .foregroundStyle(Color.ink)
                                 .lineLimit(1...5)
                             Text("들은 말 그대로 적어도 괜찮아요. 앱이 고치지 않아요.")
-                                .font(JanjanFont.body(12))
+                                .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                         }
                     }
@@ -302,10 +302,10 @@ private struct MedicationNoteComposer: View {
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                             Text("증상과 이어 둘까요? (선택)")
-                                .font(JanjanFont.body(13, weight: .medium))
+                                .janjanBody(13, weight: .medium)
                                 .foregroundStyle(Color.ink)
                             Text("이어 두면 그 증상을 기록할 때마다 리포트에서 나란히 보여요.")
-                                .font(JanjanFont.body(12))
+                                .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                                 .fixedSize(horizontal: false, vertical: true)
 

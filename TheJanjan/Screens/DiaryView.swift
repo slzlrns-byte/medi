@@ -97,7 +97,7 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("지금 기분은 어떠세요?")
-                    .font(JanjanFont.display(22))
+                    .janjanDisplay(22)
                     .foregroundStyle(Color.ink)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -108,11 +108,11 @@ struct DiaryView: View {
 
                 if let record = todayRecord {
                     Text(JanjanMood.label(forScore: record.moodScore))
-                        .font(JanjanFont.body(14, weight: .medium))
+                        .janjanBody(14, weight: .medium)
                         .foregroundStyle(Color.ink2)
                 } else {
                     Text("하나만 골라도 완전한 기록이에요.")
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
             }
@@ -145,10 +145,10 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("한 줄 남길까요?")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 TextField("", text: text(record, \.note), axis: .vertical)
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1...4)
                     .padding(CGFloat(JanjanSpacing.s))
@@ -175,7 +175,7 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("어떤 마음이었어요?")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 // 좋은/나쁜을 색으로 편 가르지 않는다. 전부 같은 회색 칩.
@@ -213,12 +213,12 @@ struct DiaryView: View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack {
                 Text(title)
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 Spacer()
                 if value.wrappedValue == nil {
                     Text("안 적음")
-                        .font(JanjanFont.body(12))
+                        .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
             }
@@ -236,7 +236,7 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("잠은 어땠어요?")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 CountStepper(
@@ -272,7 +272,7 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("무엇을 했어요?")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -299,11 +299,11 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("더 쓰고 싶으면")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 TextEditor(text: text(record, \.longText))
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 120)
@@ -314,7 +314,7 @@ struct DiaryView: View {
                     )
 
                 Text("길이 제한은 없어요.")
-                    .font(JanjanFont.body(12))
+                    .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
         }
@@ -326,12 +326,12 @@ struct DiaryView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("증상")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if todaysSymptoms.isEmpty {
                     Text("오늘 남긴 증상이 없어요.")
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 } else {
                     ForEach(todaysSymptoms) { entry in
@@ -350,7 +350,7 @@ struct DiaryView: View {
     private func symptomRow(_ entry: SymptomEntryRecord) -> some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
             Text(Catalogs.symptoms.symptom(id: entry.symptomID)?.nameKo ?? entry.symptomID)
-                .font(JanjanFont.body(15))
+                .janjanBody(15)
                 .foregroundStyle(Color.ink2)
             PillChip(text: "세기 \(entry.severity)")
             Spacer(minLength: 0)
@@ -377,12 +377,11 @@ struct DiaryView: View {
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text("오늘의 질문")
-                    .font(JanjanFont.body(12, weight: .medium))
+                    .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                 Text(card?.textKo ?? "오늘은 그냥 여기까지여도 괜찮아요.")
-                    .font(JanjanFont.display(19))
+                    .janjanDisplay(19)
                     .foregroundStyle(Color.ink)
-                    .lineSpacing(3)
             }
         }
     }
@@ -396,12 +395,12 @@ struct DiaryView: View {
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("지난 기록")
-                    .font(JanjanFont.display(20))
+                    .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if past.isEmpty {
                     Text("아직 지난 기록이 없어요.")
-                        .font(JanjanFont.body(13))
+                        .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
 
@@ -411,11 +410,11 @@ struct DiaryView: View {
                             .fill(Color.mood(record.moodScore))
                             .frame(width: 18, height: 18)
                         Text(dayText(record.date))
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.ink2)
                             .monospacedDigit()
                         Text(record.note ?? JanjanMood.label(forScore: record.moodScore))
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.muted)
                             .lineLimit(1)
                         Spacer(minLength: 0)
@@ -614,7 +613,7 @@ private struct SymptomEntrySheet: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text(group.nameKo)
-                    .font(JanjanFont.body(13, weight: .medium))
+                    .janjanBody(13, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -641,7 +640,7 @@ private struct SymptomEntrySheet: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text("얼마나 심했어요?")
-                    .font(JanjanFont.body(15, weight: .medium))
+                    .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 CountStepper(
@@ -653,7 +652,7 @@ private struct SymptomEntrySheet: View {
                 )
 
                 TextField("덧붙일 말 (선택)", text: $note, axis: .vertical)
-                    .font(JanjanFont.body(15))
+                    .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1...4)
                     .padding(CGFloat(JanjanSpacing.s))
