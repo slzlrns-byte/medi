@@ -212,9 +212,16 @@ struct MedicationFormView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
+                // 일곱 개가 화면 폭을 고르게 나눠 가진다. 최소 폭 40 을 그대로
+                // 두면 일곱 개가 472pt 라 아이폰 어느 기기에도 들어가지 않는다.
                 HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
                     ForEach(Weekday.displayOrderKo, id: \.self) { day in
-                        TogglePill(text: day.labelKo, isOn: weekdays.contains(day)) {
+                        TogglePill(
+                            text: day.labelKo,
+                            isOn: weekdays.contains(day),
+                            minWidth: 0,
+                            fillsRow: true
+                        ) {
                             toggle(day)
                         }
                     }

@@ -209,6 +209,20 @@ struct TogglePill: View {
 
     let text: String
     let isOn: Bool
+
+    /// 글자가 짧아도 누를 만한 넓이를 지키는 최소 폭.
+    ///
+    /// 요일처럼 한 글자짜리를 일곱 개 늘어놓을 때는 이 40 이 그대로 곱해져
+    /// 줄이 화면 밖으로 나간다. 그럴 때는 0 으로 두고 `fillsRow` 를 쓴다.
+    var minWidth: CGFloat = 40
+
+    /// 줄에서 남는 폭을 고르게 나눠 가진다.
+    ///
+    /// 최소 폭을 곱해 늘어놓는 대신 화면이 주는 만큼만 쓴다. 그래서 기기가
+    /// 좁아져도 넘치지 않는다 — 넘치면 가운데 정렬된 바깥 VStack 이 그 폭까지
+    /// 커져서, 이 줄뿐 아니라 **화면의 모든 카드**가 좌우로 잘려 나간다.
+    var fillsRow: Bool = false
+
     let action: () -> Void
 
     var body: some View {
@@ -216,9 +230,10 @@ struct TogglePill: View {
             Text(text)
                 .janjanBody(14, weight: .medium)
                 .foregroundStyle(Color.janjan(isOn ? .surface : .ink2))
-                .frame(minWidth: 40)
-                .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                .frame(minWidth: minWidth)
+                .padding(.horizontal, CGFloat(fillsRow ? JanjanSpacing.xs : JanjanSpacing.s))
                 .padding(.vertical, CGFloat(JanjanSpacing.xs))
+                .frame(maxWidth: fillsRow ? .infinity : nil)
                 .background(
                     Capsule(style: .continuous)
                         .fill(Color.janjan(isOn ? .ink : .surface2))

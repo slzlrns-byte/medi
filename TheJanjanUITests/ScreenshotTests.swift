@@ -59,6 +59,13 @@ final class ScreenshotTests: XCTestCase {
             // "더 남기기" 가 겹친 채로 남는다(실제로 그렇게 찍혔다).
             Thread.sleep(forTimeInterval: 1.5)
             capture("05-기록-펼침")
+
+            // 펼친 아래쪽도 본다. 기운·불안의 1~5 줄이 여기 있는데, 한 장에는
+            // 안 들어와서 넘치는지 아닌지를 확인할 수가 없었다.
+            app.swipeUp()
+            app.swipeUp()
+            settle()
+            capture("05b-기록-아래")
         }
 
         tap(tab: "리포트")
