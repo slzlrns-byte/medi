@@ -49,15 +49,21 @@ struct MedicationsView: View {
                     }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
-                // 검은 원 버튼이 목록 위에 떠 있다(overlay). 그 지름과 여백만큼
-                // 아래를 비우지 않으면 끝까지 내렸을 때 마지막 약의 남은 개수를 가린다.
-                .padding(.bottom, blackButtonDiameter + CGFloat(JanjanSpacing.l) * 2)
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
             .navigationTitle("약")
             .navigationBarTitleDisplayMode(.large)
-            .overlay(alignment: .bottomTrailing) {
+            // 검은 원 버튼은 목록 '위에 얹지' 않고 아래를 실제로 비워서 놓는다.
+            //
+            // overlay + 아래 여백으로 두면 끝까지 내렸을 때만 안 가린다. 목록이
+            // 화면보다 조금 길 때는 맨 위에서 마지막 줄이 버튼 밑에 깔린다 -
+            // 비워 둔 여백이 화면 밖에 있기 때문이다. 실제로 '로라제팜 10정' 이
+            // 그렇게 가렸다(2026-08-26, 두 번째).
+            //
+            // safeAreaInset 은 스크롤 영역 자체를 그만큼 줄인다. 어느 위치에서도,
+            // 목록이 얼마나 길든 겹치지 않는다.
+            .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
                 BlackCircleButton(
                     systemImage: "plus",
                     accessibilityLabelKo: "약 추가",
