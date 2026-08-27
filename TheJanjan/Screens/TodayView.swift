@@ -154,13 +154,22 @@ struct TodayView: View {
     private var slotSection: some View {
         VStack(spacing: CGFloat(JanjanSpacing.s)) {
             ForEach(plan) { line in
-                Button {
-                    openSlot = SlotSelection(id: line.slotKey)
-                } label: {
-                    slotTile(line)
-                }
-                .buttonStyle(.plain)
+                slotTile(line)
             }
+        }
+    }
+
+    /// 그 시간대에 아직 답하지 않은 것을 전부 복용함으로 적는다.
+    ///
+    /// 이 앱에서 가장 자주 하는 동작이라 가장 싸야 한다. 예전에는 타일을 눌러
+    /// 시트를 열고, 약마다 복용함을 누르고, 닫아야 했다 - 하루 두 번이면
+    /// 한 달에 180번이다.
+    ///
+    /// 이미 건너뜀으로 적어 둔 것은 건드리지 않는다. 사용자가 일부러 고른 답을
+    /// 한 번의 손짓이 조용히 덮으면 안 된다.
+    private func recordRestTaken(in line: DayPlan.SlotLine) {
+        for entry in line.entries where entry.status == nil || entry.status == .unrecorded {
+            record(entry, in: line, as: .taken)
         }
     }
 
@@ -173,37 +182,69 @@ struct TodayView: View {
         }
     }
 
+    /// 타일 하나에 손잡이가 둘이다.
+    ///
+    /// 오른쪽 '먹었어요' 는 한 번에 그 시간대를 끝낸다. 왼쪽 본문은 예전처럼
+    /// 시트를 열어 약마다 따로 답하게 한다. 자주 하는 쪽이 크고 가깝고,
+    /// 드문 쪽(하나만 건너뛰기, 되돌리기)이 한 겹 안에 있다.
     private func slotTile(_ line: DayPlan.SlotLine) -> some View {
         JanjanTile(tint: tint(for: line.slot), padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.s)) {
-                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                        Text(line.slot.labelKo)
-                            .janjanDisplay(22)
-                            .foregroundStyle(Color.ink)
-                        Text(line.time.description)
-                            .janjanBody(13)
+                Button {
+                    openSlot = SlotSelection(id: line.slotKey)
+                } label: {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                            Text(line.slot.labelKo)
+                                .janjanDisplay(22)
+                                .foregroundStyle(Color.ink)
+                            Text(line.time.description)
+                                .janjanBody(13)
+                                .foregroundStyle(Color.ink2)
+                        }
+                        Text(line.medicationNames.joined(separator: " · "))
+                            .janjanBody(14)
                             .foregroundStyle(Color.ink2)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                     }
-                    Text(line.medicationNames.joined(separator: " · "))
-                        .janjanBody(14)
-                        .foregroundStyle(Color.ink2)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("약마다 따로 기록합니다"))
 
-                Spacer(minLength: CGFloat(JanjanSpacing.xs))
-
-                // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
-                PillChip(
-                    text: line.isCompleted ? "완료" : "\(line.pendingCount)개 남음",
-                    tint: .surface,
-                    textTint: line.isCompleted ? .sageInk : .ink2
-                )
+                if line.isCompleted {
+                    // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
+                    // 높이는 아래 버튼과 맞춘다 - 다르면 다 적은 순간 타일이 튄다.
+                    PillChip(text: "완료", tint: .surface, textTint: .sageInk)
+                        .frame(minWidth: 96, minHeight: 56)
+                } else {
+                    Button {
+                        recordRestTaken(in: line)
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text("먹었어요")
+                                .janjanBody(15, weight: .medium)
+                                .foregroundStyle(Color.ink)
+                            Text("\(line.pendingCount)개")
+                                .janjanBody(12)
+                                .foregroundStyle(Color.ink2)
+                        }
+                        .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                        .padding(.vertical, CGFloat(JanjanSpacing.s))
+                        .frame(minWidth: 96, minHeight: 56)
+                        .background(
+                            Capsule(style: .continuous).fill(Color.surface)
+                        )
+                        .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("\(line.slot.labelKo) 약 \(line.pendingCount)개 먹었어요"))
+                    .accessibilityHint(Text("한 번에 기록합니다"))
+                }
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(Text("눌러서 기록합니다"))
     }
 
     private var emptyCard: some View {
