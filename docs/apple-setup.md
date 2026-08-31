@@ -237,8 +237,10 @@ $pat  = "ghp_여기에_토큰"
 | `Authentication failed` (git) | `MATCH_GIT_BASIC_AUTHORIZATION` 이 잘못됐다 | `사용자이름:PAT` 를 base64 한 값인지, 줄바꿈이 섞이지 않았는지 확인. PAT 에 `repo` 권한이 있는지 확인 |
 | `Invalid curve name` / `Could not create API key` | `ASC_KEY_CONTENT` 가 base64가 아니거나 줄바꿈이 섞였다 | PowerShell `Set-Clipboard` 방식으로 다시 넣기 |
 | `No signing certificate "Apple Distribution" found` | 배포 인증서가 없다 | `first_run` 켜고 실행. 이미 3개(최대치)면 developer.apple.com 에서 안 쓰는 인증서를 폐기 |
-| `Provisioning profile ... doesn't include the com.apple.developer.icloud-services entitlement` | App ID 에 iCloud capability 를 안 켰다 | c-2 / c-3 을 다시 확인. **워치 App ID 도** iCloud + 컨테이너 체크 필요 |
-| `...watchkitapp` 프로파일이 없다고 나옴 | 워치 App ID 를 등록하지 않았다 | c-3 을 하고 `first_run` 으로 다시 실행 |
+| `Provisioning profile ... doesn't include the com.apple.developer.icloud-services entitlement` | App ID 에 iCloud capability 를 안 켰다 | c-3 / c-4 / c-5 를 다시 확인. **워치와 위젯 App ID 에도** iCloud + 컨테이너 체크가 필요합니다 |
+| `...watchkitapp` 프로파일이 없다고 나옴 | 워치 App ID 를 등록하지 않았다 | c-4 를 하고 `first_run` 으로 다시 실행 |
+| `...widgets` 프로파일이 없다고 나옴 | 위젯 App ID 를 등록하지 않았다 | c-5 를 하고 `first_run` 으로 다시 실행 |
+| 위젯이 앱을 열면 데이터가 있는데 홈 화면에서는 계속 비어 있다 | App Group 이 App ID 에 안 붙었다 | c-2 의 그룹이 만들어졌는지, 그리고 **앱(c-3)과 위젯(c-5) 양쪽** App ID 에 App Groups 가 체크됐는지 확인. 한쪽만 붙으면 서로 다른 저장소를 엽니다 |
 | `aps-environment` 불일치 | (설정되어 있음) Release 는 production 으로 자동 주입된다 | 손대지 말 것. `project.yml` 의 `APS_ENVIRONMENT` 참고 |
 | TestFlight 에 빌드가 안 보임 | 아직 처리 중 | **10~30분** 기다리기. 1시간 넘으면 애플에서 거절 메일이 왔는지 확인 |
 | `Missing app icon` 으로 업로드 거절 | 아이콘이 없거나 알파 채널이 있다 | 현재 1024×1024 불투명 PNG 가 들어 있다. 새 아이콘으로 바꿀 때 **투명도를 넣지 말 것** |
