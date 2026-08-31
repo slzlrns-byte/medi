@@ -12,6 +12,18 @@ public enum Janjan {
 
     public static let appBundleID = "com.thejanjan.app"
     public static let watchBundleID = "com.thejanjan.app.watchkitapp"
+    public static let widgetBundleID = "com.thejanjan.app.widgets"
+
+    /// 앱과 위젯이 **같은 저장소**를 열기 위한 App Group.
+    ///
+    /// 위젯은 별도 프로세스라 앱의 기본 저장 위치에 손이 닿지 않는다. 그룹 컨테이너에
+    /// 두어야 둘이 같은 파일을 본다. 위젯의 '먹었어요' 가 진짜 기록이 되는 것도
+    /// 이것 덕분이다 — 앱을 열 때까지 기다렸다 반영하는 방식이면, 앱을 안 여는 날의
+    /// 기록은 늦거나 사라진다.
+    ///
+    /// 두 타깃의 entitlements 에 같은 값이 들어 있어야 하고, Apple Developer 의
+    /// App ID 두 개 모두에 App Groups capability 가 켜져 있어야 서명이 통과한다.
+    public static let appGroupID = "group.com.thejanjan.app"
 
     /// 정책 페이지. 원본은 저장소의 `docs/site/` 이고 GitHub Pages 로 낸다.
     /// App Store Connect 의 URL 칸과 앱 설정 화면이 같은 주소를 쓴다.

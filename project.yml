@@ -91,6 +91,8 @@ targets:
         copy:
           destination: productsDirectory
           subpath: "$(CONTENTS_FOLDER_PATH)/Watch"
+      - target: TheJanjanWidgets
+        embed: true
     info:
       path: TheJanjan/Info.plist
       properties:
@@ -148,6 +150,56 @@ targets:
         JANJAN_DISABLE_CLOUDKIT: "1"
 
   # ── watchOS 앱 (단일 타깃, iOS 앱에 임베드) ─────────────────────────────
+  # ── 위젯 (홈 화면 · 잠금화면) ──────────────────────────────────────────
+  # 앱을 열지 않고 한 번에 기록하기 위한 것이다. 그래서 익스텐션이 앱과 **같은
+  # 저장소**(App Group)를 직접 열고 그 자리에서 적는다. 앱이 켜질 때까지 미뤄 두면
+  # 앱을 안 여는 날의 기록이 늦거나 사라진다.
+  #
+  # Persistence 와 Shared 를 함께 컴파일한다. 둘 다 Foundation·SwiftData·JanjanCore
+  # 만 쓰므로 익스텐션에서도 그대로 돈다. 계산을 한 벌 더 쓰지 않는 것이 요점이다 -
+  # 화면과 위젯이 서로 다른 숫자를 말하면 안 된다.
+  TheJanjanWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TheJanjanWidgets
+        excludes:
+          - "TheJanjanWidgets.entitlements"
+      - path: TheJanjanWidgets/TheJanjanWidgets.entitlements
+        buildPhase: none
+      - path: TheJanjan/Persistence
+        excludes:
+          # 알림에서 눌렀을 때의 통로다. 앱에만 있는 AppServices 를 불러서
+          # 익스텐션에서는 컴파일되지 않고, 위젯이 쓸 일도 없다.
+          - "DoseLogger.swift"
+      - path: TheJanjan/Shared
+    dependencies:
+      - package: JanjanCore
+    info:
+      path: TheJanjanWidgets/Info.plist
+      properties:
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleDisplayName: "더잔잔"
+        CFBundleDevelopmentRegion: "ko"
+        CFBundlePackageType: "XPC!"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.widgets
+        PRODUCT_NAME: TheJanjanWidgets
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+
   TheJanjanWatch:
     type: application
     platform: watchOS

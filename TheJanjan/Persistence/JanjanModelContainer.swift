@@ -37,6 +37,14 @@ enum JanjanModelContainer {
         ProcessInfo.processInfo.environment["JANJAN_DISABLE_CLOUDKIT"] == "1"
     }
 
+    /// 앱과 위젯이 같은 파일을 보게 하는 그룹 컨테이너.
+    ///
+    /// 이 그룹으로 열지 못하면(entitlement 미부여) 아래에서 앱 전용 위치로 물러난다.
+    /// 위젯이 빈 화면이 되는 것보다 사용자 기록을 못 여는 쪽이 훨씬 나쁘다.
+    private static var groupContainer: ModelConfiguration.GroupContainer {
+        .identifier(Janjan.appGroupID)
+    }
+
     static func make() -> ModelContainer {
         let schema = Schema(JanjanSchema.allModels)
 
@@ -44,6 +52,7 @@ enum JanjanModelContainer {
             let cloudConfiguration = ModelConfiguration(
                 "Janjan",
                 schema: schema,
+                groupContainer: groupContainer,
                 cloudKitDatabase: .private(Janjan.cloudKitContainerID)
             )
             if let container = try? ModelContainer(for: schema, configurations: cloudConfiguration) {
@@ -53,6 +62,20 @@ enum JanjanModelContainer {
             logger.warning("CloudKit 컨테이너를 열지 못했습니다. 로컬 저장소로 물러납니다.")
         }
 
+        let groupLocalConfiguration = ModelConfiguration(
+            "Janjan",
+            schema: schema,
+            groupContainer: groupContainer
+        )
+        if let container = try? ModelContainer(for: schema, configurations: groupLocalConfiguration) {
+            activeStorage = .localFile
+            return container
+        }
+
+        // 그룹을 못 열었다. App Group entitlement 가 없는 빌드(개발 서명, CI)다.
+        // 여기서 곧바로 메모리로 떨어지면 기록이 통째로 사라진 것처럼 보인다.
+        // 앱 전용 위치로 한 번 더 물러난다 - 위젯만 비어 보이고 앱은 멀쩡하다.
+        logger.warning("그룹 저장소를 열지 못했습니다. 앱 전용 저장소로 물러납니다(위젯은 비어 보입니다).")
         let localConfiguration = ModelConfiguration("Janjan", schema: schema)
         if let container = try? ModelContainer(for: schema, configurations: localConfiguration) {
             activeStorage = .localFile

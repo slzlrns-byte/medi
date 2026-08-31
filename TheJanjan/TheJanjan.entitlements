@@ -7,6 +7,15 @@
 	  반드시 같아야 한다. 컨테이너는 Apple Developer 사이트에서 먼저 만들어 두어야 하고,
 	  App ID(com.thejanjan.app)에도 iCloud capability 를 켜 두어야 서명이 통과한다.
 	-->
+	<!--
+	  위젯과 같은 저장소를 열기 위한 App Group. 위젯 쪽 entitlements 와 값이 같아야 한다.
+	  이 값이 빠지면 위젯은 앱 데이터를 못 보고 빈 화면이 된다(앱은 멀쩡하다 —
+	  JanjanModelContainer 가 앱 전용 위치로 물러난다).
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.thejanjan.app</string>
+	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.com.thejanjan.app</string>
