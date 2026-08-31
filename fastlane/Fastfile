@@ -9,6 +9,7 @@ SCHEME = "TheJanjan"
 PROJECT = "TheJanjan.xcodeproj"
 APP_ID = "com.thejanjan.app"
 WATCH_ID = "com.thejanjan.app.watchkitapp"
+WIDGET_ID = "com.thejanjan.app.widgets"
 
 platform :ios do
 
@@ -77,6 +78,16 @@ platform :ios do
       profile_name: ENV["sigh_#{WATCH_ID}_appstore_profile-name"],
       build_configurations: ["Release"]
     )
+    update_code_signing_settings(
+      path: PROJECT,
+      use_automatic_signing: false,
+      team_id: team_id,
+      targets: ["TheJanjanWidgets"],
+      bundle_identifier: WIDGET_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV["sigh_#{WIDGET_ID}_appstore_profile-name"],
+      build_configurations: ["Release"]
+    )
 
     # 5. 아카이브 → IPA
     build_app(
@@ -89,7 +100,8 @@ platform :ios do
       export_options: {
         provisioningProfiles: {
           APP_ID => ENV["sigh_#{APP_ID}_appstore_profile-name"],
-          WATCH_ID => ENV["sigh_#{WATCH_ID}_appstore_profile-name"]
+          WATCH_ID => ENV["sigh_#{WATCH_ID}_appstore_profile-name"],
+          WIDGET_ID => ENV["sigh_#{WIDGET_ID}_appstore_profile-name"]
         }
       },
       xcargs: "DEVELOPMENT_TEAM=#{team_id}"

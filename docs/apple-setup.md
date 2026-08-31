@@ -49,9 +49,12 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
 
 ---
 
-## c. App ID 2개와 iCloud 컨테이너 만들기
+## c. App ID 3개 · iCloud 컨테이너 · App Group 만들기
 
-아이폰 앱과 워치 앱은 서로 다른 번들 ID를 씁니다. 둘 다 미리 등록해야 서명이 통과합니다.
+아이폰 앱 · 워치 앱 · 위젯은 서로 다른 번들 ID를 씁니다. 셋 다 미리 등록해야 서명이 통과합니다.
+
+**순서가 중요합니다.** 컨테이너와 그룹을 먼저 만들어야 App ID 에서 고를 수 있습니다.
+거꾸로 하면 Capabilities 화면에 체크할 항목이 비어 있습니다.
 
 ### c-1. iCloud 컨테이너 먼저
 
@@ -60,7 +63,16 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
 3. **+** → Description 은 `TheJanjan`, Identifier 는 정확히
    **`iCloud.com.thejanjan.app`** → Continue → Register.
 
-### c-2. 아이폰 앱 ID
+### c-2. App Group 만들기
+
+앱과 위젯이 **같은 저장소 파일**을 열기 위한 것입니다. 이게 없으면 위젯은
+앱 데이터를 못 보고 빈 화면이 됩니다(앱 자체는 멀쩡합니다).
+
+1. 같은 화면에서 드롭다운을 **App Groups** 로 바꿉니다.
+2. **+** → Description `TheJanjan Shared`, Identifier 는 정확히
+   **`group.com.thejanjan.app`** → Continue → Register.
+
+### c-3. 아이폰 앱 ID
 
 1. 다시 드롭다운을 **App IDs** 로 바꾸고 **+** 를 누릅니다.
 2. **App** 을 고르고 Continue.
@@ -69,9 +81,10 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
    - **iCloud** → 체크하면 아래에 `Configure` 버튼이 생깁니다.
      누르고 **CloudKit** 을 고른 뒤 위에서 만든 `iCloud.com.thejanjan.app` 을 체크 → Save.
    - **Push Notifications** → 체크만 합니다.
+   - **App Groups** → 체크하고 `Configure` → `group.com.thejanjan.app` 체크 → Save.
 5. Continue → Register.
 
-### c-3. 워치 앱 ID
+### c-4. 워치 앱 ID
 
 1. **+** → **App** → Continue.
 2. Description `The Janjan Watch`, Bundle ID **Explicit** → **`com.thejanjan.app.watchkitapp`**.
@@ -80,6 +93,20 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
    같은 컨테이너 `iCloud.com.thejanjan.app` 체크 → Save.
    - 워치 앱도 같은 컨테이너를 entitlements 에 선언해 두었기 때문에 여기서 빠지면 서명이 실패합니다.
 4. Push Notifications 는 워치엔 필요 없습니다. 체크하지 마세요.
+5. Continue → Register.
+   - 워치는 App Group 을 쓰지 않습니다. 워치 화면은 폰이 보내 주는 스냅샷을 그리고,
+     저장소를 직접 열지 않기 때문입니다.
+
+### c-5. 위젯 앱 ID
+
+1. **+** → **App** → Continue.
+2. Description `The Janjan Widgets`, Bundle ID **Explicit** → **`com.thejanjan.app.widgets`**.
+3. Capabilities 에서 **두 개**를 체크합니다.
+   - **App Groups** → Configure → `group.com.thejanjan.app` 체크 → Save.
+     **이게 위젯의 핵심입니다.** 위젯은 별도 프로세스라 이 그룹으로만 앱 데이터에 닿습니다.
+   - **iCloud** → Configure → **CloudKit** → `iCloud.com.thejanjan.app` 체크 → Save.
+     위젯에서 누른 '먹었어요' 가 다른 기기로 따라가야 하기 때문입니다.
+4. Push Notifications 는 필요 없습니다.
 5. Continue → Register.
 
 ---
