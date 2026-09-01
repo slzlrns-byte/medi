@@ -8,7 +8,7 @@ final class MonthWaveTests: XCTestCase {
     private func checkIn(_ month: Int, _ day: Int, score: Int, updatedAt: Date? = nil) -> CheckIn {
         CheckIn(
             date: Fixed.calendar.startOfDay(for: Fixed.date(2026, month, day)),
-            mood: .init(score: score),
+            mood: .init(score),
             updatedAt: updatedAt ?? Fixed.date(2026, month, day, 12, 0)
         )
     }
