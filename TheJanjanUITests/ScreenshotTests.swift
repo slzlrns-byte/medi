@@ -39,6 +39,10 @@ final class ScreenshotTests: XCTestCase {
         // ── 탭으로 갈 수 있는 화면들 ─────────────────────────────────
         capture("01-오늘")
 
+        scrollToBottom()
+        capture("01b-오늘-바닥")
+        scrollToTop()
+
         // 설정은 오늘 탭 우상단 톱니에서 올라온다.
         let settings = app.buttons["설정"]
         if settings.waitForExistence(timeout: 10) {
@@ -70,6 +74,12 @@ final class ScreenshotTests: XCTestCase {
 
         tap(tab: "리포트")
         capture("06-리포트")
+
+        // 바닥까지 내려 본다. 탭 막대는 떠 있고 내용은 그 아래로 지나가므로,
+        // 마지막 카드가 막대에 갇히지 않고 위로 올라오는지 눈으로 봐야 안다.
+        // 여기가 화면 중 가장 길다.
+        scrollToBottom()
+        capture("06b-리포트-바닥")
 
         tap(tab: "약")
         capture("02-약")
@@ -125,6 +135,26 @@ final class ScreenshotTests: XCTestCase {
     }
 
     // MARK: - 조각
+
+    /// 더 내려갈 데가 없을 때까지 내린다.
+    ///
+    /// 정해진 횟수만큼 쓸어 올리면 화면이 길어질 때 바닥에 못 닿는다.
+    /// 화면이 더 안 바뀔 때까지 민다. 스크롤이 없는 화면에서는 한 번에 끝난다.
+    private func scrollToBottom(limit: Int = 8) {
+        var previous = app.windows.firstMatch.screenshot().pngRepresentation
+        for _ in 0..<limit {
+            app.swipeUp()
+            settle()
+            let current = app.windows.firstMatch.screenshot().pngRepresentation
+            if current == previous { return }
+            previous = current
+        }
+    }
+
+    private func scrollToTop(limit: Int = 8) {
+        for _ in 0..<limit { app.swipeDown() }
+        settle()
+    }
 
     /// 탭을 누르고 **정말 그 탭으로 갔는지 확인한다.**
     ///

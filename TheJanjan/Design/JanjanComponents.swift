@@ -7,7 +7,13 @@ import JanjanCore
 /// 연회색 바탕 위의 순백 카드.
 struct JanjanCard<Content: View>: View {
 
-    var padding: CGFloat = CGFloat(JanjanSpacing.l)
+    /// 카드 안쪽 여백.
+    ///
+    /// 바깥 여백 16 과 더해 글자가 화면 끝에서 32pt 에서 시작한다 — 애플의 기본
+    /// 그룹 목록과 같은 값이다. 예전에는 20 이라 36pt 였고, 393pt 화면에서 글자가
+    /// 쓸 수 있는 폭이 321pt 뿐이었다. 카드가 겹겹이 쌓인 화면에서 그만큼
+    /// 좁아 보였다.
+    var padding: CGFloat = CGFloat(JanjanSpacing.m)
     @ViewBuilder var content: Content
 
     var body: some View {

@@ -6,8 +6,9 @@
 # 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
 #
 # 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
-# 마지막 실행: 약 화면의 + 를 제목 줄로 옮기고, 등록 폼 아래쪽(10b)을 새로 찍기 시작한 뒤.
-#   볼 것 둘 - 로라제팜 개수가 더 이상 가려지지 않는지, 요일 일곱 개가 한 줄에 고르게 들어가는지. (2026-09-01)
+# 마지막 실행: 카드 여백을 좁히고, 좁은 기기(SE)와 바닥 컷을 새로 찍기 시작한 뒤.
+#   볼 것 셋 - 폭이 넓어졌는지, 좁은 화면에서 잘리는 데가 있는지(-좁은화면),
+#   바닥 카드가 탭 막대에 갇히지 않는지(01b·06b). (2026-09-01)
 
 name: Screenshots
 
@@ -57,12 +58,21 @@ jobs:
       - name: 프로젝트 생성
         run: xcodegen generate --spec project.yml
 
-      - name: 시뮬레이터 고르기
+      - name: 시뮬레이터 두 대 고르기
         id: simulator
+        # 넓은 기기 하나, 좁은 기기 하나.
+        #
+        # 예전에는 "그 런타임의 첫 번째 아이폰" 을 썼다. 우연히 402x874 짜리가
+        # 잡혔고, 그 화면에서만 확인하다 보니 좁고 짧은 기기에서 무엇이 잘리는지
+        # 알 수가 없었다. SE 는 375x667 로 27pt 좁고 179pt 짧다 - 넘치는 것은
+        # 거기서 먼저 넘친다.
         run: |
           set -o pipefail
-          UDID=$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+
+          NARROW = ["iPhone SE (3rd generation)", "iPhone SE (2nd generation)",
+                    "iPhone 13 mini", "iPhone 12 mini", "iPhone SE"]
 
           runtimes = json.load(sys.stdin)["devices"]
 
@@ -71,33 +81,65 @@ jobs:
               parts = [p for p in tail.split("-") if p.isdigit()]
               return tuple(int(p) for p in parts) or (0,)
 
-          best = None
+          newest, phones = None, []
           for identifier, devices in runtimes.items():
               if "iOS" not in identifier:
                   continue
-              phones = [d for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")]
-              if not phones:
+              available = [d for d in devices
+                           if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not available:
                   continue
-              candidate = (version(identifier), identifier, phones[0])
-              if best is None or candidate[0] > best[0]:
-                  best = candidate
+              if newest is None or version(identifier) > newest:
+                  newest, phones = version(identifier), available
 
-          if best is None:
+          if not phones:
               sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
 
-          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
-          print(best[2]["udid"])
-          ')
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          def find(name):
+              return next((d for d in phones if d["name"] == name), None)
 
-      - name: UI 테스트로 화면 찍기
+          wide = phones[0]
+          narrow = next((d for name in NARROW if (d := find(name))), None)
+
+          lines = ["wide_udid=" + wide["udid"], "wide_name=" + wide["name"]]
+          if narrow and narrow["udid"] != wide["udid"]:
+              lines += ["narrow_udid=" + narrow["udid"], "narrow_name=" + narrow["name"]]
+              sys.stderr.write("좁은 기기: {}\n".format(narrow["name"]))
+          else:
+              # 좁은 기기가 없으면 넓은 것만 찍는다. 사진이 아예 없는 것보다 낫다.
+              lines += ["narrow_udid=", "narrow_name="]
+              sys.stderr.write("좁은 기기를 못 찾았습니다. 넓은 기기만 찍습니다.\n")
+
+          sys.stderr.write("넓은 기기: {}\n".format(wide["name"]))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+              handle.write("\n".join(lines) + "\n")
+          '
+
+      - name: UI 테스트로 화면 찍기 (넓은 기기)
         run: |
           set -o pipefail
           xcodebuild \
             -project TheJanjan.xcodeproj \
             -scheme Screenshots \
-            -destination "id=${{ steps.simulator.outputs.udid }}" \
-            -resultBundlePath build/Screenshots.xcresult \
+            -destination "id=${{ steps.simulator.outputs.wide_udid }}" \
+            -resultBundlePath build/wide.xcresult \
+            -skipPackagePluginValidation \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 480 \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: UI 테스트로 화면 찍기 (좁은 기기)
+        # 좁은 기기가 실패해도 넓은 기기 사진은 이미 있다. 여기서 멈추지 않는다.
+        if: always() && steps.simulator.outputs.narrow_udid != ''
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.simulator.outputs.narrow_udid }}" \
+            -resultBundlePath build/narrow.xcresult \
             -skipPackagePluginValidation \
             -test-timeouts-enabled YES \
             -maximum-test-execution-time-allowance 480 \
@@ -109,38 +151,50 @@ jobs:
         # 25분 멈춘 뒤 찍어 둔 사진까지 통째로 잃었다.
         if: always()
         continue-on-error: true
+        env:
+          WIDE_NAME: ${{ steps.simulator.outputs.wide_name }}
+          NARROW_NAME: ${{ steps.simulator.outputs.narrow_name }}
         run: |
           set -o pipefail
-          mkdir -p build/shots
+          mkdir -p build/named
 
-          # Xcode 판에 따라 이 하위 명령이 없을 수 있다. 없으면 무엇이 있는지 찍어 두고
-          # 멈춘다 - 조용히 빈 손으로 끝나면 왜 사진이 없는지 알 길이 없다.
-          if ! xcrun xcresulttool export attachments \
-              --path build/Screenshots.xcresult \
-              --output-path build/shots; then
-            echo "::error::xcresulttool export attachments 가 실패했습니다. 쓸 수 있는 하위 명령:"
-            xcrun xcresulttool --help || true
-            exit 1
-          fi
+          # 두 기기의 결과 꾸러미를 차례로 푼다. 좁은 기기 사진은 이름 뒤에
+          # -좁은화면 을 붙여 한 폴더에 나란히 둔다 - 같은 화면을 위아래로
+          # 놓고 봐야 무엇이 잘렸는지 보인다.
+          for pass in wide narrow; do
+            bundle="build/${pass}.xcresult"
+            [ -d "$bundle" ] || { echo "$bundle 없음 - 건너뜁니다"; continue; }
 
-          ls -la build/shots || true
+            raw="build/raw-${pass}"
+            mkdir -p "$raw"
 
-          # export 는 파일을 해시 이름으로 떨구고 manifest.json 에 원래 이름을 적어 둔다.
-          # 사람이 읽을 이름으로 바꾸되, manifest 형식이 달라지면 이름만 포기하고
-          # 사진은 건진다 - 이름 때문에 빈 손으로 끝나는 것이 가장 나쁘다.
-          python3 - <<'PY'
+            # Xcode 판에 따라 이 하위 명령이 없을 수 있다. 없으면 무엇이 있는지
+            # 찍어 두고 멈춘다 - 조용히 빈 손으로 끝나면 왜 사진이 없는지 알 길이 없다.
+            if ! xcrun xcresulttool export attachments --path "$bundle" --output-path "$raw"; then
+              echo "::error::xcresulttool export attachments 가 실패했습니다($pass). 쓸 수 있는 하위 명령:"
+              xcrun xcresulttool --help || true
+              continue
+            fi
+
+            SUFFIX=""
+            [ "$pass" = "narrow" ] && SUFFIX="-좁은화면"
+            RAW="$raw" OUT=build/named SUFFIX="$SUFFIX" python3 - <<'PY'
           import json, os, shutil
 
-          root = "build/shots"
-          out = "build/named"
+          root = os.environ["RAW"]
+          out = os.environ["OUT"]
+          suffix = os.environ["SUFFIX"]
           os.makedirs(out, exist_ok=True)
 
           def copy(source, stem):
-              shutil.copyfile(source, os.path.join(out, stem + ".png"))
+              shutil.copyfile(source, os.path.join(out, stem + suffix + ".png"))
 
           named = 0
           manifest_path = os.path.join(root, "manifest.json")
 
+          # export 는 파일을 해시 이름으로 떨구고 manifest.json 에 원래 이름을 적어 둔다.
+          # 사람이 읽을 이름으로 바꾸되, manifest 형식이 달라지면 이름만 포기하고
+          # 사진은 건진다 - 이름 때문에 빈 손으로 끝나는 것이 가장 나쁘다.
           if os.path.exists(manifest_path):
               try:
                   with open(manifest_path, encoding="utf-8") as handle:
@@ -165,18 +219,20 @@ jobs:
                   print("manifest 를 읽지 못했습니다:", error)
 
           if named == 0:
-              # 이름 붙이기에 실패했으면 있는 파일을 그대로 가져온다.
               for entry in sorted(os.listdir(root)):
                   if entry.lower().endswith(".png"):
                       copy(os.path.join(root, entry), os.path.splitext(entry)[0])
                       named += 1
 
-          print("사진 {}장".format(named))
-          if named == 0:
-              raise SystemExit("첨부에서 사진을 하나도 꺼내지 못했습니다.")
+          print("{} 사진 {}장".format(root, named))
           PY
+          done
 
           ls -la build/named
+          test "$(ls build/named/*.png 2>/dev/null | wc -l)" -gt 0 \
+            || { echo "::error::사진을 하나도 꺼내지 못했습니다."; exit 1; }
+
+          echo "넓은 기기: ${WIDE_NAME:-?} / 좁은 기기: ${NARROW_NAME:-없음}"
 
       # ── 워치 ────────────────────────────────────────────────────────────
       # watchOS 는 XCUITest 를 지원하지 않는다. 눌러 가며 찍을 수 없으므로
