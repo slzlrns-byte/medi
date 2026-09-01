@@ -100,11 +100,7 @@ struct DiaryView: View {
                     .janjanDisplay(22)
                     .foregroundStyle(Color.ink)
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    ForEach(JanjanMood.scores, id: \.self) { score in
-                        moodDot(score)
-                    }
-                }
+                MoodPickerRow(chosenScore: todayRecord?.moodScore) { saveMood($0) }
 
                 if let record = todayRecord {
                     Text(JanjanMood.label(forScore: record.moodScore))
@@ -117,28 +113,6 @@ struct DiaryView: View {
                 }
             }
         }
-    }
-
-    private func moodDot(_ score: Int) -> some View {
-        let isChosen = todayRecord?.moodScore == score
-        return Button {
-            saveMood(score)
-        } label: {
-            Circle()
-                .fill(Color.mood(score))
-                .frame(width: 38, height: 38)
-                .overlay {
-                    Circle()
-                        .strokeBorder(Color.ink, lineWidth: isChosen ? 2 : 0)
-                        .padding(-3)
-                }
-                // 색 동그라미 크기는 그대로 두고 누를 수 있는 범위만 44pt 로 넓힌다.
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
-        .accessibilityAddTraits(isChosen ? [.isButton, .isSelected] : [.isButton])
     }
 
     private func noteCard(_ record: CheckInRecord) -> some View {

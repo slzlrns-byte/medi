@@ -347,3 +347,37 @@ public enum DayPlan {
         return formatter.string(from: day)
     }
 }
+
+
+// MARK: - 목소리로 골라야 할 때
+
+public extension DayPlan {
+
+    /// "약 먹었어" 라고만 들었을 때 고를 시간대.
+    ///
+    /// 화면이 있는 곳(오늘·위젯)은 가장 이른 미답을 **보여 주고** 사용자가 보고
+    /// 누른다. 시리는 보여 줄 화면이 없다. 밤에 아침이 미답이라고 아침을 적어
+    /// 버리면, 방금 먹은 취침 약이 엉뚱한 줄에 남는다. 그래서 여기서는 **지금
+    /// 시각과 가장 가까운 미답**을 고른다. 무엇을 적었는지는 대화문이 말해
+    /// 주므로, 어긋나면 그 자리에서 들리고 앱에서 고칠 수 있다.
+    static func nearestPending(
+        in lines: [SlotLine],
+        at moment: Date,
+        calendar: Calendar = .current
+    ) -> SlotLine? {
+        lines
+            .filter { !$0.isCompleted }
+            .min { lhs, rhs in
+                distance(of: lhs, from: moment, calendar: calendar)
+                    < distance(of: rhs, from: moment, calendar: calendar)
+            }
+    }
+
+    private static func distance(
+        of line: SlotLine,
+        from moment: Date,
+        calendar: Calendar
+    ) -> TimeInterval {
+        abs(line.time.date(on: moment, calendar: calendar).timeIntervalSince(moment))
+    }
+}

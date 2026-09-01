@@ -274,37 +274,10 @@ struct TodayView: View {
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    ForEach(JanjanMood.scores, id: \.self) { score in
-                        moodDot(score)
-                    }
-                }
-                .padding(.top, CGFloat(JanjanSpacing.xxs))
+                MoodPickerRow(chosenScore: todaysMoodScore) { recordMood($0) }
+                    .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
         }
-    }
-
-    private func moodDot(_ score: Int) -> some View {
-        let isChosen = todaysMoodScore == score
-        return Button {
-            recordMood(score)
-        } label: {
-            Circle()
-                .fill(Color.mood(score))
-                .frame(width: 34, height: 34)
-                .overlay {
-                    // 고른 것을 색이 아니라 테두리로도 말한다.
-                    Circle()
-                        .strokeBorder(Color.ink, lineWidth: isChosen ? 2 : 0)
-                        .padding(-3)
-                }
-                // 색 동그라미 크기는 그대로 두고 누를 수 있는 범위만 44pt 로 넓힌다.
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
-        .accessibilityAddTraits(isChosen ? [.isButton, .isSelected] : [.isButton])
     }
 
     // MARK: - 한눈에

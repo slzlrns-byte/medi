@@ -39,6 +39,7 @@ struct ReportView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     adherenceCard
+                    MonthWaveCard(checkIns: checkIns)
                     perMedicationCard
                     askDoctorCard
                     exportCard

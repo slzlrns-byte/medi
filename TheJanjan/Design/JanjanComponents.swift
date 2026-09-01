@@ -64,6 +64,50 @@ struct PillChip: View {
     }
 }
 
+/// 기분 색 일곱 개 한 줄. 화면 폭을 고르게 나눠 갖는다.
+///
+/// 처음에는 고정 44pt 일곱 개였다. 간격까지 356pt 인데 카드·바깥 여백을 더하면
+/// 420pt - 어느 아이폰에도 다 들어가지 않아서, 이 줄이 있는 화면(오늘·기록)만
+/// 통째로 넘쳐 좌우가 잘렸다. 402pt 기기에서는 여백이 이상하게 좁아 보이는
+/// 정도였지만 SE(375pt)에서는 제목 글자까지 잘렸다. 요일 알약과 같은 병이라
+/// 같은 약을 쓴다: 최소 폭을 곱해 늘어놓지 않고, 주어진 폭을 나눈다.
+struct MoodPickerRow: View {
+
+    let chosenScore: Int?
+    let pick: (Int) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(JanjanMood.scores, id: \.self) { score in
+                dot(score)
+            }
+        }
+    }
+
+    private func dot(_ score: Int) -> some View {
+        let isChosen = chosenScore == score
+        return Button {
+            pick(score)
+        } label: {
+            Circle()
+                .fill(Color.mood(score))
+                .overlay {
+                    // 고른 것을 색이 아니라 테두리로도 말한다.
+                    Circle()
+                        .strokeBorder(Color.ink, lineWidth: isChosen ? 2 : 0)
+                        .padding(-3)
+                }
+                .frame(maxWidth: 38, maxHeight: 38)
+                // 칸 전체가 눌린다. 동그라미가 줄어도 손가락 자리는 그대로다.
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
+        .accessibilityAddTraits(isChosen ? [.isButton, .isSelected] : [.isButton])
+    }
+}
+
 /// 나머지 버튼은 전부 흰 알약.
 struct WhitePillButton: View {
 

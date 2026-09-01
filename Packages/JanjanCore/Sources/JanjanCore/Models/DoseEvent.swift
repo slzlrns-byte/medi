@@ -29,6 +29,7 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
         case watch
         case notificationAction
         case widget
+        case siri
 
         public var labelKo: String {
             switch self {
@@ -36,6 +37,7 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
             case .watch: return "애플워치"
             case .notificationAction: return "알림"
             case .widget: return "위젯"
+            case .siri: return "시리"
             }
         }
     }

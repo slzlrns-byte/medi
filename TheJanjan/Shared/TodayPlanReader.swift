@@ -33,6 +33,13 @@ enum TodayPlanReader {
         slots(on: day, in: context).first { !$0.isCompleted }
     }
 
+    /// 시리가 고를 한 줄. 지금 시각과 가장 가까운 미답 시간대.
+    ///
+    /// 위젯(가장 이른 미답)과 다른 이유는 `DayPlan.nearestPending` 에 적어 뒀다.
+    static func nearestPending(at moment: Date, in context: ModelContext) -> DayPlan.SlotLine? {
+        DayPlan.nearestPending(in: slots(on: moment, in: context), at: moment)
+    }
+
     /// 그 시간대에서 **아직 답하지 않은 것만** 복용함으로 적는다.
     ///
     /// 이미 건너뜀으로 적어 둔 것은 건드리지 않는다. 사용자가 일부러 고른 답을
