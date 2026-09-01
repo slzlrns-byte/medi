@@ -39,6 +39,10 @@ enum TodayPlanReader {
     /// 위젯의 손짓 하나가 조용히 덮으면 안 된다. 오늘 화면의 '먹었어요' 와 같은 규칙이다.
     ///
     /// 적은 개수를 돌려준다. 0 이면 이미 다 답해 둔 시간대라는 뜻이다.
+    ///
+    /// `DoseRecorder` 가 MainActor 라서 여기도 MainActor 다. 읽기(`slots`)는
+    /// 그대로 두었다 — 위젯의 TimelineProvider 는 MainActor 가 아닌 곳에서 읽는다.
+    @MainActor
     @discardableResult
     static func recordRestTaken(
         slotKey: String,

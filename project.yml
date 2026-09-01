@@ -168,11 +168,18 @@ targets:
           - "TheJanjanWidgets.entitlements"
       - path: TheJanjanWidgets/TheJanjanWidgets.entitlements
         buildPhase: none
-      - path: TheJanjan/Persistence
-        excludes:
-          # 알림에서 눌렀을 때의 통로다. 앱에만 있는 AppServices 를 불러서
-          # 익스텐션에서는 컴파일되지 않고, 위젯이 쓸 일도 없다.
-          - "DoseLogger.swift"
+      # 폴더째 넣지 않고 세 파일만 이름으로 넣는다.
+      #
+      # 폴더로 넣었다가 MedicationStore 가 딸려 들어와 깨졌다. 그 파일은
+      # NotificationManager 를 부르는데 알림 코드는 앱에만 있다. 제외 목록으로
+      # 막으면 Persistence 에 새 파일이 생길 때마다 위젯 빌드가 조용히 깨지고,
+      # 그 파일을 쓴 사람은 위젯을 건드린 적도 없다. 필요한 것만 적는 쪽이
+      # 늘어나는 제외 목록보다 안전하다.
+      #
+      # 셋 다 Persistence 안의 다른 파일을 부르지 않는다(확인함).
+      - path: TheJanjan/Persistence/Records.swift
+      - path: TheJanjan/Persistence/JanjanModelContainer.swift
+      - path: TheJanjan/Persistence/DoseRecorder.swift
       - path: TheJanjan/Shared
     dependencies:
       - package: JanjanCore

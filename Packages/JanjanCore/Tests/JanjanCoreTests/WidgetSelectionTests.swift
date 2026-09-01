@@ -36,6 +36,27 @@ final class WidgetSelectionTests: XCTestCase {
         lines.first { !$0.isCompleted }
     }
 
+    /// 그 시간대에 답을 하나 적는다.
+    ///
+    /// **`slotKey` 가 반드시 붙는다.** `DayPlan.slots` 는 `slotKey` 가 없는 사건을
+    /// 조용히 버리므로, 빠뜨리면 "적었는데 안 적힌" 상태가 되고 테스트는 아무것도
+    /// 확인하지 못한 채 통과한다. 그래서 사건을 손으로 만들지 않고 여기를 지난다.
+    private func answer(
+        _ slot: DoseSlot,
+        for medicationID: UUID,
+        _ status: DoseEvent.Status,
+        source: DoseEvent.Source = .phone
+    ) -> DoseEvent {
+        let time = slot.defaultTime
+        return DoseEvent(
+            medicationID: medicationID,
+            scheduledAt: Fixed.date(2026, 8, 17, time.hour, time.minute),
+            status: status,
+            source: source,
+            slotKey: slot.storageKey
+        )
+    }
+
     // MARK: - 고르기
 
     func testPicksTheEarliestUnansweredSlot() {
@@ -48,24 +69,18 @@ final class WidgetSelectionTests: XCTestCase {
     /// 저녁이 됐다고 아침을 지나쳐 버리면, 안 적은 아침이 조용히 묻힌다.
     /// 놓친 것을 계속 보여 주되 재촉하는 말은 붙이지 않는 것이 이 앱의 방식이다.
     func testDoesNotSkipAMissedEarlierSlot() {
-        let bedtimeTaken = DoseEvent(
-            medicationID: Fixed.medB,
-            scheduledAt: Fixed.date(2026, 8, 17, 22, 30),
-            status: .taken,
-            source: .widget
-        )
+        let bedtimeTaken = answer(.bedtime, for: Fixed.medB, .taken, source: .widget)
+        let lines = plan(doses: [bedtimeTaken])
 
-        let picked = widgetPick(plan(doses: [bedtimeTaken]))
-        XCTAssertEqual(picked?.slot, .morning, "취침을 먼저 적었어도 안 적은 아침이 먼저입니다")
+        // 취침이 실제로 적혔는지 먼저 본다. 이게 없으면 아래 단언이
+        // '아무것도 안 적힌 계획' 을 보고도 통과해 버린다.
+        XCTAssertEqual(lines.first(where: { $0.slot == .bedtime })?.isCompleted, true)
+
+        XCTAssertEqual(widgetPick(lines)?.slot, .morning, "취침을 먼저 적었어도 안 적은 아침이 먼저입니다")
     }
 
     func testMovesOnOnceTheEarlierSlotIsAnswered() {
-        let morningTaken = DoseEvent(
-            medicationID: Fixed.medA,
-            scheduledAt: Fixed.date(2026, 8, 17, 8, 0),
-            status: .taken,
-            source: .widget
-        )
+        let morningTaken = answer(.morning, for: Fixed.medA, .taken, source: .widget)
 
         let picked = widgetPick(plan(doses: [morningTaken]))
         XCTAssertEqual(picked?.slot, .bedtime)
@@ -73,12 +88,7 @@ final class WidgetSelectionTests: XCTestCase {
 
     /// 건너뜀도 '답한 것' 이다. 다시 물어보면 이미 내린 결정을 되묻는 셈이 된다.
     func testSkippedCountsAsAnswered() {
-        let morningSkipped = DoseEvent(
-            medicationID: Fixed.medA,
-            scheduledAt: Fixed.date(2026, 8, 17, 8, 0),
-            status: .skipped,
-            source: .phone
-        )
+        let morningSkipped = answer(.morning, for: Fixed.medA, .skipped)
 
         let picked = widgetPick(plan(doses: [morningSkipped]))
         XCTAssertEqual(picked?.slot, .bedtime)
@@ -86,21 +96,28 @@ final class WidgetSelectionTests: XCTestCase {
 
     func testNothingLeftWhenEverySlotIsAnswered() {
         let doses = [
-            DoseEvent(
-                medicationID: Fixed.medA,
-                scheduledAt: Fixed.date(2026, 8, 17, 8, 0),
-                status: .taken,
-                source: .widget
-            ),
-            DoseEvent(
-                medicationID: Fixed.medB,
-                scheduledAt: Fixed.date(2026, 8, 17, 22, 30),
-                status: .skipped,
-                source: .phone
-            )
+            answer(.morning, for: Fixed.medA, .taken, source: .widget),
+            answer(.bedtime, for: Fixed.medB, .skipped)
         ]
 
         XCTAssertNil(widgetPick(plan(doses: doses)))
+    }
+
+    /// `slotKey` 가 없는 사건은 계획에 닿지 않는다.
+    ///
+    /// 오류도 경고도 없이 그냥 무시된다. 이걸 모르고 테스트에서 `slotKey` 를
+    /// 빠뜨렸다가, 아무것도 적히지 않은 계획을 보고도 통과하는 테스트를 썼다.
+    /// 다음 사람이 같은 데서 넘어지지 않게 동작을 적어 둔다.
+    func testAnEventWithoutASlotKeyIsNotMatched() {
+        let noSlotKey = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 8, 17, 8, 0),
+            status: .taken,
+            source: .widget
+        )
+
+        let morning = plan(doses: [noSlotKey]).first { $0.slot == .morning }
+        XCTAssertEqual(morning?.isCompleted, false, "시간대를 모르는 기록은 어느 줄에도 붙지 않습니다")
     }
 
     // MARK: - 출처
