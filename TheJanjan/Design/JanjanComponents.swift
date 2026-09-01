@@ -58,27 +58,6 @@ struct PillChip: View {
     }
 }
 
-/// 화면에 하나뿐인 검은 원 버튼. 가장 중요한 다음 행동만 받는다.
-struct BlackCircleButton: View {
-
-    let systemImage: String
-    let accessibilityLabelKo: String
-    var diameter: CGFloat = 64
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: diameter * 0.34, weight: .light))
-                .foregroundStyle(Color.janjan(.surface))
-                .frame(width: diameter, height: diameter)
-                .background(Circle().fill(Color.janjan(.ink)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(accessibilityLabelKo))
-    }
-}
-
 /// 나머지 버튼은 전부 흰 알약.
 struct WhitePillButton: View {
 

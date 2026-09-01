@@ -112,6 +112,14 @@ final class ScreenshotTests: XCTestCase {
                 // 화면 안에 들어와 멈춰야 다 밀려 들어온 것이다.
                 waitUntilStill(app.staticTexts["어떻게 먹는 약인가요"])
                 capture("10-약-등록-폼")
+
+                // 요일 일곱 개는 한 장에 안 들어온다. 화면 밖에 있으면 한 줄에
+                // 고르게 들어갔는지 볼 수가 없어서 아래로 내려 한 장 더 찍는다.
+                // 기록 탭에서 05b 를 넣은 것과 같은 이유다.
+                app.swipeUp()
+                app.swipeUp()
+                settle()
+                capture("10b-약-등록-폼-아래")
             }
         }
     }

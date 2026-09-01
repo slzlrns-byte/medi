@@ -24,9 +24,6 @@ struct MedicationsView: View {
 
     private var today: Date { Date() }
 
-    /// 떠 있는 검은 원 버튼의 지름. 목록 아래 여백이 이 값을 따라간다.
-    private let blackButtonDiameter: CGFloat = 64
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -54,24 +51,27 @@ struct MedicationsView: View {
             .scrollContentBackground(.hidden)
             .navigationTitle("약")
             .navigationBarTitleDisplayMode(.large)
-            // 검은 원 버튼은 목록 '위에 얹지' 않고 아래를 실제로 비워서 놓는다.
+            // 약을 더하는 손잡이는 제목 줄에 둔다. 오늘 화면의 설정 버튼과 같은 자리다.
             //
-            // overlay + 아래 여백으로 두면 끝까지 내렸을 때만 안 가린다. 목록이
-            // 화면보다 조금 길 때는 맨 위에서 마지막 줄이 버튼 밑에 깔린다 -
-            // 비워 둔 여백이 화면 밖에 있기 때문이다. 실제로 '로라제팜 10정' 이
-            // 그렇게 가렸다(2026-08-26, 두 번째).
+            // 원래는 떠 있는 검은 원 버튼이었는데 두 번 고치고도 계속 목록을 가렸다.
+            // 처음에는 아래 여백으로, 다음에는 safeAreaInset 으로 막으려 했다.
+            // 둘 다 틀렸다 - safeAreaInset 은 '마지막 줄까지 스크롤로 닿게' 해 줄 뿐,
+            // 목록 중간에서 버튼 밑으로 내용이 지나가는 것은 그대로다. 사진에서
+            // '로라제팜 10정' 의 개수가 세 번째로 가려진 것을 보고 접었다.
             //
-            // safeAreaInset 은 스크롤 영역 자체를 그만큼 줄인다. 어느 위치에서도,
-            // 목록이 얼마나 길든 겹치지 않는다.
-            .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-                BlackCircleButton(
-                    systemImage: "plus",
-                    accessibilityLabelKo: "약 추가",
-                    diameter: blackButtonDiameter
-                ) {
-                    isShowingAddFlow = true
+            // 떠 있는 버튼은 구조상 늘 무언가를 덮는다. 그리고 약을 더하는 일은
+            // 자주 하는 일이 아니다 - 처음에 몇 번 하고 나면 거의 안 한다.
+            // 화면에서 가장 큰 손잡이를 줄 만한 동작이 아니었다.
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isShowingAddFlow = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(Color.ink2)
+                    }
+                    .accessibilityLabel(Text("약 추가"))
                 }
-                .padding(CGFloat(JanjanSpacing.l))
             }
             .sheet(isPresented: $isShowingAddFlow) {
                 AddMedicationEntryView()
