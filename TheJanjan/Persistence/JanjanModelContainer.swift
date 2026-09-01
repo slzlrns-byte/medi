@@ -37,24 +37,65 @@ enum JanjanModelContainer {
         ProcessInfo.processInfo.environment["JANJAN_DISABLE_CLOUDKIT"] == "1"
     }
 
-    /// 앱과 위젯이 같은 파일을 보게 하는 그룹 컨테이너.
+    /// 앱과 위젯이 같은 파일을 보게 하는 그룹을 실제로 열 수 있는가.
     ///
-    /// 이 그룹으로 열지 못하면(entitlement 미부여) 아래에서 앱 전용 위치로 물러난다.
-    /// 위젯이 빈 화면이 되는 것보다 사용자 기록을 못 여는 쪽이 훨씬 나쁘다.
-    private static var groupContainer: ModelConfiguration.GroupContainer {
-        .identifier(Janjan.appGroupID)
+    /// **반드시 먼저 물어야 한다.** entitlement 없는 그룹을 SwiftData 에 넘기면
+    /// 오류를 던지는 대신 `fatalError` 로 프로세스를 끝낸다 — `try?` 로 못 잡는다.
+    /// 처음에는 단계별 후퇴가 이걸 받아 줄 것이라 여겼는데, 그 코드에 닿기 전에
+    /// 앱이 죽었다. 서명 없는 CI 빌드가 실행 즉시 종료됐다.
+    ///
+    /// FileManager 는 같은 질문에 nil 로 답한다. 그래서 여기로 묻는다.
+    private static var isAppGroupReachable: Bool {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: Janjan.appGroupID) != nil
+    }
+
+    /// 그룹을 쓸 수 있는지 / iCloud 를 붙일지에 따른 네 가지 조합.
+    ///
+    /// 삼항 연산자로 겹쳐 쓰지 않는다. 어느 조합이 무엇인지 눈으로 보이는 편이,
+    /// 나중에 한 갈래만 고칠 때 안전하다.
+    private static func configuration(
+        schema: Schema,
+        useGroup: Bool,
+        cloudKit: Bool
+    ) -> ModelConfiguration {
+        switch (useGroup, cloudKit) {
+        case (true, true):
+            return ModelConfiguration(
+                "Janjan",
+                schema: schema,
+                groupContainer: .identifier(Janjan.appGroupID),
+                cloudKitDatabase: .private(Janjan.cloudKitContainerID)
+            )
+        case (true, false):
+            return ModelConfiguration(
+                "Janjan",
+                schema: schema,
+                groupContainer: .identifier(Janjan.appGroupID)
+            )
+        case (false, true):
+            return ModelConfiguration(
+                "Janjan",
+                schema: schema,
+                cloudKitDatabase: .private(Janjan.cloudKitContainerID)
+            )
+        case (false, false):
+            return ModelConfiguration("Janjan", schema: schema)
+        }
     }
 
     static func make() -> ModelContainer {
         let schema = Schema(JanjanSchema.allModels)
 
+        // 한 번만 묻고 그 답을 아래 전부에 쓴다.
+        let useGroup = isAppGroupReachable
+        if !useGroup {
+            // 앱은 멀쩡히 돌아간다. 위젯만 앱 데이터를 못 보고 비어 보인다.
+            logger.warning("App Group 을 열 수 없습니다. 앱 전용 저장소를 씁니다(위젯은 비어 보입니다).")
+        }
+
         if !isCloudKitDisabledByEnvironment {
-            let cloudConfiguration = ModelConfiguration(
-                "Janjan",
-                schema: schema,
-                groupContainer: groupContainer,
-                cloudKitDatabase: .private(Janjan.cloudKitContainerID)
-            )
+            let cloudConfiguration = configuration(schema: schema, useGroup: useGroup, cloudKit: true)
             if let container = try? ModelContainer(for: schema, configurations: cloudConfiguration) {
                 activeStorage = .cloudKit
                 return container
@@ -62,21 +103,7 @@ enum JanjanModelContainer {
             logger.warning("CloudKit 컨테이너를 열지 못했습니다. 로컬 저장소로 물러납니다.")
         }
 
-        let groupLocalConfiguration = ModelConfiguration(
-            "Janjan",
-            schema: schema,
-            groupContainer: groupContainer
-        )
-        if let container = try? ModelContainer(for: schema, configurations: groupLocalConfiguration) {
-            activeStorage = .localFile
-            return container
-        }
-
-        // 그룹을 못 열었다. App Group entitlement 가 없는 빌드(개발 서명, CI)다.
-        // 여기서 곧바로 메모리로 떨어지면 기록이 통째로 사라진 것처럼 보인다.
-        // 앱 전용 위치로 한 번 더 물러난다 - 위젯만 비어 보이고 앱은 멀쩡하다.
-        logger.warning("그룹 저장소를 열지 못했습니다. 앱 전용 저장소로 물러납니다(위젯은 비어 보입니다).")
-        let localConfiguration = ModelConfiguration("Janjan", schema: schema)
+        let localConfiguration = configuration(schema: schema, useGroup: useGroup, cloudKit: false)
         if let container = try? ModelContainer(for: schema, configurations: localConfiguration) {
             activeStorage = .localFile
             return container
