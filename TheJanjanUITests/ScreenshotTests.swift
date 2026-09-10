@@ -131,17 +131,23 @@ final class ScreenshotTests: XCTestCase {
                 settle()
                 capture("10b-약-등록-폼-아래")
             }
-            dismissSheet()
+            // 여기서는 못 닫아도 테스트를 죽이지 않는다. 이 뒤에 남은 것은
+            // 한 장뿐이고, 그 한 장을 건너뛰는 것보다 런 전체가 빨갛게 끝나는
+            // 쪽이 더 헷갈린다 - 실제로 폼 닫기가 한 박자 늦어 마지막 장만
+            // 남기고 통째로 실패한 적이 있다(2026-09-10, 런 21).
+            _ = tryDismissSheet()
         }
 
         // 오늘의 시간대 타일 본문을 누르면 그 시간대의 약 목록 시트가 열린다.
         // 이것도 시트라 맨 뒤에 있다.
-        tap(tab: "오늘")
-        let morning = app.staticTexts["아침"].firstMatch
-        if morning.waitForExistence(timeout: 10) {
-            morning.tap()
-            settle()
-            capture("01c-아침-시트")
+        if isTabBarReachable {
+            tap(tab: "오늘")
+            let morning = app.staticTexts["아침"].firstMatch
+            if morning.waitForExistence(timeout: 10) {
+                morning.tap()
+                settle()
+                capture("01c-아침-시트")
+            }
         }
     }
 
@@ -222,14 +228,20 @@ final class ScreenshotTests: XCTestCase {
         app.tabBars.firstMatch.isHittable
     }
 
-    /// 시트를 닫고, **정말 닫혔는지 확인한다.**
-    ///
+    /// 시트를 닫고, **정말 닫혔는지 확인한다.** 못 닫으면 실패로 끊는다 —
+    /// 다음 캡처들이 시트 위에서 엉뚱한 사진을 남기는 것보다 낫다.
+    private func dismissSheet(file: StaticString = #filePath, line: UInt = #line) {
+        if !tryDismissSheet() {
+            XCTFail("시트가 닫히지 않았습니다", file: file, line: line)
+        }
+    }
+
     /// "닫기" 는 시트 뿌리에만 있다. 시트 안에서 다음 화면으로 밀고 들어가 있으면
     /// (약 추가 -> 직접 입력) 닫기가 없어서, 예전에는 swipeDown 으로 떨어졌다.
     /// 그런데 폼 위에서의 swipeDown 은 시트를 닫는 대신 내용만 스크롤한다.
     /// 그래서 먼저 뿌리로 나온 다음 닫는다.
-    private func dismissSheet(file: StaticString = #filePath, line: UInt = #line) {
-        for _ in 0..<4 {
+    private func tryDismissSheet(attempts: Int = 6) -> Bool {
+        for _ in 0..<attempts {
             let close = app.buttons["닫기"].firstMatch
             let backButton = app.navigationBars.buttons.element(boundBy: 0)
 
@@ -243,9 +255,9 @@ final class ScreenshotTests: XCTestCase {
             }
 
             settle()
-            if isTabBarReachable { return }
+            if isTabBarReachable { return true }
         }
-        XCTFail("시트가 닫히지 않았습니다", file: file, line: line)
+        return isTabBarReachable
     }
 
     private func back() {

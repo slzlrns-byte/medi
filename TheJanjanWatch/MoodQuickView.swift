@@ -8,7 +8,10 @@ struct MoodQuickView: View {
     @EnvironmentObject private var session: WatchSessionManager
     @Environment(\.dismiss) private var dismiss
 
-    private let columns = [GridItem(.adaptive(minimum: 40), spacing: 6)]
+    /// 4열 고정. adaptive(minimum: 40) 은 40mm 워치에서 3열로 줄바꿈되어
+    /// 일곱 번째 원이 혼자 남고 아래 설명까지 밀어냈다. 열 수를 못박고
+    /// 원이 폭에 맞춰 줄어들게 한다 - 4+3 은 어느 크기에서도 4+3 이다.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
 
     var body: some View {
         NavigationStack {
@@ -22,7 +25,7 @@ struct MoodQuickView: View {
                             } label: {
                                 Circle()
                                     .fill(color(for: score))
-                                    .frame(height: 40)
+                                    .aspectRatio(1, contentMode: .fit)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
