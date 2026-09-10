@@ -76,4 +76,24 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
         if case .correction = kind { return true }
         return false
     }
+
+    /// 보충이면 받아 온 개수, 정정이면 nil. "받아 온 N정" 표시가 쓴다.
+    public var refillQuantity: Decimal? {
+        if case .refill(let quantity) = kind { return quantity }
+        return nil
+    }
+
+    /// 이 약의 가장 최근 보충 개수. 한 번도 보충을 적지 않았으면 nil.
+    ///
+    /// "남은 12정" 옆에 "받아 온 28정" 을 놓기 위한 값이다. 남은 개수처럼
+    /// 계산된 값이 아니라 사용자가 적은 사실 그대로라서 무료 영역이다.
+    public static func lastRefillQuantity(
+        of medicationID: UUID,
+        in events: [StockEvent]
+    ) -> Decimal? {
+        events
+            .filter { $0.medicationID == medicationID && $0.refillQuantity != nil }
+            .max { $0.occurredAt < $1.occurredAt }?
+            .refillQuantity
+    }
 }

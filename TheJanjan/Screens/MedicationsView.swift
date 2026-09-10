@@ -114,6 +114,8 @@ struct MedicationsView: View {
         let snapshot: InventoryCalculator.Snapshot
         /// 재고를 한 번도 세지 않았으면 잔여를 숫자로 말하지 않는다.
         let hasStock: Bool
+        /// 가장 최근 보충으로 받아 온 개수. 남은 개수의 눈금 역할을 한다.
+        let lastRefill: Decimal?
     }
 
     private struct RowGroup {
@@ -151,7 +153,8 @@ struct MedicationsView: View {
                     nextVisit: visit,
                     asOf: today
                 ),
-                hasStock: stock.contains { $0.medicationID == medication.id }
+                hasStock: stock.contains { $0.medicationID == medication.id },
+                lastRefill: StockEvent.lastRefillQuantity(of: medication.id, in: stock)
             )
         }
     }
@@ -263,6 +266,13 @@ struct MedicationsView: View {
                             .janjanDisplay(20)
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
+                        // 남은 숫자만으로는 많은지 적은지 모른다. 받아 온 개수가 눈금이 된다.
+                        if let refill = row.lastRefill {
+                            Text("받아 온 \(DecimalQuantity.display(refill))정")
+                                .janjanBody(12)
+                                .foregroundStyle(Color.muted)
+                                .monospacedDigit()
+                        }
                     } else {
                         Text("재고 미기록")
                             .janjanBody(13)

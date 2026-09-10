@@ -211,6 +211,30 @@ final class InventoryCalculatorTests: XCTestCase {
         )
     }
 
+    // MARK: - 받아 온 개수
+
+    func testLastRefillQuantityPicksTheMostRecentRefill() {
+        let stock: [StockEvent] = [
+            .refill(medicationID: Fixed.medA, quantity: 28, at: Fixed.date(2026, 7, 1)),
+            .refill(medicationID: Fixed.medA, quantity: 14, at: Fixed.date(2026, 8, 1)),
+            // 정정은 보충이 아니다. 더 나중이어도 "받아 온 개수" 가 되면 안 된다.
+            .correction(medicationID: Fixed.medA, setTo: 9, at: Fixed.date(2026, 8, 10)),
+            // 다른 약의 보충은 섞이면 안 된다.
+            .refill(medicationID: Fixed.medB, quantity: 56, at: Fixed.date(2026, 8, 12))
+        ]
+
+        XCTAssertEqual(StockEvent.lastRefillQuantity(of: Fixed.medA, in: stock), 14)
+        XCTAssertEqual(StockEvent.lastRefillQuantity(of: Fixed.medB, in: stock), 56)
+    }
+
+    func testLastRefillQuantityIsNilWithoutAnyRefill() {
+        let stock: [StockEvent] = [
+            .correction(medicationID: Fixed.medA, setTo: 5, at: Fixed.date(2026, 8, 10))
+        ]
+        XCTAssertNil(StockEvent.lastRefillQuantity(of: Fixed.medA, in: stock))
+        XCTAssertNil(StockEvent.lastRefillQuantity(of: Fixed.medB, in: []))
+    }
+
     // MARK: - 문서의 예시 그대로
 
     func testWorkedExampleRemainingIsFourteen() {

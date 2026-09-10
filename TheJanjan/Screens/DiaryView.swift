@@ -60,6 +60,9 @@ struct DiaryView: View {
 
                     symptomCard
                     questionCard
+                    // 리포트에도 같은 카드가 있지만, 기분을 적는 자리에서 바로
+                    // 한 달을 돌아볼 수 있어야 한다. 계산은 MonthWave 한 곳이 한다.
+                    MonthWaveCard(checkIns: checkInRecords.map(\.core))
                     historyCard
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))

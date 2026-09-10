@@ -123,6 +123,12 @@ struct MedicationDetailView: View {
                         .janjanDisplay(28)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
+                    if let refill = StockEvent.lastRefillQuantity(of: medication.id, in: stock) {
+                        Text("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정")
+                            .janjanBody(13)
+                            .foregroundStyle(Color.muted)
+                            .monospacedDigit()
+                    }
                 } else {
                     Text("아직 세지 않았어요")
                         .janjanBody(15)

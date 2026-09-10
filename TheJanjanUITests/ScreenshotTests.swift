@@ -131,6 +131,17 @@ final class ScreenshotTests: XCTestCase {
                 settle()
                 capture("10b-약-등록-폼-아래")
             }
+            dismissSheet()
+        }
+
+        // 오늘의 시간대 타일 본문을 누르면 그 시간대의 약 목록 시트가 열린다.
+        // 이것도 시트라 맨 뒤에 있다.
+        tap(tab: "오늘")
+        let morning = app.staticTexts["아침"].firstMatch
+        if morning.waitForExistence(timeout: 10) {
+            morning.tap()
+            settle()
+            capture("01c-아침-시트")
         }
     }
 
