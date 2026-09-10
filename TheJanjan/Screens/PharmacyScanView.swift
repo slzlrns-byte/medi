@@ -37,7 +37,7 @@ struct PharmacyScanView: View {
 
                 if stage != .reading {
                     WhitePillButton(
-                        title: stage == .intro ? "봉투 찍기" : "다시 찍기",
+                        title: stage == .intro ? t("봉투 찍기", "Take a photo") : t("다시 찍기", "Retake photo"),
                         systemImage: "camera"
                     ) {
                         isShowingCamera = true
@@ -55,7 +55,7 @@ struct PharmacyScanView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle(ProFeature.pharmacyScan.titleKo)
+        .navigationTitle(ProFeature.pharmacyScan.title(.current))
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $isShowingCamera) {
             CameraPicker { image in
@@ -75,20 +75,20 @@ struct PharmacyScanView: View {
     private var introCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("봉투를 평평하게 놓고 찍어 주세요")
+                Text(t("봉투를 평평하게 놓고 찍어 주세요", "Lay the bag flat and take a photo"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text("약 이름과 용량이 적힌 면이 보이면 됩니다.")
+                Text(t("약 이름과 용량이 적힌 면이 보이면 됩니다.", "Just make sure the side with the name and dose is visible."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
-                Text("사진은 글자를 읽는 동안에만 쓰이고 저장되지 않아요. 읽은 내용은 등록 전에 확인할 수 있어요.")
+                Text(t("사진은 글자를 읽는 동안에만 쓰이고 저장되지 않아요. 읽은 내용은 등록 전에 확인할 수 있어요.", "The photo is used only to read the text and isn't saved. You can check what it reads before adding it."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
 
                 if !CameraPicker.isAvailable {
-                    Text("이 기기에는 카메라가 없어서 앨범에서 고르게 됩니다.")
+                    Text(t("이 기기에는 카메라가 없어서 앨범에서 고르게 됩니다.", "This device has no camera, so you'll pick a photo from your library instead."))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -102,7 +102,7 @@ struct PharmacyScanView: View {
             HStack(spacing: CGFloat(JanjanSpacing.s)) {
                 ProgressView()
                     .tint(Color.ink2)
-                Text("글자를 읽고 있어요")
+                Text(t("글자를 읽고 있어요", "Reading the text"))
                     .janjanBody(15)
                     .foregroundStyle(Color.ink2)
             }
@@ -112,10 +112,10 @@ struct PharmacyScanView: View {
     private var nothingFoundCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("약 이름을 찾지 못했어요")
+                Text(t("약 이름을 찾지 못했어요", "Couldn't find a medication name"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text("글자가 흐리거나 접힌 부분에 있으면 잘 안 읽혀요. 다시 찍거나 직접 입력해도 괜찮아요.")
+                Text(t("글자가 흐리거나 접힌 부분에 있으면 잘 안 읽혀요. 다시 찍거나 직접 입력해도 괜찮아요.", "Blurry or creased text is hard to read. Feel free to retake the photo or enter it manually."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -125,7 +125,7 @@ struct PharmacyScanView: View {
 
     private func resultsCards(_ candidates: [PharmacyLabelParser.Candidate]) -> some View {
         VStack(spacing: CGFloat(JanjanSpacing.s)) {
-            Text("읽은 내용이 맞는지 확인해 주세요")
+            Text(t("읽은 내용이 맞는지 확인해 주세요", "Please check that this was read correctly"))
                 .janjanBody(13)
                 .foregroundStyle(Color.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -64,7 +64,7 @@ struct PrescriptionFormView: View {
                     }
                 }
 
-                BlackPillButton(title: "저장", isBusy: isSaving, isEnabled: canSave) {
+                BlackPillButton(title: t("저장", "Save"), isBusy: isSaving, isEnabled: canSave) {
                     save()
                 }
                 .padding(.top, CGFloat(JanjanSpacing.s))
@@ -79,7 +79,7 @@ struct PrescriptionFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle("처방 기록")
+        .navigationTitle(t("처방 기록", "Log a prescription"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -89,7 +89,7 @@ struct PrescriptionFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                 DatePicker(
-                    "진료 받은 날",
+                    t("진료 받은 날", "Visit date"),
                     selection: $visitDate,
                     displayedComponents: .date
                 )
@@ -98,25 +98,25 @@ struct PrescriptionFormView: View {
                 .onChange(of: visitDate) { _, _ in refreshSuggestions() }
 
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                    Text("며칠치를 받았어요?")
+                    Text(t("며칠치를 받았어요?", "How many days' worth did you get?"))
                         .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
                     CountStepper(
-                        text: "\(daysSupplied)일치",
-                        decreaseLabelKo: "처방 일수 줄이기",
-                        increaseLabelKo: "처방 일수 늘리기",
+                        text: t("\(daysSupplied)일치", "\(daysSupplied) days"),
+                        decreaseLabelKo: t("처방 일수 줄이기", "Decrease days supplied"),
+                        increaseLabelKo: t("처방 일수 늘리기", "Increase days supplied"),
                         onDecrease: { changeDays(by: -7) },
                         onIncrease: { changeDays(by: 7) }
                     )
                 }
 
-                Toggle("다음 진료일이 정해졌어요", isOn: $hasNextVisit)
+                Toggle(t("다음 진료일이 정해졌어요", "Next visit date is set"), isOn: $hasNextVisit)
                     .janjanBody(15)
                     .tint(Color.ink)
 
                 if hasNextVisit {
                     DatePicker(
-                        "다음 진료",
+                        t("다음 진료", "Next visit"),
                         selection: $nextVisitDate,
                         in: visitDate...,
                         displayedComponents: .date
@@ -131,10 +131,10 @@ struct PrescriptionFormView: View {
     private var emptyCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("등록된 약이 없어요")
+                Text(t("등록된 약이 없어요", "No medications registered"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text("약을 먼저 등록하면 여기서 받아 온 개수를 함께 적을 수 있어요. 진료일만 먼저 남겨도 괜찮아요.")
+                Text(t("약을 먼저 등록하면 여기서 받아 온 개수를 함께 적을 수 있어요. 진료일만 먼저 남겨도 괜찮아요.", "Register a medication first and you can log how much you picked up here too. It's fine to just save the visit date for now."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -145,7 +145,7 @@ struct PrescriptionFormView: View {
     private var medicationCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("이번에 받아 온 약")
+                Text(t("이번에 받아 온 약", "Medications picked up this time"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
@@ -170,9 +170,9 @@ struct PrescriptionFormView: View {
 
             if let quantity = refills[medication.id] {
                 CountStepper(
-                    text: "\(DecimalQuantity.display(quantity))정",
-                    decreaseLabelKo: "\(medication.name) 개수 줄이기",
-                    increaseLabelKo: "\(medication.name) 개수 늘리기",
+                    text: t("\(DecimalQuantity.display(quantity))정", "\(DecimalQuantity.display(quantity)) pills"),
+                    decreaseLabelKo: t("\(medication.name) 개수 줄이기", "Decrease \(medication.name) count"),
+                    increaseLabelKo: t("\(medication.name) 개수 늘리기", "Increase \(medication.name) count"),
                     onDecrease: { adjust(medication, by: -1) },
                     onIncrease: { adjust(medication, by: 1) }
                 )
@@ -185,11 +185,11 @@ struct PrescriptionFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 JanjanField(
-                    label: "진료 메모 (선택)",
-                    placeholder: "예: 용량 절반으로",
+                    label: t("진료 메모 (선택)", "Visit note (optional)"),
+                    placeholder: t("예: 용량 절반으로", "e.g. Cut the dose in half"),
                     text: $clinicNote
                 )
-                Text("들은 말을 그대로 적어 두면 다음 진료에서 되짚기 쉬워요.")
+                Text(t("들은 말을 그대로 적어 두면 다음 진료에서 되짚기 쉬워요.", "Writing down what you heard, as is, makes it easy to revisit at the next visit."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
@@ -213,8 +213,12 @@ struct PrescriptionFormView: View {
             .filter { $0.occurredAt > visitDate }
 
         guard !blocked.isEmpty else { return nil }
-        return "고른 약 중에 진료일 뒤에 재고를 직접 센 기록이 있어요. "
-            + "재고는 마지막으로 센 개수가 기준이라, 그보다 앞선 보충은 개수에 더해지지 않아요."
+        return t(
+            "고른 약 중에 진료일 뒤에 재고를 직접 센 기록이 있어요. "
+                + "재고는 마지막으로 센 개수가 기준이라, 그보다 앞선 보충은 개수에 더해지지 않아요.",
+            "One of the medications you chose has a stock count recorded after this visit date. "
+                + "Since stock is based on the most recent count, a refill dated earlier than that won't be added."
+        )
     }
 
     private func changeDays(by delta: Int) {

@@ -38,6 +38,7 @@ struct TodayView: View {
     private struct SlotSelection: Identifiable { let id: String }
 
     private var today: Date { Date() }
+    private var lang: JanjanLanguage { .current }
 
     // MARK: - 저장소에서 읽어 온 것
 
@@ -96,7 +97,7 @@ struct TodayView: View {
                         Image(systemName: "gearshape")
                             .foregroundStyle(Color.ink2)
                     }
-                    .accessibilityLabel(Text("설정"))
+                    .accessibilityLabel(Text(t("설정", "Settings")))
                 }
             }
             .sheet(item: $safetyReason) { _ in
@@ -135,20 +136,20 @@ struct TodayView: View {
     private var greetingKo: String {
         let hour = Calendar.current.component(.hour, from: today)
         switch hour {
-        case 5..<11: return "좋은 아침이에요"
-        case 11..<17: return "오후예요"
-        case 17..<22: return "저녁이에요"
-        default: return "늦은 시간이네요"
+        case 5..<11: return t("좋은 아침이에요", "Good morning")
+        case 11..<17: return t("오후예요", "Good afternoon")
+        case 17..<22: return t("저녁이에요", "Good evening")
+        default: return t("늦은 시간이네요", "It's late")
         }
     }
 
     /// 한 문장에 한 정보. 놓쳤다고 다그치지 않고 남은 것만 알린다.
     private var subtitleKo: String {
-        guard hasAnyMedication else { return "약을 등록하면 여기에 오늘 일정이 보여요." }
+        guard hasAnyMedication else { return t("약을 등록하면 여기에 오늘 일정이 보여요.", "Add a medication and today's plan will show up here.") }
         let pending = DayPlan.pendingSlotCount(in: plan)
-        if plan.isEmpty { return "오늘은 예정된 약이 없어요." }
-        if pending == 0 { return "오늘 약은 다 챙기셨어요." }
-        return "오늘 남은 시간대가 \(pending)번 있어요."
+        if plan.isEmpty { return t("오늘은 예정된 약이 없어요.", "No medications are scheduled for today.") }
+        if pending == 0 { return t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.") }
+        return t("오늘 남은 시간대가 \(pending)번 있어요.", "\(pending) time \(pending == 1 ? "slot" : "slots") left today.")
     }
 
     // MARK: - 시간대 타일
@@ -197,7 +198,7 @@ struct TodayView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                            Text(line.slot.labelKo)
+                            Text(line.slot.label(lang))
                                 .janjanDisplay(22)
                                 .foregroundStyle(Color.ink)
                             // 직접 넣은 시간대는 이름이 곧 시각이라 두 번 말하지 않는다.
@@ -217,22 +218,22 @@ struct TodayView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint(Text("약마다 따로 기록합니다"))
+                .accessibilityHint(Text(t("약마다 따로 기록합니다", "Record each medication separately")))
 
                 if line.isCompleted {
                     // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
                     // 높이는 아래 버튼과 맞춘다 - 다르면 다 적은 순간 타일이 튄다.
-                    PillChip(text: "완료", tint: .surface, textTint: .sageInk)
+                    PillChip(text: t("완료", "Done"), tint: .surface, textTint: .sageInk)
                         .frame(minWidth: 96, minHeight: 56)
                 } else {
                     Button {
                         recordRestTaken(in: line)
                     } label: {
                         VStack(spacing: 2) {
-                            Text("먹었어요")
+                            Text(t("먹었어요", "Took it"))
                                 .janjanBody(15, weight: .medium)
                                 .foregroundStyle(Color.ink)
-                            Text("\(line.pendingCount)개")
+                            Text(t("\(line.pendingCount)개", "\(line.pendingCount)"))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.ink2)
                         }
@@ -245,8 +246,11 @@ struct TodayView: View {
                         .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(Text("\(line.slot.labelKo) 약 \(line.pendingCount)개 먹었어요"))
-                    .accessibilityHint(Text("한 번에 기록합니다"))
+                    .accessibilityLabel(Text(t(
+                        "\(line.slot.labelKo) 약 \(line.pendingCount)개 먹었어요",
+                        "Took \(line.pendingCount) \(line.pendingCount == 1 ? "medication" : "medications") for \(line.slot.label(lang))"
+                    )))
+                    .accessibilityHint(Text(t("한 번에 기록합니다", "Records all of them at once")))
                 }
             }
         }
@@ -255,10 +259,10 @@ struct TodayView: View {
     private var emptyCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("아직 등록한 약이 없어요")
+                Text(t("아직 등록한 약이 없어요", "No medications yet"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text("약 탭에서 하나만 추가해도 오늘 일정이 만들어져요.")
+                Text(t("약 탭에서 하나만 추가해도 오늘 일정이 만들어져요.", "Add just one in the Meds tab, and today's plan appears."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
             }
@@ -270,12 +274,12 @@ struct TodayView: View {
     private var checkInCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("오늘 기분")
+                Text(t("오늘 기분", "Mood today"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(todaysMoodScore == nil
-                     ? "하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요."
-                     : "언제든 다시 고를 수 있어요.")
+                     ? t("하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요.", "Choosing just one is fine. You can add the rest later.")
+                     : t("언제든 다시 고를 수 있어요.", "You can change it any time."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
@@ -290,7 +294,7 @@ struct TodayView: View {
     private var glanceCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("한눈에")
+                Text(t("한눈에", "At a glance"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
@@ -311,8 +315,10 @@ struct TodayView: View {
             .compactMap({ $0.core.daysUntilNextVisit(from: today) })
             .filter({ $0 >= 0 })
             .min()
-        else { return "다음 진료 미정" }
-        return days == 0 ? "오늘 진료" : "다음 진료 D-\(days)"
+        else { return t("다음 진료 미정", "Next visit not set") }
+        return days == 0
+            ? t("오늘 진료", "Visit today")
+            : t("다음 진료 D-\(days)", "Next visit in \(days) days")
     }
 
     /// 다음 진료 전에 모자라는 약을 약별로 세지 않고 한 번에 묶어 말한다(설계 05절).
@@ -335,9 +341,9 @@ struct TodayView: View {
             return (snapshot.shortfallDays ?? 0) > 0
         }
 
-        guard !short.isEmpty else { return "부족한 약 없음" }
-        if short.count == 1 { return "\(short[0].name) 모자람" }
-        return "모자라는 약 \(short.count)개"
+        guard !short.isEmpty else { return t("부족한 약 없음", "Nothing running low") }
+        if short.count == 1 { return t("\(short[0].name) 모자람", "\(short[0].name) running low") }
+        return t("모자라는 약 \(short.count)개", "\(short.count) meds running low")
     }
 
     // MARK: - 기록
@@ -385,13 +391,13 @@ private struct SlotGoneSheet: View {
 
     var body: some View {
         VStack(spacing: CGFloat(JanjanSpacing.m)) {
-            Text("이 시간대가 지금은 없어요")
+            Text(t("이 시간대가 지금은 없어요", "This time slot is gone"))
                 .janjanDisplay(22)
                 .foregroundStyle(Color.ink)
-            Text("다른 기기에서 약이 바뀌었을 수 있어요.")
+            Text(t("다른 기기에서 약이 바뀌었을 수 있어요.", "It may have changed on another device."))
                 .janjanBody(14)
                 .foregroundStyle(Color.muted)
-            WhitePillButton(title: "닫기") { dismiss() }
+            WhitePillButton(title: t("닫기", "Close")) { dismiss() }
         }
         .padding(CGFloat(JanjanSpacing.l))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -411,6 +417,8 @@ private struct SlotRecordSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private var lang: JanjanLanguage { .current }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -420,7 +428,7 @@ private struct SlotRecordSheet: View {
                     }
 
                     if line.entries.count > 1 {
-                        WhitePillButton(title: "모두 복용함", systemImage: "checkmark") {
+                        WhitePillButton(title: t("모두 복용함", "Take all"), systemImage: "checkmark") {
                             for entry in line.entries { onRecord(entry, .taken) }
                             dismiss()
                         }
@@ -437,11 +445,11 @@ private struct SlotRecordSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle(line.slot.isCustom ? line.time.description : "\(line.slot.labelKo) \(line.time.description)")
+            .navigationTitle(line.slot.isCustom ? line.time.description : "\(line.slot.label(lang)) \(line.time.description)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
             }
@@ -456,11 +464,11 @@ private struct SlotRecordSheet: View {
                     Text(entry.medicationName)
                         .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
-                    PillChip(text: "\(DecimalQuantity.display(entry.dose))정")
+                    PillChip(text: t("\(DecimalQuantity.display(entry.dose))정", "\(DecimalQuantity.display(entry.dose)) pills"))
                     Spacer(minLength: 0)
                     if let status = entry.status, status != .unrecorded {
                         PillChip(
-                            text: status.labelKo,
+                            text: status.label(lang),
                             tint: status == .taken ? .sage : .peach,
                             textTint: status == .taken ? .sageInk : .ink2
                         )
@@ -468,8 +476,8 @@ private struct SlotRecordSheet: View {
                 }
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    WhitePillButton(title: "복용함") { onRecord(entry, .taken) }
-                    WhitePillButton(title: "건너뜀") { onRecord(entry, .skipped) }
+                    WhitePillButton(title: t("복용함", "Taken")) { onRecord(entry, .taken) }
+                    WhitePillButton(title: t("건너뜀", "Skipped")) { onRecord(entry, .skipped) }
                 }
             }
         }

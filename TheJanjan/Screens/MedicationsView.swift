@@ -23,6 +23,7 @@ struct MedicationsView: View {
     @State private var pendingDeletion: Row?
 
     private var today: Date { Date() }
+    private var lang: JanjanLanguage { .current }
 
     var body: some View {
         NavigationStack {
@@ -49,7 +50,7 @@ struct MedicationsView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("약")
+            .navigationTitle(t("약", "Meds"))
             .navigationBarTitleDisplayMode(.large)
             // 약을 더하는 손잡이는 제목 줄에 둔다. 오늘 화면의 설정 버튼과 같은 자리다.
             //
@@ -70,7 +71,7 @@ struct MedicationsView: View {
                         Image(systemName: "plus")
                             .foregroundStyle(Color.ink2)
                     }
-                    .accessibilityLabel(Text("약 추가"))
+                    .accessibilityLabel(Text(t("약 추가", "Add medication")))
                 }
             }
             .sheet(isPresented: $isShowingAddFlow) {
@@ -81,14 +82,14 @@ struct MedicationsView: View {
                     PrescriptionFormView { isShowingPrescription = false }
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
-                                Button("닫기") { isShowingPrescription = false }
+                                Button(t("닫기", "Close")) { isShowingPrescription = false }
                                     .foregroundStyle(Color.ink)
                             }
                         }
                 }
             }
             .confirmationDialog(
-                "이 약의 기록을 모두 지울까요?",
+                t("이 약의 기록을 모두 지울까요?", "Delete all records for this medication?"),
                 isPresented: Binding(
                     get: { pendingDeletion != nil },
                     // 바깥을 눌러 닫았을 때도 고른 줄을 놓아 준다.
@@ -98,10 +99,13 @@ struct MedicationsView: View {
                 titleVisibility: .visible,
                 presenting: pendingDeletion
             ) { row in
-                Button("삭제", role: .destructive) { delete(row) }
-                Button("취소", role: .cancel) { pendingDeletion = nil }
+                Button(t("삭제", "Delete"), role: .destructive) { delete(row) }
+                Button(t("취소", "Cancel"), role: .cancel) { pendingDeletion = nil }
             } message: { row in
-                Text("\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.")
+                Text(t(
+                    "\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
+                    "This removes \(row.medication.name)'s dose and stock records together. This can't be undone."
+                ))
             }
         }
     }
@@ -162,13 +166,13 @@ struct MedicationsView: View {
     private var sections: [RowGroup] {
         let all = rows
         return [
-            RowGroup(title: "복용 중", rows: all.filter {
+            RowGroup(title: t("복용 중", "Taking"), rows: all.filter {
                 $0.medication.status == .active && $0.medication.kind == .scheduled
             }),
-            RowGroup(title: "필요시", rows: all.filter {
+            RowGroup(title: t("필요시", "As needed"), rows: all.filter {
                 $0.medication.status == .active && $0.medication.kind == .asNeeded
             }),
-            RowGroup(title: "중단", rows: all.filter { $0.medication.status == .stopped })
+            RowGroup(title: t("중단", "Stopped"), rows: all.filter { $0.medication.status == .stopped })
         ]
         .filter { !$0.rows.isEmpty }
     }
@@ -189,13 +193,13 @@ struct MedicationsView: View {
                 }
 
                 Text(nextVisit == nil
-                     ? "진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요."
-                     : "다음 진료 전에 모자라는 약이 있으면 약 줄에 함께 보여요.")
+                     ? t("진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요.", "Add a visit date and how many pills you picked up, and running-low forecasts turn on.")
+                     : t("다음 진료 전에 모자라는 약이 있으면 약 줄에 함께 보여요.", "If anything runs short before the next visit, it'll show right on that medication's row."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                WhitePillButton(title: "처방 기록하기", systemImage: "doc.text") {
+                WhitePillButton(title: t("처방 기록하기", "Log a prescription"), systemImage: "doc.text") {
                     isShowingPrescription = true
                 }
                 .overlay(
@@ -207,22 +211,24 @@ struct MedicationsView: View {
     }
 
     private var nextVisitText: String {
-        guard let nextVisit else { return "다음 진료 미정" }
+        guard let nextVisit else { return t("다음 진료 미정", "Next visit not set") }
         let days = Calendar.current.dateComponents(
             [.day],
             from: Calendar.current.startOfDay(for: today),
             to: Calendar.current.startOfDay(for: nextVisit)
         ).day ?? 0
-        return days == 0 ? "오늘 진료" : "다음 진료 D-\(days)"
+        return days == 0
+            ? t("오늘 진료", "Visit today")
+            : t("다음 진료 D-\(days)", "Next visit in \(days) days")
     }
 
     private var emptyCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("첫 약을 등록해 볼까요")
+                Text(t("첫 약을 등록해 볼까요", "Let's add your first medication"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text("오른쪽 아래 + 를 누르면 이름과 시간만으로 시작할 수 있어요.")
+                Text(t("오른쪽 아래 + 를 누르면 이름과 시간만으로 시작할 수 있어요.", "Tap the + in the bottom right — a name and a time is all it takes to start."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
             }
@@ -262,19 +268,19 @@ struct MedicationsView: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
-                        Text("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정")
+                        Text(t("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정", "\(DecimalQuantity.display(max(row.snapshot.remaining, 0))) pills"))
                             .janjanDisplay(20)
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
                         // 남은 숫자만으로는 많은지 적은지 모른다. 받아 온 개수가 눈금이 된다.
                         if let refill = row.lastRefill {
-                            Text("받아 온 \(DecimalQuantity.display(refill))정")
+                            Text(t("받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(DecimalQuantity.display(refill)) pills"))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                                 .monospacedDigit()
                         }
                     } else {
-                        Text("재고 미기록")
+                        Text(t("재고 미기록", "No count yet"))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
@@ -288,17 +294,17 @@ struct MedicationsView: View {
         }
         .contextMenu {
             if row.medication.status == .active {
-                Button("복용 중단") {
+                Button(t("복용 중단", "Stop taking")) {
                     MedicationStore.setStatus(.stopped, for: row.id, in: context)
                     rescheduleReminders()
                 }
             } else {
-                Button("다시 복용") {
+                Button(t("다시 복용", "Resume")) {
                     MedicationStore.setStatus(.active, for: row.id, in: context)
                     rescheduleReminders()
                 }
             }
-            Button("삭제", role: .destructive) { pendingDeletion = row }
+            Button(t("삭제", "Delete"), role: .destructive) { pendingDeletion = row }
         }
     }
 
@@ -309,14 +315,14 @@ struct MedicationsView: View {
 
         // 세어 둔 것보다 많이 먹은 것으로 계산되면 음수가 나온다.
         // 0 으로 깎아 보이되 그 사실을 숨기지는 않는다 — 다시 세어 달라고 말한다.
-        if row.snapshot.remaining < 0 { return "다시 세어 주세요" }
+        if row.snapshot.remaining < 0 { return t("다시 세어 주세요", "Please recount") }
         guard pro.isPro else { return nil }
 
         if let shortfall = row.snapshot.shortfallDays, shortfall > 0 {
-            return "진료 전 \(shortfall)일 모자람"
+            return t("진료 전 \(shortfall)일 모자람", "\(shortfall) days short before the visit")
         }
         guard let days = row.snapshot.daysRemaining else { return nil }
-        return "약 \(DecimalQuantity.floorToInt(days))일치"
+        return t("약 \(DecimalQuantity.floorToInt(days))일치", "About \(DecimalQuantity.floorToInt(days)) days' worth")
     }
 
     // MARK: - 손대기
@@ -343,8 +349,8 @@ private struct AddMedicationEntryView: View {
         NavigationStack {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 entryRow(
-                    title: "직접 입력",
-                    subtitle: "이름 · 용량 · 시간을 하나씩 적어요.",
+                    title: t("직접 입력", "Enter manually"),
+                    subtitle: t("이름 · 용량 · 시간을 하나씩 적어요.", "Enter the name, dose, and time one by one."),
                     systemImage: "square.and.pencil"
                 ) {
                     isShowingForm = true
@@ -353,8 +359,8 @@ private struct AddMedicationEntryView: View {
                 .accessibilityIdentifier("directEntry")
 
                 entryRow(
-                    title: ProFeature.pharmacyScan.titleKo,
-                    subtitle: "봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.",
+                    title: ProFeature.pharmacyScan.title(.current),
+                    subtitle: t("봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.", "Reads medication names from a photo of the bag. The photo isn't saved."),
                     systemImage: "camera"
                 ) {
                     isShowingScan = true
@@ -366,11 +372,11 @@ private struct AddMedicationEntryView: View {
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .padding(.top, CGFloat(JanjanSpacing.m))
             .fogBackground()
-            .navigationTitle("약 추가")
+            .navigationTitle(t("약 추가", "Add medication"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
             }

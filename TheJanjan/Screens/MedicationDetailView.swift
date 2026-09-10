@@ -27,6 +27,7 @@ struct MedicationDetailView: View {
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
 
     private var today: Date { Date() }
+    private var lang: JanjanLanguage { .current }
 
     private var record: MedicationRecord? {
         medicationRecords.first { $0.id == medicationID }
@@ -52,7 +53,7 @@ struct MedicationDetailView: View {
                 } else {
                     // 다른 화면에서 지운 뒤 이 화면이 남아 있는 경우.
                     JanjanCard {
-                        Text("이 약은 지워졌어요.")
+                        Text(t("이 약은 지워졌어요.", "This medication has been deleted."))
                             .janjanBody(15)
                             .foregroundStyle(Color.muted)
                     }
@@ -68,7 +69,7 @@ struct MedicationDetailView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle(medication?.name ?? "약")
+        .navigationTitle(medication?.name ?? t("약", "Medication"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $composing) { kind in
             MedicationNoteComposer(kind: kind) { text, symptomID in
@@ -83,7 +84,7 @@ struct MedicationDetailView: View {
             }
         }
         .confirmationDialog(
-            "이 용량 변경 기록을 지울까요?",
+            t("이 용량 변경 기록을 지울까요?", "Delete this dose change record?"),
             isPresented: Binding(
                 get: { pendingDoseChangeDeletion != nil },
                 set: { if !$0 { pendingDoseChangeDeletion = nil } }
@@ -91,8 +92,8 @@ struct MedicationDetailView: View {
             titleVisibility: .visible,
             presenting: pendingDoseChangeDeletion
         ) { entry in
-            Button("지우기", role: .destructive) { deleteDoseChange(entry) }
-            Button("취소", role: .cancel) { pendingDoseChangeDeletion = nil }
+            Button(t("지우기", "Delete"), role: .destructive) { deleteDoseChange(entry) }
+            Button(t("취소", "Cancel"), role: .cancel) { pendingDoseChangeDeletion = nil }
         }
     }
 
@@ -110,8 +111,8 @@ struct MedicationDetailView: View {
                     }
                 }
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    PillChip(text: medication.form.labelKo)
-                    PillChip(text: medication.kind.labelKo)
+                    PillChip(text: medication.form.label(lang))
+                    PillChip(text: medication.kind.label(lang))
                 }
                 if !medication.purposeLine.isEmpty {
                     Text(medication.purposeLine)
@@ -138,22 +139,22 @@ struct MedicationDetailView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("남은 개수")
+                Text(t("남은 개수", "Remaining"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                 if hasStock {
-                    Text("\(DecimalQuantity.display(snapshot.remaining))정")
+                    Text(t("\(DecimalQuantity.display(snapshot.remaining))정", "\(DecimalQuantity.display(snapshot.remaining)) pills"))
                         .janjanDisplay(28)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
                     if let refill = StockEvent.lastRefillQuantity(of: medication.id, in: stock) {
-                        Text("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정")
+                        Text(t("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(DecimalQuantity.display(refill)) pills last time"))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                             .monospacedDigit()
                     }
                 } else {
-                    Text("아직 세지 않았어요")
+                    Text(t("아직 세지 않았어요", "Not counted yet"))
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
@@ -171,12 +172,12 @@ struct MedicationDetailView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("용량 변경")
+                Text(t("용량 변경", "Dose changes"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 if mine.isEmpty {
-                    Text("용량이 바뀌면 여기 적어 두세요. 리포트에 함께 실려요.")
+                    Text(t("용량이 바뀌면 여기 적어 두세요. 리포트에 함께 실려요.", "Write it down here when the dose changes. It goes into the report too."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -186,7 +187,7 @@ struct MedicationDetailView: View {
                     doseChangeRow(entry)
                 }
 
-                WhitePillButton(title: "적어 두기", systemImage: "plus") {
+                WhitePillButton(title: t("적어 두기", "Write it down"), systemImage: "plus") {
                     isShowingDoseChangeSheet = true
                 }
                 .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -219,13 +220,13 @@ struct MedicationDetailView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("이 용량 변경 기록 지우기"))
+            .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
         }
     }
 
     private func doseChangeDayText(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
         formatter.setLocalizedDateFormatFromTemplate("Md")
         return formatter.string(from: date)
     }
@@ -238,12 +239,12 @@ struct MedicationDetailView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("먹는 때")
+                Text(t("먹는 때", "When to take it"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 if mine.isEmpty {
-                    Text("정해 둔 시간이 없어요.")
+                    Text(t("정해 둔 시간이 없어요.", "No time set."))
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
@@ -252,10 +253,10 @@ struct MedicationDetailView: View {
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                         Text(schedule.slot.isCustom
                              ? schedule.timeOfDay.description
-                             : "\(schedule.slot.labelKo) \(schedule.timeOfDay.description)")
+                             : "\(schedule.slot.label(lang)) \(schedule.timeOfDay.description)")
                             .janjanBody(15)
                             .foregroundStyle(Color.ink2)
-                        PillChip(text: "\(DecimalQuantity.display(schedule.dosePerIntake))정")
+                        PillChip(text: t("\(DecimalQuantity.display(schedule.dosePerIntake))정", "\(DecimalQuantity.display(schedule.dosePerIntake)) pills"))
                         Spacer(minLength: 0)
                     }
                 }
@@ -269,12 +270,12 @@ struct MedicationDetailView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(kind.titleKo)
+                Text(kind.title(lang))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 if notes.isEmpty {
-                    Text(emptyTextKo(kind))
+                    Text(emptyText(kind))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -284,7 +285,7 @@ struct MedicationDetailView: View {
                     noteRow(note)
                 }
 
-                WhitePillButton(title: "적어 두기", systemImage: "plus") {
+                WhitePillButton(title: t("적어 두기", "Write it down"), systemImage: "plus") {
                     composing = kind
                 }
                 .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -292,12 +293,18 @@ struct MedicationDetailView: View {
         }
     }
 
-    private func emptyTextKo(_ kind: MedicationNote.Kind) -> String {
+    private func emptyText(_ kind: MedicationNote.Kind) -> String {
         switch kind {
         case .heardFromDoctor:
-            return "진료에서 들은 이야기를 적어 두면 잊지 않고, 리포트에 실제 기록과 나란히 나가요."
+            return t(
+                "진료에서 들은 이야기를 적어 두면 잊지 않고, 리포트에 실제 기록과 나란히 나가요.",
+                "Write down what you heard at the visit so you don't forget, and it goes into the report alongside your actual records."
+            )
         case .questionForDoctor:
-            return "다음 진료에서 여쭤볼 것을 적어 두면 리포트에 함께 나가요."
+            return t(
+                "다음 진료에서 여쭤볼 것을 적어 두면 리포트에 함께 나가요.",
+                "Write down what to ask at the next visit, and it goes into the report too."
+            )
         }
     }
 
@@ -309,10 +316,10 @@ struct MedicationDetailView: View {
                     .foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
                 if let symptomID = note.symptomID,
-                   let name = Catalogs.symptoms.symptom(id: symptomID)?.nameKo {
+                   let name = Catalogs.symptoms.symptom(id: symptomID)?.name(lang) {
                     // 이름 뒤에 "과/와" 를 직접 붙이면 받침에 따라 틀린다.
                     // 조사를 이름에서 떼어 내 그 문제를 아예 없앤다.
-                    Text("\(name) 증상과 이어 둠")
+                    Text(t("\(name) 증상과 이어 둠", "Linked to \(name)"))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
@@ -328,7 +335,7 @@ struct MedicationDetailView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("이 메모 지우기"))
+            .accessibilityLabel(Text(t("이 메모 지우기", "Delete this note")))
         }
     }
 
@@ -336,14 +343,14 @@ struct MedicationDetailView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack {
-                    Text("상태")
+                    Text(t("상태", "Status"))
                         .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
                     Spacer()
-                    PillChip(text: medication.status.labelKo)
+                    PillChip(text: medication.status.label(lang))
                 }
                 WhitePillButton(
-                    title: medication.status == .active ? "복용 중단" : "다시 복용",
+                    title: medication.status == .active ? t("복용 중단", "Stop taking") : t("다시 복용", "Resume"),
                     systemImage: medication.status == .active ? "pause" : "play"
                 ) {
                     MedicationStore.setStatus(
@@ -426,17 +433,19 @@ private struct MedicationNoteComposer: View {
     @State private var text = ""
     @State private var symptomID: String?
 
+    private var lang: JanjanLanguage { .current }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: CGFloat(JanjanSpacing.s)) {
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                            TextField(kind.placeholderKo, text: $text, axis: .vertical)
+                            TextField(kind.placeholder(lang), text: $text, axis: .vertical)
                                 .janjanBody(16)
                                 .foregroundStyle(Color.ink)
                                 .lineLimit(1...5)
-                            Text("들은 말 그대로 적어도 괜찮아요. 앱이 고치지 않아요.")
+                            Text(t("들은 말 그대로 적어도 괜찮아요. 앱이 고치지 않아요.", "It's fine to write it exactly as you heard it. The app won't correct it."))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                         }
@@ -444,10 +453,10 @@ private struct MedicationNoteComposer: View {
 
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                            Text("증상과 이어 둘까요? (선택)")
+                            Text(t("증상과 이어 둘까요? (선택)", "Link it to a symptom? (optional)"))
                                 .janjanBody(13, weight: .medium)
                                 .foregroundStyle(Color.ink)
-                            Text("이어 두면 그 증상을 기록할 때마다 리포트에서 나란히 보여요.")
+                            Text(t("이어 두면 그 증상을 기록할 때마다 리포트에서 나란히 보여요.", "Once linked, it shows alongside that symptom in the report every time you log it."))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -459,7 +468,7 @@ private struct MedicationNoteComposer: View {
                                         symptomID = isOn ? nil : item.id
                                     } label: {
                                         PillChip(
-                                            text: item.nameKo,
+                                            text: item.name(lang),
                                             tint: isOn ? .ink : .surface2,
                                             textTint: isOn ? .surface : .ink2
                                         )
@@ -477,15 +486,15 @@ private struct MedicationNoteComposer: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle(kind.titleKo)
+            .navigationTitle(kind.title(lang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("저장") {
+                    Button(t("저장", "Save")) {
                         onSave(text, symptomID)
                         dismiss()
                     }
@@ -529,7 +538,7 @@ private struct DoseChangeSheet: View {
                 VStack(spacing: CGFloat(JanjanSpacing.s)) {
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                            Text("바뀐 날")
+                            Text(t("바뀐 날", "Date changed"))
                                 .janjanBody(13, weight: .medium)
                                 .foregroundStyle(Color.muted)
                             // 아직 오지 않은 날의 용량은 알 수 없으니 미래는 고를 수 없게 막는다.
@@ -546,14 +555,14 @@ private struct DoseChangeSheet: View {
 
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                            doseField(label: "이전", placeholder: "10mg", text: $fromText)
-                            doseField(label: "새 용량", placeholder: "15mg", text: $toText)
+                            doseField(label: t("이전", "Previous"), placeholder: "10mg", text: $fromText)
+                            doseField(label: t("새 용량", "New dose"), placeholder: "15mg", text: $toText)
                         }
                     }
 
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                            Text("덧붙일 말 (선택)")
+                            Text(t("덧붙일 말 (선택)", "Anything to add (optional)"))
                                 .janjanBody(13, weight: .medium)
                                 .foregroundStyle(Color.ink)
                             TextField("", text: $note, axis: .vertical)
@@ -574,15 +583,15 @@ private struct DoseChangeSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("용량 변경")
+            .navigationTitle(t("용량 변경", "Dose changes"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("저장") {
+                    Button(t("저장", "Save")) {
                         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
                         onSave(changedAt, fromText, toText, trimmedNote.isEmpty ? nil : trimmedNote)
                         dismiss()

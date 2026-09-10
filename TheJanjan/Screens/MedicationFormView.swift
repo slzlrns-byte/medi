@@ -27,6 +27,8 @@ struct MedicationFormView: View {
     /// 알림 권한을 묻는 화면. 시간이 있는 약을 저장한 직후에만 올라온다.
     @State private var isAskingNotification = false
 
+    private var lang: JanjanLanguage { .current }
+
     /// - Parameter prefill: 약봉투 스캔이 읽어 온 값. 채워만 두고 사용자가 고칠 수 있다 —
     ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
     init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
@@ -84,7 +86,7 @@ struct MedicationFormView: View {
                 }
                 stockCard
 
-                BlackPillButton(title: "저장", isBusy: isSaving, isEnabled: canSave) {
+                BlackPillButton(title: t("저장", "Save"), isBusy: isSaving, isEnabled: canSave) {
                     save()
                 }
                 .padding(.top, CGFloat(JanjanSpacing.s))
@@ -99,7 +101,7 @@ struct MedicationFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle("직접 입력")
+        .navigationTitle(t("직접 입력", "Enter manually"))
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $isAskingNotification) {
             NotificationPermissionView {
@@ -118,11 +120,11 @@ struct MedicationFormView: View {
     private var identityCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
-                JanjanField(label: "이름", placeholder: "예: 에스시탈로프람", text: $name)
-                JanjanField(label: "용량", placeholder: "예: 10mg", text: $strength)
+                JanjanField(label: t("이름", "Name"), placeholder: t("예: 에스시탈로프람", "e.g. Escitalopram"), text: $name)
+                JanjanField(label: t("용량", "Dose"), placeholder: t("예: 10mg", "e.g. 10mg"), text: $strength)
                 JanjanField(
-                    label: "용도 한 줄 (선택)",
-                    placeholder: "예: 잠들기 쉽게",
+                    label: t("용도 한 줄 (선택)", "What it's for (optional)"),
+                    placeholder: t("예: 잠들기 쉽게", "e.g. To help me sleep"),
                     text: $purpose
                 )
             }
@@ -132,33 +134,33 @@ struct MedicationFormView: View {
     private var kindCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("어떻게 먹는 약인가요")
+                Text(t("어떻게 먹는 약인가요", "How do you take it"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(Medication.Kind.allCases, id: \.self) { option in
-                        TogglePill(text: option.labelKo, isOn: kind == option) {
+                        TogglePill(text: option.label(lang), isOn: kind == option) {
                             kind = option
                         }
                     }
                 }
 
-                Text("제형")
+                Text(t("제형", "Form"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xs))
 
-                Picker("제형", selection: $form) {
+                Picker(t("제형", "Form"), selection: $form) {
                     ForEach(Medication.Form.allCases, id: \.self) { option in
-                        Text(option.labelKo).tag(option)
+                        Text(option.label(lang)).tag(option)
                     }
                 }
                 .pickerStyle(.menu)
                 .tint(Color.ink)
 
                 if !form.isSplittable {
-                    Text("이 제형은 쪼개 먹지 않는 것으로 보고 개수를 1정 단위로만 셉니다.")
+                    Text(t("이 제형은 쪼개 먹지 않는 것으로 보고 개수를 1정 단위로만 셉니다.", "This form isn't split, so counts are tracked in whole pills only."))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -170,7 +172,7 @@ struct MedicationFormView: View {
     private var slotCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("언제 먹나요")
+                Text(t("언제 먹나요", "When do you take it"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
@@ -179,7 +181,7 @@ struct MedicationFormView: View {
                 }
 
                 // 정신과 처방은 하루 네 번을 넘기도 한다(분복 등). 모자라면 더 넣는다.
-                WhitePillButton(title: "시간대 추가", systemImage: "plus") {
+                WhitePillButton(title: t("시간대 추가", "Add a time"), systemImage: "plus") {
                     drafts.append(.custom())
                 }
             }
@@ -190,7 +192,7 @@ struct MedicationFormView: View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack {
                 if let preset = draft.wrappedValue.preset {
-                    TogglePill(text: preset.labelKo, isOn: draft.wrappedValue.isOn) {
+                    TogglePill(text: preset.label(lang), isOn: draft.wrappedValue.isOn) {
                         draft.wrappedValue.isOn.toggle()
                     }
                 } else {
@@ -205,7 +207,7 @@ struct MedicationFormView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(Text("이 시간대 빼기"))
+                    .accessibilityLabel(Text(t("이 시간대 빼기", "Remove this time slot")))
                 }
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
                 if draft.wrappedValue.isOn {
@@ -215,7 +217,10 @@ struct MedicationFormView: View {
                         displayedComponents: .hourAndMinute
                     )
                     .labelsHidden()
-                    .accessibilityLabel(Text("\(draft.wrappedValue.slot.labelKo) 시각"))
+                    .accessibilityLabel(Text(t(
+                        "\(draft.wrappedValue.slot.labelKo) 시각",
+                        "\(draft.wrappedValue.slot.label(lang)) time"
+                    )))
                 }
             }
 
@@ -228,9 +233,9 @@ struct MedicationFormView: View {
 
     private func doseStepper(_ draft: Binding<SlotDraft>) -> some View {
         CountStepper(
-            text: "1회 \(DecimalQuantity.display(draft.wrappedValue.dose))정",
-            decreaseLabelKo: "개수 줄이기",
-            increaseLabelKo: "개수 늘리기",
+            text: t("1회 \(DecimalQuantity.display(draft.wrappedValue.dose))정", "\(DecimalQuantity.display(draft.wrappedValue.dose)) pills per dose"),
+            decreaseLabelKo: t("개수 줄이기", "Decrease count"),
+            increaseLabelKo: t("개수 늘리기", "Increase count"),
             onDecrease: { adjust(draft, by: -doseStep) },
             onIncrease: { adjust(draft, by: doseStep) }
         )
@@ -239,7 +244,7 @@ struct MedicationFormView: View {
     private var weekdayCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("무슨 요일에")
+                Text(t("무슨 요일에", "On which days"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
@@ -248,7 +253,7 @@ struct MedicationFormView: View {
                 HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
                     ForEach(Weekday.displayOrderKo, id: \.self) { day in
                         TogglePill(
-                            text: day.labelKo,
+                            text: day.label(lang),
                             isOn: weekdays.contains(day),
                             minWidth: 0,
                             fillsRow: true
@@ -259,7 +264,7 @@ struct MedicationFormView: View {
                 }
 
                 if weekdays.isEmpty {
-                    Text("하루는 골라 주세요. 고른 요일에만 일정이 만들어져요.")
+                    Text(t("하루는 골라 주세요. 고른 요일에만 일정이 만들어져요.", "Pick at least one day. Only the days you choose get a schedule."))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
@@ -271,12 +276,12 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 JanjanField(
-                    label: "지금 남은 개수 (선택)",
-                    placeholder: "예: 28",
+                    label: t("지금 남은 개수 (선택)", "Pills on hand (optional)"),
+                    placeholder: t("예: 28", "e.g. 28"),
                     keyboard: .decimalPad,
                     text: $stockText
                 )
-                Text("세어 본 개수를 적으면 이 시점이 기준이 돼요. 비워 두면 재고를 세지 않아요.")
+                Text(t("세어 본 개수를 적으면 이 시점이 기준이 돼요. 비워 두면 재고를 세지 않아요.", "Enter the count you've checked and this moment becomes the baseline. Leave it blank to skip tracking stock."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
