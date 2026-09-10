@@ -47,7 +47,8 @@ enum ReminderPlanner {
             AppointmentReminder.reminders(
                 visitDates: visits,
                 leadDays: leadDays,
-                now: Date()
+                now: Date(),
+                language: JanjanLanguage.current
             )
         )
     }

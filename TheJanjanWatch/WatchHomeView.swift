@@ -24,13 +24,16 @@ struct WatchHomeView: View {
                     // 워치 앱 전체가 Pro 다. 반쯤 동작하게 두지 않고 여기서 멈춘다.
                     // 결제는 워치에서 받지 않는다 — 작은 화면에서 되돌릴 수 없는
                     // 결정을 받지 않기 위해서다.
-                    Text("워치 앱은 Pro 기능이에요.")
+                    Text(t("워치 앱은 Pro 기능이에요.", "The Watch app is a Pro feature."))
                         .font(.footnote)
-                    Text("아이폰의 설정에서 Pro 를 켜면 여기에 오늘 일정이 나와요.")
+                    Text(t(
+                        "아이폰의 설정에서 Pro 를 켜면 여기에 오늘 일정이 나와요.",
+                        "Turn on Pro in the iPhone app's settings to see today's plan here."
+                    ))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else if session.snapshot.slots.isEmpty {
-                    Text("아이폰에서 약을 등록하면 여기 나옵니다.")
+                    Text(t("아이폰에서 약을 등록하면 여기 나옵니다.", "Add a medication on your iPhone to see it here."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
@@ -40,20 +43,20 @@ struct WatchHomeView: View {
                 }
 
                 if session.snapshot.isPro {
-                    Button("증상 기록") { isShowingSymptom = true }
-                    Button("기분") { isShowingMood = true }
+                    Button(t("증상 기록", "Log symptom")) { isShowingSymptom = true }
+                    Button(t("기분", "Mood")) { isShowingMood = true }
                 }
 
                 if session.lastSendWasQueued {
                     // 전송이 큐에 쌓였다는 사실을 숨기지 않는다 - 시트가 닫혔다고
                     // 폰에 이미 적혔다고 믿게 두면 안 된다.
-                    Text("아이폰과 만나면 방금 기록이 전달돼요.")
+                    Text(t("아이폰과 만나면 방금 기록이 전달돼요.", "Your entry will sync when your iPhone is nearby."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
 
-                Text("자세한 건 iPhone에서")
+                Text(t("자세한 건 iPhone에서", "Details on iPhone"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
@@ -111,7 +114,7 @@ struct WatchHomeView: View {
 
     private var navigationTitleText: String {
         let text = session.snapshot.dateText
-        return text == "—" ? "오늘" : "오늘 \(text)"
+        return text == "—" ? t("오늘", "Today") : t("오늘 \(text)", "Today \(text)")
     }
 
     /// 아직 답하지 않은 시간대는 눌러서 바로 기록한다. 끝난 줄은 그냥 정보다 —
@@ -139,11 +142,11 @@ struct WatchHomeView: View {
                 Text(slot.labelKo)
                     .font(.headline)
                 Spacer()
-                Text(slot.isCompleted ? "완료" : slot.timeText)
+                Text(slot.isCompleted ? t("완료", "Done") : slot.timeText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Text(slot.medicationNames.isEmpty ? slot.summaryKo : slot.medicationNames.joined(separator: " · "))
+            Text(slot.medicationNames.isEmpty ? slot.summary(session.snapshot.language) : slot.medicationNames.joined(separator: " · "))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)

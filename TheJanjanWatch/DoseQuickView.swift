@@ -26,7 +26,7 @@ struct DoseQuickView: View {
                     Button {
                         record(.taken)
                     } label: {
-                        Text("먹었어요")
+                        Text(t("먹었어요", "Took it"))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -36,12 +36,15 @@ struct DoseQuickView: View {
                     Button {
                         record(.skipped)
                     } label: {
-                        Text("건너뜀")
+                        Text(t("건너뜀", "Skipped"))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
 
-                    Text("하나만 따로 기록하는 건 아이폰에서 할 수 있어요.")
+                    Text(t(
+                        "하나만 따로 기록하는 건 아이폰에서 할 수 있어요.",
+                        "You can log a single med on your iPhone."
+                    ))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)

@@ -26,7 +26,7 @@ struct DoseEntry: TimelineEntry {
     static let placeholder = DoseEntry(
         date: Date(),
         slotKey: "morning",
-        slotLabelKo: "아침",
+        slotLabelKo: t("아침", "Morning"),
         timeText: "08:00",
         medicationNames: ["에스시탈로프람"],
         pendingCount: 1,
@@ -94,7 +94,7 @@ struct NextDoseProvider: TimelineProvider {
         return DoseEntry(
             date: now,
             slotKey: line.slotKey,
-            slotLabelKo: line.slot.labelKo,
+            slotLabelKo: line.slot.label(JanjanLanguage.current),
             // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 아래에서 안 그린다.
             timeText: line.slot.isCustom ? "" : line.time.description,
             medicationNames: line.medicationNames,
@@ -172,7 +172,7 @@ struct NextDoseWidgetView: View {
                 }
             }
             // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
-            Text("\(entry.pendingCount)개 남음")
+            Text(t("\(entry.pendingCount)개 남음", "\(entry.pendingCount) left"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -181,7 +181,9 @@ struct NextDoseWidgetView: View {
     /// 남은 것이 없을 때. 재촉하지 않고, 하지도 않은 일을 했다고 하지도 않는다.
     private var restingBody: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(entry.hasAnyMedication ? "오늘 약은 다 챙기셨어요." : "약을 등록하면 여기 나와요.")
+            Text(entry.hasAnyMedication
+                 ? t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
+                 : t("약을 등록하면 여기 나와요.", "Add a medication to see it here."))
                 .font(.system(size: 15))
                 .foregroundStyle(.primary)
                 .lineLimit(3)
@@ -192,7 +194,7 @@ struct NextDoseWidgetView: View {
 
     private func takenButton(slotKey: String) -> some View {
         Button(intent: LogDoseIntent(slotKey: slotKey)) {
-            Text("먹었어요")
+            Text(t("먹었어요", "Took it"))
                 .font(.system(size: 15, weight: .medium))
                 .frame(maxWidth: .infinity, minHeight: 40)
         }
@@ -210,8 +212,8 @@ struct NextDoseWidget: Widget {
             NextDoseWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("다음 약")
-        .description("다음 시간대를 보여 주고, 눌러서 바로 기록해요.")
+        .configurationDisplayName(t("다음 약", "Next dose"))
+        .description(t("다음 시간대를 보여 주고, 눌러서 바로 기록해요.", "Shows your next time slot — tap to log it right away."))
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -232,8 +234,8 @@ struct NextDoseLockScreenWidget: Widget {
             NextDoseLockScreenView(entry: entry)
                 .containerBackground(.clear, for: .widget)
         }
-        .configurationDisplayName("다음 약")
-        .description("잠금화면에서 다음 시간대를 봐요.")
+        .configurationDisplayName(t("다음 약", "Next dose"))
+        .description(t("잠금화면에서 다음 시간대를 봐요.", "See your next time slot on the Lock Screen."))
         .supportedFamilies([.accessoryRectangular, .accessoryInline])
     }
 }
@@ -253,12 +255,14 @@ struct NextDoseLockScreenView: View {
                     Text([entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " "))
                         .font(.headline)
                     Text(entry.medicationNames.isEmpty
-                         ? "\(entry.pendingCount)개 남음"
+                         ? t("\(entry.pendingCount)개 남음", "\(entry.pendingCount) left")
                          : entry.medicationNames.joined(separator: " · "))
                         .font(.caption)
                         .lineLimit(1)
                 } else {
-                    Text(entry.hasAnyMedication ? "오늘 약은 다 챙기셨어요." : "약을 등록해 주세요.")
+                    Text(entry.hasAnyMedication
+                         ? t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
+                         : t("약을 등록해 주세요.", "Add a medication to get started."))
                         .font(.caption)
                         .lineLimit(2)
                 }
@@ -269,9 +273,9 @@ struct NextDoseLockScreenView: View {
 
     private var inlineText: String {
         guard entry.slotKey != nil else {
-            return entry.hasAnyMedication ? "오늘 약 완료" : "약 등록 전"
+            return entry.hasAnyMedication ? t("오늘 약 완료", "Done for today") : t("약 등록 전", "No meds yet")
         }
         let head = [entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " ")
-        return "\(head) · \(entry.pendingCount)개"
+        return "\(head) · \(t("\(entry.pendingCount)개", "\(entry.pendingCount)"))"
     }
 }

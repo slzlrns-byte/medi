@@ -22,10 +22,10 @@ struct SymptomQuickEntryView: View {
             } else {
                 List {
                     ForEach(items) { item in
-                        Button(item.nameKo) { selected = item }
+                        Button(item.name(session.snapshot.language)) { selected = item }
                     }
                 }
-                .navigationTitle("증상")
+                .navigationTitle(t("증상", "Symptom"))
             }
         }
     }
@@ -37,12 +37,13 @@ private struct SeverityPicker: View {
     let item: SymptomItem
     let onSave: (Int) -> Void
 
+    @EnvironmentObject private var session: WatchSessionManager
     @State private var value: Double = 5
     @FocusState private var isCrownFocused: Bool
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(item.nameKo)
+            Text(item.name(session.snapshot.language))
                 .font(.headline)
                 .lineLimit(2)
 
@@ -61,11 +62,11 @@ private struct SeverityPicker: View {
                     isHapticFeedbackEnabled: true
                 )
 
-            Text("세기 · 크라운으로 조절")
+            Text(t("세기 · 크라운으로 조절", "Intensity · adjust with Crown"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
-            Button("저장") {
+            Button(t("저장", "Save")) {
                 onSave(Int(value.rounded()))
             }
         }

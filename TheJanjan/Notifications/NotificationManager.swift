@@ -102,9 +102,9 @@ final class NotificationManager: NSObject {
     }
 
     func registerCategories() {
-        let taken = UNNotificationAction(identifier: DoseNotification.actionTaken, title: "복용함", options: [])
-        let skipped = UNNotificationAction(identifier: DoseNotification.actionSkipped, title: "건너뜀", options: [])
-        let snooze = UNNotificationAction(identifier: DoseNotification.actionSnooze, title: "30분 뒤", options: [])
+        let taken = UNNotificationAction(identifier: DoseNotification.actionTaken, title: t("복용함", "Taken"), options: [])
+        let skipped = UNNotificationAction(identifier: DoseNotification.actionSkipped, title: t("건너뜀", "Skip"), options: [])
+        let snooze = UNNotificationAction(identifier: DoseNotification.actionSnooze, title: t("30분 뒤", "In 30 min"), options: [])
 
         let category = UNNotificationCategory(
             identifier: DoseNotification.categoryID,
@@ -160,7 +160,7 @@ final class NotificationManager: NSObject {
 
     private func makeRequest(for reminder: SlotReminder, weekday: Weekday) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = "\(reminder.slot.labelKo) 약"
+        content.title = titleText(for: reminder.slot)
         content.body = bodyText(for: reminder)
         content.sound = .default
         content.categoryIdentifier = DoseNotification.categoryID
@@ -182,10 +182,17 @@ final class NotificationManager: NSObject {
         )
     }
 
-    /// "쿠에티아핀 · 라모트리진" 또는 이름을 숨겼을 때 "2종".
+    /// "아침 약" / "Morning meds". " 약" 을 그대로 붙이면 영어에서 어색해
+    /// 두 언어를 따로 짓는다.
+    private func titleText(for slot: DoseSlot) -> String {
+        JanjanLanguage.current == .english ? "\(slot.labelEn) meds" : "\(slot.labelKo) 약"
+    }
+
+    /// "쿠에티아핀 · 라모트리진" 또는 이름을 숨겼을 때 "2종"/"2 meds".
     private func bodyText(for reminder: SlotReminder) -> String {
         guard showsMedicationNames, !reminder.medicationNames.isEmpty else {
-            return "\(reminder.medicationIDs.count)종"
+            let count = reminder.medicationIDs.count
+            return t("\(count)종", count == 1 ? "1 med" : "\(count) meds")
         }
         return reminder.medicationNames.joined(separator: " · ")
     }
@@ -231,8 +238,12 @@ final class NotificationManager: NSObject {
     func snooze(slotKey: String, medicationIDs: [UUID]) {
         let slot = DoseSlot(storageKey: slotKey)
         let content = UNMutableNotificationContent()
-        content.title = "\(slot?.labelKo ?? "복용") 약"
-        content.body = "아직 남아 있어요."
+        if let slot {
+            content.title = titleText(for: slot)
+        } else {
+            content.title = t("복용 약", "Meds")
+        }
+        content.body = t("아직 남아 있어요.", "Still waiting for you.")
         content.sound = .default
         content.categoryIdentifier = DoseNotification.categoryID
         content.userInfo = [

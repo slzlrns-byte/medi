@@ -26,7 +26,8 @@ enum WatchSnapshotBuilder {
             doseEvents: doseEvents(around: day, in: context, calendar: calendar),
             calendar: calendar,
             isPro: isPro,
-            themeRaw: JanjanTheme.current.rawValue
+            themeRaw: JanjanTheme.current.rawValue,
+            language: JanjanLanguage.current
         )
     }
 

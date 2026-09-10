@@ -15,7 +15,10 @@ struct JanjanShortcuts: AppShortcutsProvider {
             phrases: [
                 "\(.applicationName) 약 먹었어",
                 "\(.applicationName)에 약 먹었다고 적어 줘",
-                "\(.applicationName) 약 기록"
+                "\(.applicationName) 약 기록",
+                "Log my meds in \(.applicationName)",
+                "\(.applicationName) I took my meds",
+                "Log meds taken in \(.applicationName)"
             ],
             shortTitle: "약 먹었어요",
             systemImageName: "pills"

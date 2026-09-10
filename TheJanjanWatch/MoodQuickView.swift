@@ -28,17 +28,17 @@ struct MoodQuickView: View {
                                     .aspectRatio(1, contentMode: .fit)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
+                            .accessibilityLabel(Text(CheckIn.Mood(score).label(session.snapshot.language)))
                         }
                     }
 
-                    Text("−3 매우 힘듦 → +3 좋음")
+                    Text(t("−3 매우 힘듦 → +3 좋음", "−3 very hard → +3 good"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 4)
             }
-            .navigationTitle("기분")
+            .navigationTitle(t("기분", "Mood"))
         }
     }
 
