@@ -55,7 +55,7 @@ struct ReportView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("리포트")
+            .navigationTitle(t("리포트", "Report"))
             .sheet(item: $exportURL) { file in
                 ShareSheet(items: [file.url])
                     .onDisappear {
@@ -115,24 +115,24 @@ struct ReportView: View {
     private var adherenceCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text(reportWindow.anchoredToVisit ? "지난 진료 이후" : "지난 4주")
+                Text(reportWindow.anchoredToVisit ? t("지난 진료 이후", "Since your last visit") : t("지난 4주", "Past 4 weeks"))
                     .janjanBody(13, weight: .medium)
                     .foregroundStyle(Color.muted)
 
                 if let rate = overallAdherence {
                     let percent = DecimalQuantity.floorToInt(rate * 100)
-                    Text("복약률 \(percent)%")
+                    Text(t("복약률 \(percent)%", "Adherence \(percent)%"))
                         .janjanDisplay(30)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
                     adherenceBar(fraction: (rate as NSDecimalNumber).doubleValue)
                 } else {
-                    Text("아직 셀 기록이 없어요.")
+                    Text(t("아직 셀 기록이 없어요.", "No counted records yet."))
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
 
-                Text("건너뜀도 정상적인 선택으로 함께 셉니다.")
+                Text(t("건너뜀도 정상적인 선택으로 함께 셉니다.", "Skipped doses are counted too, as a normal choice."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -159,12 +159,12 @@ struct ReportView: View {
     private var perMedicationCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("약별 남은 개수")
+                Text(t("약별 남은 개수", "Remaining per medication"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if activeMedications.isEmpty {
-                    Text("등록된 약이 없어요.")
+                    Text(t("등록된 약이 없어요.", "No medications added yet."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
@@ -191,7 +191,9 @@ struct ReportView: View {
                 .foregroundStyle(Color.ink2)
             Spacer()
             // 한 번도 세지 않았으면 0정이라고 말하지 않는다.
-            Text(counted ? "\(DecimalQuantity.display(remaining))정" : "재고 미기록")
+            Text(counted
+                ? t("\(DecimalQuantity.display(remaining))정", "\(DecimalQuantity.display(remaining)) pills")
+                : t("재고 미기록", "Stock not tracked"))
                 .janjanBody(15, weight: counted ? .medium : .light)
                 .foregroundStyle(counted ? Color.ink : Color.muted)
                 .monospacedDigit()
@@ -203,11 +205,11 @@ struct ReportView: View {
     private var exportCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("진료에 가져가기")
+                Text(t("진료에 가져가기", "Bring to your visit"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
-                WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {
+                WhitePillButton(title: t("PDF 로 내보내기", "Export as PDF"), systemImage: "square.and.arrow.up") {
                     export()
                 }
                 .overlay(
@@ -215,7 +217,10 @@ struct ReportView: View {
                 )
                 .disabled(isExporting)
 
-                Text("만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.")
+                Text(t(
+                    "만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.",
+                    "The file leaves this device only when you share it yourself."
+                ))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -226,7 +231,7 @@ struct ReportView: View {
     private var askDoctorCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("의사에게 물어볼 것")
+                Text(t("의사에게 물어볼 것", "Questions for my doctor"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
@@ -237,7 +242,10 @@ struct ReportView: View {
                     .frame(minHeight: 92)
                     .overlay(alignment: .topLeading) {
                         if questions.isEmpty {
-                            Text("한 줄에 하나씩 적어 두면 리포트에 함께 나가요.")
+                            Text(t(
+                                "한 줄에 하나씩 적어 두면 리포트에 함께 나가요.",
+                                "One per line — these go out with the report."
+                            ))
                                 .janjanBody(14)
                                 .foregroundStyle(Color.muted)
                                 .allowsHitTesting(false)
@@ -253,7 +261,10 @@ struct ReportView: View {
                             .fill(Color.janjan(.surface2))
                     )
 
-                Text("이 메모는 이 기기에만 남고 iCloud 로 넘어가지 않아요.")
+                Text(t(
+                    "이 메모는 이 기기에만 남고 iCloud 로 넘어가지 않아요.",
+                    "This note stays on this device and does not sync to iCloud."
+                ))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
@@ -282,7 +293,8 @@ struct ReportView: View {
             // PDF 가 무료가 되면서 이 줄이 유료 기능의 뒷문이 되지 않게,
             // 무료에서는 진료일을 넘기지 않아 부족 캡션 자체가 생기지 않는다.
             nextVisit: pro.isPro ? nextVisit : nil,
-            questionsKo: questions
+            questionsKo: questions,
+            language: JanjanLanguage.current
         )
 
         if let url = ReportPDF.write(content) {

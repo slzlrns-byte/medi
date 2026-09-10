@@ -45,9 +45,10 @@ struct LockScreenView: View {
 
     private var wordmark: some View {
         VStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(Janjan.appNameKo)
+            Text(Janjan.appName(JanjanLanguage.current))
                 .janjanDisplay(36)
                 .foregroundStyle(Color.ink)
+            // Janjan.sloganKo 에는 영어 짝이 코어에 없어, 슬로건은 한국어로 남는다.
             Text(Janjan.sloganKo)
                 .janjanBody(13)
                 .foregroundStyle(Color.muted)
@@ -66,6 +67,8 @@ struct LockScreenView: View {
 
     private var messageText: String {
         // `now` 를 읽어 1초마다 남은 시간이 다시 계산되게 한다.
+        // PasscodeThrottle.messageKo 와 AppLockManager.failureMessageKo 는
+        // 코어·로직 파일(이 팀 소유 아님)에 한국어로만 있어 언어를 못 따라간다.
         _ = now
         if lock.isThrottled {
             return PasscodeThrottle.messageKo(forRemaining: lock.remainingLockout) ?? ""
@@ -82,7 +85,7 @@ struct LockScreenView: View {
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                         Image(systemName: lock.biometrySymbolName)
                             .font(.system(size: 16, weight: .regular))
-                        Text("생체인식으로 열기")
+                        Text(t("생체인식으로 열기", "Unlock with biometrics"))
                             .janjanBody(15, weight: .medium)
                     }
                     .foregroundStyle(Color.ink)
@@ -93,7 +96,7 @@ struct LockScreenView: View {
 
             // 되찾는 길. 기다리는 중에도 열어 둔다 — 여기가 막히면 되찾을 곳이 없다.
             if lock.canRecoverWithDevice {
-                Button("번호를 잊으셨어요?") {
+                Button(t("번호를 잊으셨어요?", "Forgot your code?")) {
                     Task { await lock.unlockWithDevice(forRecovery: true) }
                 }
                 .janjanBody(13)

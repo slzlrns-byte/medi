@@ -103,7 +103,7 @@ struct MoodPickerRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(JanjanMood.label(forScore: score)))
+        .accessibilityLabel(Text(CheckIn.Mood(score).label(JanjanLanguage.current)))
         .accessibilityAddTraits(isChosen ? [.isButton, .isSelected] : [.isButton])
     }
 }
@@ -199,7 +199,7 @@ extension View {
 /// 어느 화면에서든 같은 문장으로 나가는 면책 한 줄.
 struct MedicalDisclaimer: View {
     var body: some View {
-        Text(Janjan.medicalDisclaimerKo)
+        Text(Janjan.medicalDisclaimer(JanjanLanguage.current))
             .janjanBody(12)
             .foregroundStyle(Color.muted)
             .multilineTextAlignment(.leading)
@@ -280,8 +280,8 @@ struct TogglePill: View {
 struct CountStepper: View {
 
     let text: String
-    var decreaseLabelKo: String = "줄이기"
-    var increaseLabelKo: String = "늘리기"
+    var decreaseLabelKo: String = t("줄이기", "Decrease")
+    var increaseLabelKo: String = t("늘리기", "Increase")
     let onDecrease: () -> Void
     let onIncrease: () -> Void
 

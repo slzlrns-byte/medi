@@ -75,7 +75,7 @@ struct DiaryView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("기록")
+            .navigationTitle(t("기록", "Journal"))
             .sheet(isPresented: $isShowingSymptomSheet) {
                 SymptomEntrySheet { symptomID, severity, note in
                     saveSymptom(symptomID: symptomID, severity: severity, note: note)
@@ -85,7 +85,7 @@ struct DiaryView: View {
                 SafetyCardView()
             }
             .confirmationDialog(
-                "이 증상 기록을 지울까요?",
+                t("이 증상 기록을 지울까요?", "Delete this symptom entry?"),
                 isPresented: Binding(
                     get: { pendingSymptomDeletion != nil },
                     set: { if !$0 { pendingSymptomDeletion = nil } }
@@ -93,8 +93,8 @@ struct DiaryView: View {
                 titleVisibility: .visible,
                 presenting: pendingSymptomDeletion
             ) { entry in
-                Button("지우기", role: .destructive) { delete(entry) }
-                Button("취소", role: .cancel) { pendingSymptomDeletion = nil }
+                Button(t("지우기", "Delete"), role: .destructive) { delete(entry) }
+                Button(t("취소", "Cancel"), role: .cancel) { pendingSymptomDeletion = nil }
             }
         }
     }
@@ -104,18 +104,18 @@ struct DiaryView: View {
     private var moodCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("지금 기분은 어떠세요?")
+                Text(t("지금 기분은 어떠세요?", "How are you feeling right now?"))
                     .janjanDisplay(22)
                     .foregroundStyle(Color.ink)
 
                 MoodPickerRow(chosenScore: todayRecord?.moodScore) { saveMood($0) }
 
                 if let record = todayRecord {
-                    Text(JanjanMood.label(forScore: record.moodScore))
+                    Text(CheckIn.Mood(record.moodScore).label(JanjanLanguage.current))
                         .janjanBody(14, weight: .medium)
                         .foregroundStyle(Color.ink2)
                 } else {
-                    Text("하나만 골라도 완전한 기록이에요.")
+                    Text(t("하나만 골라도 완전한 기록이에요.", "Choosing just one is still a complete entry."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
@@ -126,7 +126,7 @@ struct DiaryView: View {
     private func noteCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("한 줄 남길까요?")
+                Text(t("한 줄 남길까요?", "Want to leave a note?"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 TextField("", text: text(record, \.note), axis: .vertical)
@@ -151,19 +151,19 @@ struct DiaryView: View {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     TogglePill(
-                        text: "술 마셨어요",
+                        text: t("술 마셨어요", "Had alcohol"),
                         isOn: record.activities.contains(ActivityTag.alcoholID)
                     ) {
                         toggleActivity(ActivityTag.alcoholID, in: record)
                     }
                     TogglePill(
-                        text: "담배 피웠어요",
+                        text: t("담배 피웠어요", "Smoked"),
                         isOn: record.activities.contains(ActivityTag.smokingID)
                     ) {
                         toggleActivity(ActivityTag.smokingID, in: record)
                     }
                 }
-                Text("진료 때 자주 묻는 항목이라 리포트에 함께 실려요.")
+                Text(t("진료 때 자주 묻는 항목이라 리포트에 함께 실려요.", "This is often asked at visits, so it's included in the report."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
@@ -172,7 +172,7 @@ struct DiaryView: View {
 
     private var expandButton: some View {
         WhitePillButton(
-            title: isExpanded ? "접기" : "더 남기기",
+            title: isExpanded ? t("접기", "Show less") : t("더 남기기", "Add more"),
             systemImage: isExpanded ? "chevron.up" : "chevron.down"
         ) {
             withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
@@ -184,7 +184,7 @@ struct DiaryView: View {
     private func emotionWordCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("어떤 마음이었어요?")
+                Text(t("어떤 마음이었어요?", "What did it feel like?"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
@@ -196,7 +196,7 @@ struct DiaryView: View {
                             toggle(word.id, in: record)
                         } label: {
                             PillChip(
-                                text: word.nameKo,
+                                text: word.name(JanjanLanguage.current),
                                 tint: isOn ? .ink : .surface2,
                                 textTint: isOn ? .surface : .ink2
                             )
@@ -212,8 +212,8 @@ struct DiaryView: View {
     private func scaleCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
-                scaleRow("기운", value: optionalInt(record, \.energy))
-                scaleRow("불안", value: optionalInt(record, \.anxiety))
+                scaleRow(t("기운", "Energy"), value: optionalInt(record, \.energy))
+                scaleRow(t("불안", "Anxiety"), value: optionalInt(record, \.anxiety))
             }
         }
     }
@@ -227,7 +227,7 @@ struct DiaryView: View {
                     .foregroundStyle(Color.ink)
                 Spacer()
                 if value.wrappedValue == nil {
-                    Text("안 적음")
+                    Text(t("안 적음", "Not set"))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
@@ -245,14 +245,14 @@ struct DiaryView: View {
     private func sleepCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("잠은 어땠어요?")
+                Text(t("잠은 어땠어요?", "How did you sleep?"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 CountStepper(
                     text: sleepText(record),
-                    decreaseLabelKo: "잔 시간 줄이기",
-                    increaseLabelKo: "잔 시간 늘리기",
+                    decreaseLabelKo: t("잔 시간 줄이기", "Decrease sleep time"),
+                    increaseLabelKo: t("잔 시간 늘리기", "Increase sleep time"),
                     onDecrease: { adjustSleep(record, by: -30) },
                     onIncrease: { adjustSleep(record, by: 30) }
                 )
@@ -260,7 +260,7 @@ struct DiaryView: View {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(CheckIn.SleepQuality.allCases, id: \.self) { quality in
                         TogglePill(
-                            text: quality.labelKo,
+                            text: quality.label(JanjanLanguage.current),
                             isOn: record.sleepQualityRaw == quality.rawValue
                         ) {
                             record.sleepQualityRaw =
@@ -270,7 +270,7 @@ struct DiaryView: View {
                     }
                 }
 
-                TogglePill(text: "꿈을 꿨어요", isOn: record.dreamed == true) {
+                TogglePill(text: t("꿈을 꿨어요", "Had a dream"), isOn: record.dreamed == true) {
                     record.dreamed = (record.dreamed == true) ? nil : true
                     touch(record)
                 }
@@ -279,16 +279,16 @@ struct DiaryView: View {
                 // 실수로 "꿈을 꿨어요" 를 껐다가 다시 켠 사람이 이미 적어 둔
                 // 생생함·악몽·기억·한 줄을 그대로 다시 볼 수 있어야 한다.
                 if record.dreamed == true {
-                    dreamScaleRow("생생함", value: optionalInt(record, \.dreamVividness))
+                    dreamScaleRow(t("생생함", "Vividness"), value: optionalInt(record, \.dreamVividness))
 
-                    TogglePill(text: "악몽이었어요", isOn: record.nightmare == true) {
+                    TogglePill(text: t("악몽이었어요", "It was a nightmare"), isOn: record.nightmare == true) {
                         record.nightmare = (record.nightmare == true) ? nil : true
                         touch(record)
                     }
 
-                    dreamScaleRow("기억", value: optionalInt(record, \.dreamRecall))
+                    dreamScaleRow(t("기억", "Recall"), value: optionalInt(record, \.dreamRecall))
 
-                    TextField("꿈 한 줄 (선택)", text: text(record, \.dreamNote), axis: .vertical)
+                    TextField(t("꿈 한 줄 (선택)", "A line about the dream (optional)"), text: text(record, \.dreamNote), axis: .vertical)
                         .janjanBody(15)
                         .foregroundStyle(Color.ink)
                         .lineLimit(1...4)
@@ -312,7 +312,7 @@ struct DiaryView: View {
                     .foregroundStyle(Color.ink)
                 Spacer()
                 if value.wrappedValue == nil {
-                    Text("안 적음")
+                    Text(t("안 적음", "Not set"))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                 }
@@ -330,7 +330,7 @@ struct DiaryView: View {
     private func activityCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("무엇을 했어요?")
+                Text(t("무엇을 했어요?", "What did you do?"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
@@ -341,7 +341,7 @@ struct DiaryView: View {
                             toggleActivity(tag.id, in: record)
                         } label: {
                             PillChip(
-                                text: tag.nameKo,
+                                text: tag.name(JanjanLanguage.current),
                                 tint: isOn ? .ink : .surface2,
                                 textTint: isOn ? .surface : .ink2
                             )
@@ -357,7 +357,7 @@ struct DiaryView: View {
     private func longTextCard(_ record: CheckInRecord) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("더 쓰고 싶으면")
+                Text(t("더 쓰고 싶으면", "If you want to write more"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
@@ -372,7 +372,7 @@ struct DiaryView: View {
                             .fill(Color.janjan(.surface2))
                     )
 
-                Text("길이 제한은 없어요.")
+                Text(t("길이 제한은 없어요.", "There's no length limit."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
@@ -384,12 +384,12 @@ struct DiaryView: View {
     private var symptomCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("증상")
+                Text(t("증상", "Symptoms"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if todaysSymptoms.isEmpty {
-                    Text("오늘 남긴 증상이 없어요.")
+                    Text(t("오늘 남긴 증상이 없어요.", "No symptoms logged today."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 } else {
@@ -398,7 +398,7 @@ struct DiaryView: View {
                     }
                 }
 
-                WhitePillButton(title: "증상 남기기", systemImage: "plus") {
+                WhitePillButton(title: t("증상 남기기", "Log a symptom"), systemImage: "plus") {
                     isShowingSymptomSheet = true
                 }
                 .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -408,10 +408,10 @@ struct DiaryView: View {
 
     private func symptomRow(_ entry: SymptomEntryRecord) -> some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(Catalogs.symptoms.symptom(id: entry.symptomID)?.nameKo ?? entry.symptomID)
+            Text(Catalogs.symptoms.symptom(id: entry.symptomID)?.name(JanjanLanguage.current) ?? entry.symptomID)
                 .janjanBody(15)
                 .foregroundStyle(Color.ink2)
-            PillChip(text: "세기 \(entry.severity)")
+            PillChip(text: t("세기 \(entry.severity)", "Severity \(entry.severity)"))
             Spacer(minLength: 0)
             Button {
                 // 바로 지우지 않는다. 12pt 글리프를 잘못 스치면 기록이 사라지고,
@@ -425,7 +425,7 @@ struct DiaryView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("이 증상 기록 지우기"))
+            .accessibilityLabel(Text(t("이 증상 기록 지우기", "Delete this symptom entry")))
         }
     }
 
@@ -435,10 +435,10 @@ struct DiaryView: View {
         let card = Catalogs.questions.card(for: today)
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("오늘의 질문")
+                Text(t("오늘의 질문", "Today's question"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
-                Text(card?.textKo ?? "오늘은 그냥 여기까지여도 괜찮아요.")
+                Text(card?.text(JanjanLanguage.current) ?? t("오늘은 그냥 여기까지여도 괜찮아요.", "It's okay to stop here for today."))
                     .janjanDisplay(19)
                     .foregroundStyle(Color.ink)
             }
@@ -453,12 +453,12 @@ struct DiaryView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("지난 기록")
+                Text(t("지난 기록", "Past entries"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
                 if past.isEmpty {
-                    Text("아직 지난 기록이 없어요.")
+                    Text(t("아직 지난 기록이 없어요.", "No past entries yet."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
@@ -472,7 +472,7 @@ struct DiaryView: View {
                             .janjanBody(13)
                             .foregroundStyle(Color.ink2)
                             .monospacedDigit()
-                        Text(record.note ?? JanjanMood.label(forScore: record.moodScore))
+                        Text(record.note ?? CheckIn.Mood(record.moodScore).label(JanjanLanguage.current))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                             .lineLimit(1)
@@ -485,7 +485,7 @@ struct DiaryView: View {
 
     private func dayText(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
         formatter.setLocalizedDateFormatFromTemplate("Md")
         return formatter.string(from: date)
     }
@@ -555,9 +555,12 @@ struct DiaryView: View {
     }
 
     private func sleepText(_ record: CheckInRecord) -> String {
-        guard let minutes = record.sleepMinutes else { return "안 적음" }
+        guard let minutes = record.sleepMinutes else { return t("안 적음", "Not set") }
         let hours = minutes / 60
         let rest = minutes % 60
+        if JanjanLanguage.current == .english {
+            return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+        }
         return rest == 0 ? "\(hours)시간" : "\(hours)시간 \(rest)분"
     }
 
@@ -647,15 +650,15 @@ private struct SymptomEntrySheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("증상 남기기")
+            .navigationTitle(t("증상 남기기", "Log a symptom"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("저장") {
+                    Button(t("저장", "Save")) {
                         if let selectedID {
                             onSave(selectedID, severity, note)
                         }
@@ -671,7 +674,7 @@ private struct SymptomEntrySheet: View {
     private func groupCard(_ group: SymptomGroup) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(group.nameKo)
+                Text(group.name(JanjanLanguage.current))
                     .janjanBody(13, weight: .medium)
                     .foregroundStyle(Color.muted)
 
@@ -682,7 +685,7 @@ private struct SymptomEntrySheet: View {
                             selectedID = isOn ? nil : item.id
                         } label: {
                             PillChip(
-                                text: item.nameKo,
+                                text: item.name(JanjanLanguage.current),
                                 tint: isOn ? .ink : .surface2,
                                 textTint: isOn ? .surface : .ink2
                             )
@@ -698,19 +701,22 @@ private struct SymptomEntrySheet: View {
     private var severityCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text("얼마나 심했어요?")
+                Text(t("얼마나 심했어요?", "How severe was it?"))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
                 CountStepper(
-                    text: "세기 \(severity) / \(SymptomEntry.severityRange.upperBound)",
-                    decreaseLabelKo: "세기 줄이기",
-                    increaseLabelKo: "세기 늘리기",
+                    text: t(
+                        "세기 \(severity) / \(SymptomEntry.severityRange.upperBound)",
+                        "Severity \(severity) / \(SymptomEntry.severityRange.upperBound)"
+                    ),
+                    decreaseLabelKo: t("세기 줄이기", "Decrease severity"),
+                    increaseLabelKo: t("세기 늘리기", "Increase severity"),
                     onDecrease: { severity = max(severity - 1, SymptomEntry.severityRange.lowerBound) },
                     onIncrease: { severity = min(severity + 1, SymptomEntry.severityRange.upperBound) }
                 )
 
-                TextField("덧붙일 말 (선택)", text: $note, axis: .vertical)
+                TextField(t("덧붙일 말 (선택)", "Add a note (optional)"), text: $note, axis: .vertical)
                     .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1...4)

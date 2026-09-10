@@ -156,11 +156,35 @@ enum JanjanFontChoice: String, CaseIterable {
         }
     }
 
+    var labelEn: String {
+        switch self {
+        case .standard: return "Default"
+        case .plex: return "Crisp"
+        case .gowun: return "Rounded"
+        }
+    }
+
+    func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
+    }
+
     var detailKo: String {
         switch self {
         case .standard: return "SUIT 제목과 프리텐다드 본문"
         case .plex: return "IBM Plex Sans KR"
         case .gowun: return "고운돋움 제목과 프리텐다드 본문"
         }
+    }
+
+    var detailEn: String {
+        switch self {
+        case .standard: return "SUIT titles with Pretendard body text"
+        case .plex: return "IBM Plex Sans KR"
+        case .gowun: return "Gowun Dodum titles with Pretendard body text"
+        }
+    }
+
+    func detail(_ language: JanjanLanguage) -> String {
+        language == .english ? detailEn : detailKo
     }
 }

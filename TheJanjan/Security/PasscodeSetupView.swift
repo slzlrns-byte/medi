@@ -24,6 +24,16 @@ struct PasscodeSetupView: View {
             case .reset: return "새 번호 정하기"
             }
         }
+
+        var titleEn: String {
+            switch self {
+            case .create: return "Turn on lock"
+            case .change: return "Change code"
+            case .reset: return "Set a new code"
+            }
+        }
+
+        var title: String { t(titleKo, titleEn) }
     }
 
     let mode: Mode
@@ -65,13 +75,13 @@ struct PasscodeSetupView: View {
             .padding(.top, CGFloat(JanjanSpacing.l))
             .padding(.bottom, CGFloat(JanjanSpacing.xl))
             .fogBackground()
-            .navigationTitle(mode.titleKo)
+            .navigationTitle(mode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     // 되찾은 뒤에는 물러날 곳이 없다. 새 번호를 정해야 앱을 쓸 수 있다.
                     if mode != .reset {
-                        Button("취소") {
+                        Button(t("취소", "Cancel")) {
                             onDone()
                             dismiss()
                         }
@@ -105,20 +115,23 @@ struct PasscodeSetupView: View {
 
     private var promptKo: String {
         switch step {
-        case .current: return "지금 번호를 눌러 주세요"
-        case .fresh: return "쓸 번호를 정해 주세요"
-        case .confirm: return "한 번 더 눌러 주세요"
+        case .current: return t("지금 번호를 눌러 주세요", "Enter your current code")
+        case .fresh: return t("쓸 번호를 정해 주세요", "Choose a code to use")
+        case .confirm: return t("한 번 더 눌러 주세요", "Enter it once more")
         }
     }
 
     private var subtitleKo: String {
         switch step {
         case .current:
-            return "확인한 뒤에 새 번호를 정해요."
+            return t("확인한 뒤에 새 번호를 정해요.", "Once confirmed, you'll set a new code.")
         case .fresh:
-            return "앱을 열 때마다 이 네 자리를 눌러요."
+            return t("앱을 열 때마다 이 네 자리를 눌러요.", "You'll enter these 4 digits every time you open the app.")
         case .confirm:
-            return "잘못 누른 번호가 굳지 않도록 한 번 더 받아요."
+            return t(
+                "잘못 누른 번호가 굳지 않도록 한 번 더 받아요.",
+                "We ask once more so a mistyped code doesn't stick."
+            )
         }
     }
 
@@ -130,7 +143,7 @@ struct PasscodeSetupView: View {
                     .foregroundStyle(Color.ink2)
             }
             if isEasyGuess {
-                Text(Passcode.easyGuessMessageKo)
+                Text(Passcode.easyGuessMessage(JanjanLanguage.current))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
@@ -147,17 +160,23 @@ struct PasscodeSetupView: View {
         if !lock.canRecoverWithDevice {
             JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    Text("이 기기에는 되찾을 길이 없어요")
+                    Text(t("이 기기에는 되찾을 길이 없어요", "This device has no way to recover"))
                         .janjanBody(14, weight: .medium)
                         .foregroundStyle(Color.ink)
-                    Text("기기 암호나 Face ID 가 설정돼 있지 않아서, 번호를 잊으면 기록을 열 방법이 없어요. 기기 설정에서 암호를 먼저 만들어 두시길 권해요.")
+                    Text(t(
+                        "기기 암호나 Face ID 가 설정돼 있지 않아서, 번호를 잊으면 기록을 열 방법이 없어요. 기기 설정에서 암호를 먼저 만들어 두시길 권해요.",
+                        "No device passcode or Face ID is set up, so if you forget your code there is no way to open your records. We recommend setting a device passcode first."
+                    ))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         } else {
-            Text("번호를 잊으면 \(biometryWordKo)로 되찾을 수 있어요.")
+            Text(t(
+                "번호를 잊으면 \(biometryWordKo)로 되찾을 수 있어요.",
+                "If you forget your code, you can recover with \(biometryWordKo)."
+            ))
                 .janjanBody(12)
                 .foregroundStyle(Color.muted)
                 .multilineTextAlignment(.center)
@@ -168,7 +187,7 @@ struct PasscodeSetupView: View {
         switch lock.biometrySymbolName {
         case "faceid": return "Face ID"
         case "touchid": return "Touch ID"
-        default: return "기기 암호"
+        default: return t("기기 암호", "device passcode")
         }
     }
 
@@ -180,11 +199,12 @@ struct PasscodeSetupView: View {
             if lock.unlock(with: entered) {
                 advance(to: .fresh)
             } else {
-                reject("번호가 맞지 않아요.")
+                reject(t("번호가 맞지 않아요.", "That code doesn't match."))
             }
 
         case .fresh:
             guard Passcode.validate(entered) == .ok else {
+                // Passcode.Validation.messageKo 는 코어에 한국어만 있다.
                 reject(Passcode.validate(entered).messageKo)
                 return
             }
@@ -198,7 +218,7 @@ struct PasscodeSetupView: View {
                 firstEntry = ""
                 isEasyGuess = false
                 advance(to: .fresh)
-                messageKo = "두 번이 서로 달라요. 다시 정해 주세요."
+                messageKo = t("두 번이 서로 달라요. 다시 정해 주세요.", "The two entries didn't match. Please set it again.")
                 withAnimation(.default) { shake += 1 }
                 return
             }
@@ -206,7 +226,7 @@ struct PasscodeSetupView: View {
                 onDone()
                 dismiss()
             } else {
-                reject("번호를 저장하지 못했어요. 잠시 후 다시 해 주세요.")
+                reject(t("번호를 저장하지 못했어요. 잠시 후 다시 해 주세요.", "Couldn't save the code. Please try again shortly."))
             }
         }
     }

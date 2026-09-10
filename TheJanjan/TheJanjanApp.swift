@@ -8,6 +8,7 @@ struct TheJanjanApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appLock = AppLockManager()
     @StateObject private var proStore = ProStore()
+    @AppStorage(JanjanLanguage.defaultsKey) private var languageRaw = JanjanLanguage.standard.rawValue
 
     private let modelContainer: ModelContainer
 
@@ -69,14 +70,14 @@ struct TheJanjanApp: App {
                 }
                 .environmentObject(appLock)
                 .environmentObject(proStore)
-                // 화면 글자가 전부 한국어인데 DatePicker 만 기기 로케일을 따라가
-                // "Aug 26, 2026" 으로 나왔다. 영어 기기를 쓰는 한국 사용자에게도
-                // 그렇게 보인다. v1 은 한국어 전용이므로 로케일을 못 박는다.
+                // 화면 글자는 설정에서 고른 언어를 따르는데 DatePicker 같은 시스템 부품은
+                // 기기 로케일을 따로 본다. 그대로 두면 한국어 화면인데 "Aug 26, 2026" 처럼
+                // 어긋난 표기가 나온다(반대도 마찬가지). 그래서 로케일을 설정의 언어에 맞춘다.
                 //
                 // 위기 상담 연락처는 이것과 무관하게 기기의 **지역**을 본다
                 // (Locale.current.region) — 한국어를 쓰지만 해외에 있는 사람에게
                 // 한국 번호를 내밀면 안 되기 때문이다.
-                .environment(\.locale, Locale(identifier: "ko_KR"))
+                .environment(\.locale, Locale(identifier: (JanjanLanguage(rawValue: languageRaw) ?? .standard).localeIdentifier))
                 .onChange(of: proStore.isPro) { _, isPro in
                     AppServices.shared.updatePro(isPro)
                 }

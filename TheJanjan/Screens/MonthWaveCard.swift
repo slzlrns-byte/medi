@@ -48,24 +48,26 @@ struct MonthWaveCard: View {
 
     private var header: some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text("이번 달의 물결")
+            Text(t("이번 달의 물결", "This month's ripples"))
                 .janjanDisplay(20)
                 .foregroundStyle(Color.ink)
             Spacer(minLength: 0)
-            monthButton("chevron.left", labelKo: "지난달") {
+            monthButton("chevron.left", labelKo: t("지난달", "Previous month")) {
                 move(by: -1)
             }
-            Text("\(String(wave.year))년 \(wave.month)월")
+            Text(monthYearText)
                 .janjanBody(14)
                 .foregroundStyle(Color.muted)
                 .fixedSize()
-            monthButton("chevron.right", labelKo: "다음 달") {
+            monthButton("chevron.right", labelKo: t("다음 달", "Next month")) {
                 move(by: 1)
             }
             .disabled(isShowingCurrentMonth)
             .opacity(isShowingCurrentMonth ? 0.3 : 1)
         }
     }
+
+    private var monthYearText: String { monthWaveYearMonthText(wave) }
 
     private func monthButton(_ systemImage: String, labelKo: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -81,11 +83,11 @@ struct MonthWaveCard: View {
 
     private var footer: some View {
         HStack(alignment: .bottom) {
-            Text("기록한 색만 남아요.\n해석은 하지 않아요.")
+            Text(t("기록한 색만 남아요.\n해석은 하지 않아요.", "Only the colors you chose remain.\nNo interpretation is added."))
                 .janjanBody(12)
                 .foregroundStyle(Color.muted)
             Spacer(minLength: CGFloat(JanjanSpacing.s))
-            WhitePillButton(title: "그림으로 저장", systemImage: "square.and.arrow.down") {
+            WhitePillButton(title: t("그림으로 저장", "Save as image"), systemImage: "square.and.arrow.down") {
                 export()
             }
         }
@@ -123,6 +125,12 @@ private struct MonthWaveGrid: View {
 
     private let spacing: CGFloat = 6
 
+    private var weekdaySymbols: [String] {
+        JanjanLanguage.current == .english
+            ? ["S", "M", "T", "W", "T", "F", "S"]
+            : ["일", "월", "화", "수", "목", "금", "토"]
+    }
+
     /// 앞뒤 빈 칸을 채워 7칸씩 자른 줄들.
     private var rows: [[MonthWave.DayCell?]] {
         var cells: [MonthWave.DayCell?] = Array(repeating: nil, count: wave.leadingBlanks)
@@ -134,7 +142,7 @@ private struct MonthWaveGrid: View {
     var body: some View {
         VStack(spacing: spacing) {
             HStack(spacing: spacing) {
-                ForEach(["일", "월", "화", "수", "목", "금", "토"], id: \.self) { name in
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, name in
                     Text(name)
                         .janjanBody(11)
                         .foregroundStyle(Color.muted)
@@ -199,9 +207,23 @@ private struct MonthWaveGrid: View {
     }
 
     private func accessibilityText(_ cell: MonthWave.DayCell) -> String {
-        guard let score = cell.moodScore else { return "\(cell.day)일, 기록 없음" }
-        return "\(cell.day)일, \(JanjanMood.label(forScore: score))"
+        guard let score = cell.moodScore else {
+            return t("\(cell.day)일, 기록 없음", "Day \(cell.day), no record")
+        }
+        let label = CheckIn.Mood(score).label(JanjanLanguage.current)
+        return t("\(cell.day)일, \(label)", "Day \(cell.day), \(label)")
     }
+}
+
+/// 달과 해를 한 줄로. 화면 헤더와 내보내는 그림이 같은 것을 쓴다.
+private func monthWaveYearMonthText(_ wave: MonthWave) -> String {
+    guard JanjanLanguage.current == .english else {
+        return "\(String(wave.year))년 \(wave.month)월"
+    }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
+    let name = formatter.monthSymbols[min(max(wave.month - 1, 0), 11)]
+    return "\(name) \(String(wave.year))"
 }
 
 /// 내보내는 한 장. 종이색 바탕에 달력과 달 이름, 작은 앱 이름뿐이다.
@@ -214,18 +236,18 @@ private struct MonthWaveShareView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .lastTextBaseline) {
-                Text("이번 달의 물결")
+                Text(t("이번 달의 물결", "This month's ripples"))
                     .janjanDisplay(24)
                     .foregroundStyle(Color.ink)
                 Spacer()
-                Text("\(String(wave.year))년 \(wave.month)월")
+                Text(monthWaveYearMonthText(wave))
                     .janjanBody(15)
                     .foregroundStyle(Color.muted)
             }
             MonthWaveGrid(wave: wave, today: today, calendar: calendar)
             HStack {
                 Spacer()
-                Text("더잔잔")
+                Text(Janjan.appName(JanjanLanguage.current))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
             }

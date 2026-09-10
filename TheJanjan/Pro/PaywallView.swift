@@ -56,7 +56,7 @@ struct PaywallView: View {
 
     private var topBar: some View {
         ZStack {
-            Text(Janjan.appNameKo)
+            Text(Janjan.appName(JanjanLanguage.current))
                 .janjanBody(12, weight: .medium)
                 .tracking(1.6)
                 .foregroundStyle(Color.muted)
@@ -74,7 +74,7 @@ struct PaywallView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text("닫기"))
+                .accessibilityLabel(Text(t("닫기", "Close")))
 
                 Spacer()
             }
@@ -83,7 +83,7 @@ struct PaywallView: View {
     }
 
     private var headline: some View {
-        Text("더 잔잔한 하루를 위해,\nPro")
+        Text(t("더 잔잔한 하루를 위해,\nPro", "For a calmer day,\nPro"))
             .janjanDisplay(30, relativeTo: .largeTitle)
             .foregroundStyle(Color.ink)
             .fixedSize(horizontal: false, vertical: true)
@@ -101,7 +101,7 @@ struct PaywallView: View {
                             foreground: .lavInk,
                             diameter: 22
                         )
-                        Text(feature.titleKo)
+                        Text(feature.title(JanjanLanguage.current))
                             .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                     }
@@ -137,7 +137,7 @@ struct PaywallView: View {
             links
                 .padding(.top, CGFloat(JanjanSpacing.m) + 2)
 
-            Text("무료 기능은 구독 없이 계속 쓸 수 있어요.")
+            Text(t("무료 기능은 구독 없이 계속 쓸 수 있어요.", "Free features keep working without a subscription."))
                 .janjanBody(11)
                 .foregroundStyle(Color.muted)
                 .multilineTextAlignment(.center)
@@ -151,15 +151,15 @@ struct PaywallView: View {
             if let yearly = pro.yearlyProduct {
                 planCard(
                     plan: .yearly,
-                    title: "연간 · \(yearly.displayPrice) / 년",
-                    subtitle: pro.yearlyMonthlyEquivalentText.map { "월 \($0) 꼴" },
-                    tag: pro.isYearlyTrialEligible ? "7일 무료 체험" : nil
+                    title: t("연간 · \(yearly.displayPrice) / 년", "Yearly · \(yearly.displayPrice) / yr"),
+                    subtitle: pro.yearlyMonthlyEquivalentText.map { t("월 \($0) 꼴", "≈ \($0) / mo") },
+                    tag: pro.isYearlyTrialEligible ? t("7일 무료 체험", "7-day free trial") : nil
                 )
             }
             if let monthly = pro.monthlyProduct {
                 planCard(
                     plan: .monthly,
-                    title: "월간 · \(monthly.displayPrice) / 월",
+                    title: t("월간 · \(monthly.displayPrice) / 월", "Monthly · \(monthly.displayPrice) / mo"),
                     subtitle: nil,
                     tag: nil
                 )
@@ -248,9 +248,9 @@ struct PaywallView: View {
     /// 체험을 받을 수 있을 때만 "무료" 라고 쓴다. 못 받는 계정에 무료라고 쓰면 3.1.2 위반이다.
     private var ctaTitle: String {
         if selectedPlan == .yearly, pro.isYearlyTrialEligible {
-            return "7일 무료로 시작하기"
+            return t("7일 무료로 시작하기", "Start 7 days free")
         }
-        return "Pro 시작하기"
+        return t("Pro 시작하기", "Start Pro")
     }
 
     private func buy() {
@@ -270,17 +270,26 @@ struct PaywallView: View {
     }
 
     private var disclosureText: String {
-        let cancelSentence = "언제든 설정에서 해지할 수 있어요."
+        let cancelSentence = t("언제든 설정에서 해지할 수 있어요.", "You can cancel anytime in Settings.")
         switch selectedPlan {
         case .yearly:
             guard let price = pro.yearlyProduct?.displayPrice else { return cancelSentence }
             if pro.isYearlyTrialEligible {
-                return "7일 무료 체험 후 연 \(price)이 자동으로 결제돼요. \(cancelSentence)"
+                return t(
+                    "7일 무료 체험 후 연 \(price)이 자동으로 결제돼요. \(cancelSentence)",
+                    "After a 7-day free trial, \(price) is billed yearly and auto-renews. \(cancelSentence)"
+                )
             }
-            return "연 \(price)이 해지할 때까지 자동으로 갱신돼요. \(cancelSentence)"
+            return t(
+                "연 \(price)이 해지할 때까지 자동으로 갱신돼요. \(cancelSentence)",
+                "\(price) is billed yearly and auto-renews until cancelled. \(cancelSentence)"
+            )
         case .monthly:
             guard let price = pro.monthlyProduct?.displayPrice else { return cancelSentence }
-            return "월 \(price)이 해지할 때까지 자동으로 갱신돼요. \(cancelSentence)"
+            return t(
+                "월 \(price)이 해지할 때까지 자동으로 갱신돼요. \(cancelSentence)",
+                "\(price) is billed monthly and auto-renews until cancelled. \(cancelSentence)"
+            )
         }
     }
 
@@ -290,17 +299,17 @@ struct PaywallView: View {
                 Button {
                     Task { await pro.restore() }
                 } label: {
-                    underlined("구매 복원")
+                    underlined(t("구매 복원", "Restore purchase"))
                 }
                 .buttonStyle(.plain)
 
                 separator
-                externalLink("이용약관", Janjan.termsURLString)
+                externalLink(t("이용약관", "Terms of Use"), Janjan.termsURLString)
                 separator
-                externalLink("개인정보처리방침", Janjan.privacyPolicyURLString)
+                externalLink(t("개인정보처리방침", "Privacy Policy"), Janjan.privacyPolicyURLString)
             }
 
-            externalLink("구독 관리", ProProduct.manageSubscriptionsURLString)
+            externalLink(t("구독 관리", "Manage subscription"), ProProduct.manageSubscriptionsURLString)
         }
         .janjanBody(12)
         .foregroundStyle(Color.ink2)
@@ -336,7 +345,7 @@ struct PaywallView: View {
                     .foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                WhitePillButton(title: "다시 시도", systemImage: "arrow.clockwise") {
+                WhitePillButton(title: t("다시 시도", "Try again"), systemImage: "arrow.clockwise") {
                     pro.load()
                 }
                 .overlay(
@@ -350,7 +359,7 @@ struct PaywallView: View {
         JanjanCard {
             HStack(spacing: CGFloat(JanjanSpacing.s)) {
                 ProgressView()
-                Text("가격을 불러오는 중이에요.")
+                Text(t("가격을 불러오는 중이에요.", "Loading prices…"))
                     .janjanBody(14)
                     .foregroundStyle(Color.muted)
             }
@@ -360,10 +369,13 @@ struct PaywallView: View {
     private var alreadyProCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                Text("Pro 를 쓰고 있어요.")
+                Text(t("Pro 를 쓰고 있어요.", "You're using Pro."))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
-                Text("기간과 해지는 아래 \"구독 관리\" 에서 확인할 수 있어요.")
+                Text(t(
+                    "기간과 해지는 아래 \"구독 관리\" 에서 확인할 수 있어요.",
+                    "You can check the period and cancel below under \"Manage subscription.\""
+                ))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -384,7 +396,7 @@ struct PaywallView: View {
                     .fill(Color.janjan(.peach))
             )
             .onTapGesture { pro.lastError = nil }
-            .accessibilityHint(Text("눌러서 이 안내를 닫습니다"))
+            .accessibilityHint(Text(t("눌러서 이 안내를 닫습니다", "Tap to dismiss this notice")))
     }
 }
 

@@ -8,7 +8,7 @@ struct ProBadge: View {
         HStack(spacing: 3) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 9, weight: .regular))
-            Text("Pro")
+            Text("Pro") // 상표성 표기라 언어와 무관하게 그대로 둔다.
                 .janjanBody(11, weight: .semibold)
         }
         .foregroundStyle(Color.janjan(.lavInk))
@@ -49,8 +49,11 @@ struct ProGate: ViewModifier {
                         Color.clear.contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(Text("\(feature.titleKo) — Pro 기능"))
-                    .accessibilityHint(Text("눌러서 Pro 를 알아봅니다"))
+                    .accessibilityLabel(Text(t(
+                        "\(feature.titleKo) — Pro 기능",
+                        "\(feature.title(.english)) — Pro feature"
+                    )))
+                    .accessibilityHint(Text(t("눌러서 Pro 를 알아봅니다", "Tap to learn about Pro")))
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
@@ -71,7 +74,7 @@ extension View {
     VStack(spacing: 24) {
         ProBadge()
 
-        WhitePillButton(title: "약봉투 스캔", systemImage: "camera") {}
+        WhitePillButton(title: t("약봉투 스캔", "Pharmacy bag scan"), systemImage: "camera") {}
             .proGated(.pharmacyScan)
     }
     .padding(40)
