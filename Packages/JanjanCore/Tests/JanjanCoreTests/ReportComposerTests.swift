@@ -328,6 +328,58 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertTrue(texts(report).contains("용량을 줄일 수 있을까요"))
     }
 
+    // MARK: - 영어판
+
+    func testEnglishReportSpeaksEnglishEverywhere() {
+        let report = ReportComposer.make(
+            endingAt: end,
+            medications: medications,
+            schedules: schedules,
+            doseEvents: Fixed.workedExampleDoses(),
+            stockEvents: Fixed.workedExampleStock(),
+            checkIns: [
+                CheckIn(
+                    date: Fixed.date(2026, 8, 14), mood: .init(-1),
+                    dreamed: true, nightmare: true,
+                    activities: ["alcohol"]
+                )
+            ],
+            doseChanges: [
+                DoseChange(
+                    medicationID: Fixed.medA,
+                    changedAt: Fixed.date(2026, 8, 10),
+                    fromText: "5mg",
+                    toText: "10mg"
+                )
+            ],
+            lastVisit: Fixed.date(2026, 8, 5),
+            questionsKo: "Can I move the morning dose later",
+            language: .english,
+            calendar: Fixed.calendar
+        )
+
+        XCTAssertEqual(report.titleKo, "The Janjan · Since the last visit")
+        XCTAssertEqual(report.periodKo, "August 5, 2026 – August 17, 2026")
+        XCTAssertEqual(report.disclaimerKo, Janjan.medicalDisclaimerEn)
+
+        let headings = report.lines.filter { $0.style == .heading }.map(\.text)
+        XCTAssertEqual(headings, [
+            "Medication", "Medications", "Dose changes", "Mood", "Dreams",
+            "Lifestyle", "Questions for my doctor"
+        ])
+
+        // 영어판에 한국어가 한 글자도 남으면 안 된다(약 이름은 예시라 예외 없음 -
+        // 이 픽스처는 한글 이름이라 본문 줄에서만 확인한다).
+        let texts = report.lines.map(\.text)
+        XCTAssertTrue(texts.contains("Aug 10 · 에스시탈로프람 5mg → 10mg"))
+        XCTAssertTrue(texts.contains { $0.contains("Dreams noted on 1 day · nightmares 1 day") })
+        XCTAssertTrue(texts.contains("Alcohol on 1 day"))
+        XCTAssertTrue(texts.contains { $0.hasPrefix("Adherence ") })
+        for line in texts {
+            XCTAssertFalse(line.contains("!"), "영어에도 느낌표는 없다: \(line)")
+        }
+    }
+
     // MARK: - 말투
 
     func testNoJudgementAndNoPressure() {

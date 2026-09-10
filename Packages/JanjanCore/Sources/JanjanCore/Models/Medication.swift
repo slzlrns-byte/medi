@@ -17,6 +17,17 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
             case .asNeeded: return "필요시"
             }
         }
+
+        public var labelEn: String {
+            switch self {
+            case .scheduled: return "Scheduled"
+            case .asNeeded: return "As needed"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
     }
 
     /// 복용 중인지 중단했는지.
@@ -29,6 +40,17 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
             case .active: return "복용 중"
             case .stopped: return "중단"
             }
+        }
+
+        public var labelEn: String {
+            switch self {
+            case .active: return "Taking"
+            case .stopped: return "Stopped"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
         }
     }
 
@@ -54,6 +76,23 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
             case .injection: return "주사"
             case .other: return "기타"
             }
+        }
+
+        public var labelEn: String {
+            switch self {
+            case .tablet: return "Tablet"
+            case .capsule: return "Capsule"
+            case .extendedRelease: return "Extended-release"
+            case .orallyDisintegrating: return "Dissolving tablet"
+            case .liquid: return "Liquid"
+            case .patch: return "Patch"
+            case .injection: return "Injection"
+            case .other: return "Other"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
         }
 
         /// 반 알로 쪼갤 수 있는 제형인지. 캡슐·서방정·패치는 쪼개지 않는다.

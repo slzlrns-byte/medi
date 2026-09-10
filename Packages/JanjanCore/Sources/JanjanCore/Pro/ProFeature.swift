@@ -28,6 +28,22 @@ public enum ProFeature: String, CaseIterable, Sendable {
         }
     }
 
+    public var titleEn: String {
+        switch self {
+        case .pharmacyScan: return "Pharmacy bag scan"
+        case .runOutForecast: return "Run-out forecast and alerts"
+        case .detailedMoodDiary: return "Detailed mood journal"
+        case .watchApp: return "Apple Watch app"
+        case .reports: return "Visit report"
+        case .iCloudSync: return "iCloud sync"
+        case .altIcons: return "Alternate icons"
+        }
+    }
+
+    public func title(_ language: JanjanLanguage) -> String {
+        language == .english ? titleEn : titleKo
+    }
+
     /// 페이월에 적는 줄. **여기 적은 것은 앱에서 실제로 잠겨 있어야 한다.**
     ///
     /// 원래 넷이었는데(2026-08-17 결정) 셋을 뺐다.

@@ -81,6 +81,22 @@ public enum Weekday: Int, Codable, Sendable, CaseIterable, Comparable {
         }
     }
 
+    public var labelEn: String {
+        switch self {
+        case .sunday: return "Sun"
+        case .monday: return "Mon"
+        case .tuesday: return "Tue"
+        case .wednesday: return "Wed"
+        case .thursday: return "Thu"
+        case .friday: return "Fri"
+        case .saturday: return "Sat"
+        }
+    }
+
+    public func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
+    }
+
     public static func < (lhs: Weekday, rhs: Weekday) -> Bool { lhs.rawValue < rhs.rawValue }
 
     public static let everyday: Set<Weekday> = Set(Weekday.allCases)
@@ -114,6 +130,20 @@ public enum DoseSlot: Hashable, Codable, Sendable {
         case .bedtime: return "취침"
         case .custom(let time): return time.description
         }
+    }
+
+    public var labelEn: String {
+        switch self {
+        case .morning: return "Morning"
+        case .noon: return "Noon"
+        case .evening: return "Evening"
+        case .bedtime: return "Bedtime"
+        case .custom(let time): return time.description
+        }
+    }
+
+    public func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
     }
 
     /// 설정을 건드리지 않았을 때의 기본 시각.

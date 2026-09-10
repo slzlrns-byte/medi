@@ -25,6 +25,17 @@ public struct MedicationNote: Identifiable, Hashable, Codable, Sendable {
             }
         }
 
+        public var labelEn: String {
+            switch self {
+            case .heardFromDoctor: return "Heard"
+            case .questionForDoctor: return "To ask"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
+
         /// 입력칸 위에 붙는 제목.
         public var titleKo: String {
             switch self {
@@ -33,11 +44,33 @@ public struct MedicationNote: Identifiable, Hashable, Codable, Sendable {
             }
         }
 
+        public var titleEn: String {
+            switch self {
+            case .heardFromDoctor: return "What my doctor said"
+            case .questionForDoctor: return "To ask next visit"
+            }
+        }
+
+        public func title(_ language: JanjanLanguage) -> String {
+            language == .english ? titleEn : titleKo
+        }
+
         public var placeholderKo: String {
             switch self {
             case .heardFromDoctor: return "예: 처음 며칠 졸릴 수 있다고 하심"
             case .questionForDoctor: return "예: 아침에 더 졸린데 시간을 옮겨도 되는지"
             }
+        }
+
+        public var placeholderEn: String {
+            switch self {
+            case .heardFromDoctor: return "e.g. May feel drowsy for the first few days"
+            case .questionForDoctor: return "e.g. Can I move the morning dose later?"
+            }
+        }
+
+        public func placeholder(_ language: JanjanLanguage) -> String {
+            language == .english ? placeholderEn : placeholderKo
         }
     }
 
@@ -110,7 +143,8 @@ public enum MedicationNoteDigest {
         symptomEntries: [SymptomEntry],
         from start: Date,
         to end: Date,
-        catalog: SymptomCatalog = Catalogs.symptoms
+        catalog: SymptomCatalog = Catalogs.symptoms,
+        language: JanjanLanguage = .standard
     ) -> [Observation] {
 
         var nameByID: [UUID: String] = [:]
@@ -126,7 +160,9 @@ public enum MedicationNoteDigest {
             // 주인 없는 메모는 내보내지 않는다. 약을 지웠는데 메모만 남은 경우다.
             guard let medicationName = nameByID[note.medicationID], !note.isEmpty else { return nil }
 
-            let symptomName = note.symptomID.flatMap { catalog.symptom(id: $0)?.nameKo }
+            let symptomName = note.symptomID.flatMap { id in
+                catalog.symptom(id: id).map { $0.name(language) }
+            }
             let count = note.symptomID.map { countBySymptom[$0] ?? 0 }
 
             return Observation(
@@ -147,13 +183,26 @@ public enum MedicationNoteDigest {
     ///
     /// "졸림 — 이 기간에 6번 기록" · "졸림 — 기록 없음" · 증상을 안 이어 뒀으면 메모 그대로.
     public static func lineKo(for observation: Observation) -> String {
+        line(for: observation, language: .korean)
+    }
+
+    public static func line(for observation: Observation, language: JanjanLanguage) -> String {
         guard let symptomName = observation.symptomNameKo,
               let count = observation.recordedCount
         else {
             return observation.note.text
         }
 
-        let tally = count == 0 ? "기록 없음" : "이 기간에 \(count)번 기록"
+        let tally: String
+        if language == .english {
+            switch count {
+            case 0: tally = "no entries"
+            case 1: tally = "recorded once in this period"
+            default: tally = "recorded \(count) times in this period"
+            }
+        } else {
+            tally = count == 0 ? "기록 없음" : "이 기간에 \(count)번 기록"
+        }
         return "\(symptomName) — \(tally)"
     }
 }

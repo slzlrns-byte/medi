@@ -18,6 +18,17 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
             case .correction: return "직접 정정"
             }
         }
+
+        public var labelEn: String {
+            switch self {
+            case .refill: return "Refill"
+            case .correction: return "Manual count"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
     }
 
     public var id: UUID

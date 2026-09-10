@@ -57,6 +57,13 @@ public enum Passcode {
 
     public static let easyGuessMessageKo =
         "쉽게 짐작할 수 있는 번호예요. 그대로 쓰셔도 되지만 다른 번호를 권해요."
+
+    public static let easyGuessMessageEn =
+        "This code is easy to guess. You can keep it, but a different one is safer."
+
+    public static func easyGuessMessage(_ language: JanjanLanguage) -> String {
+        language == .english ? easyGuessMessageEn : easyGuessMessageKo
+    }
 }
 
 private extension Character {

@@ -57,6 +57,12 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
             if medicationNames.isEmpty { return "예정된 약 없음" }
             return "\(medicationNames.count)종"
         }
+
+        public func summary(_ language: JanjanLanguage) -> String {
+            guard language == .english else { return summaryKo }
+            if medicationNames.isEmpty { return "Nothing scheduled" }
+            return medicationNames.count == 1 ? "1 med" : "\(medicationNames.count) meds"
+        }
     }
 
     public let generatedAt: Date
@@ -71,9 +77,15 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     public let isPro: Bool
     /// 폰에서 고른 테마. 워치의 기분 원이 폰과 같은 색을 쓰기 위한 값이다.
     public let themeRaw: String
+    /// 폰에서 고른 언어. 워치 화면 전체가 이것을 따른다 - 워치에는 설정이 없다.
+    public let languageRaw: String
 
     public var theme: JanjanTheme {
         JanjanTheme(rawValue: themeRaw) ?? .standard
+    }
+
+    public var language: JanjanLanguage {
+        JanjanLanguage(rawValue: languageRaw) ?? .standard
     }
 
     public init(
@@ -82,7 +94,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         slots: [SlotLine],
         remainingCountToday: Int,
         isPro: Bool = true,
-        themeRaw: String = JanjanTheme.standard.rawValue
+        themeRaw: String = JanjanTheme.standard.rawValue,
+        languageRaw: String = JanjanLanguage.standard.rawValue
     ) {
         self.generatedAt = generatedAt
         self.dateText = dateText
@@ -90,10 +103,11 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         self.remainingCountToday = remainingCountToday
         self.isPro = isPro
         self.themeRaw = themeRaw
+        self.languageRaw = languageRaw
     }
 
     private enum CodingKeys: String, CodingKey {
-        case generatedAt, dateText, slots, remainingCountToday, isPro, themeRaw
+        case generatedAt, dateText, slots, remainingCountToday, isPro, themeRaw, languageRaw
     }
 
     /// 키가 없던 시절의 스냅샷이 남아 있어도 되살아나게 한다.
@@ -107,6 +121,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         isPro = try container.decodeIfPresent(Bool.self, forKey: .isPro) ?? true
         themeRaw = try container.decodeIfPresent(String.self, forKey: .themeRaw)
             ?? JanjanTheme.standard.rawValue
+        languageRaw = try container.decodeIfPresent(String.self, forKey: .languageRaw)
+            ?? JanjanLanguage.standard.rawValue
     }
 
     /// 폰이 아직 아무것도 보내 주지 않았을 때. **잠긴 상태로 시작한다** —
@@ -123,7 +139,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     public static func locked(
         dateText: String,
         generatedAt: Date = Date(),
-        themeRaw: String = JanjanTheme.standard.rawValue
+        themeRaw: String = JanjanTheme.standard.rawValue,
+        languageRaw: String = JanjanLanguage.standard.rawValue
     ) -> WatchSnapshot {
         WatchSnapshot(
             generatedAt: generatedAt,
@@ -131,7 +148,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
             slots: [],
             remainingCountToday: 0,
             isPro: false,
-            themeRaw: themeRaw
+            themeRaw: themeRaw,
+            languageRaw: languageRaw
         )
     }
 }

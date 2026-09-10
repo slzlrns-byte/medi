@@ -35,12 +35,36 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         }
     }
 
+    public var labelEn: String {
+        switch self {
+        case .sky: return "Clear sky"
+        case .sprout: return "Apple cream"
+        case .sunset: return "Peach dusk"
+        }
+    }
+
+    public func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
+    }
+
     public var detailKo: String {
         switch self {
         case .sky: return "기분이 흐린 보라에서 맑은 파랑으로 흘러요."
         case .sprout: return "기분이 보라에서 풋사과 초록으로 흘러요."
         case .sunset: return "기분이 노을 보라에서 살구빛으로 흘러요."
         }
+    }
+
+    public var detailEn: String {
+        switch self {
+        case .sky: return "Mood flows from hazy violet to clear blue."
+        case .sprout: return "Mood flows from violet to fresh green."
+        case .sunset: return "Mood flows from dusk violet to apricot."
+        }
+    }
+
+    public func detail(_ language: JanjanLanguage) -> String {
+        language == .english ? detailEn : detailKo
     }
 }
 

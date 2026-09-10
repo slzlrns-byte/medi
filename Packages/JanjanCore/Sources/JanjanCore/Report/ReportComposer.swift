@@ -88,6 +88,7 @@ public enum ReportComposer {
         lastVisit: Date? = nil,
         nextVisit: Date? = nil,
         questionsKo: String = "",
+        language: JanjanLanguage = .korean,
         calendar: Calendar = .current
     ) -> ReportContent {
 
@@ -99,7 +100,9 @@ public enum ReportComposer {
         let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
 
         var lines: [ReportContent.Line] = []
-        lines.append(contentsOf: adherenceLines(doseEvents: doseEvents, from: start, to: end))
+        lines.append(contentsOf: adherenceLines(
+            doseEvents: doseEvents, from: start, to: end, language: language
+        ))
         lines.append(contentsOf: medicationLines(
             medications: medications,
             schedules: schedules,
@@ -108,6 +111,7 @@ public enum ReportComposer {
             nextVisit: nextVisit,
             from: start,
             to: end,
+            language: language,
             calendar: calendar
         ))
         lines.append(contentsOf: doseChangeLines(
@@ -115,6 +119,7 @@ public enum ReportComposer {
             medications: medications,
             from: start,
             to: end,
+            language: language,
             calendar: calendar
         ))
         lines.append(contentsOf: moodLines(
@@ -122,26 +127,41 @@ public enum ReportComposer {
             from: start,
             to: end,
             windowLength: windowLength,
+            language: language,
             calendar: calendar
         ))
-        lines.append(contentsOf: dreamLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
-        lines.append(contentsOf: lifestyleLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
+        lines.append(contentsOf: dreamLines(
+            checkIns: checkIns, from: start, to: end, language: language, calendar: calendar
+        ))
+        lines.append(contentsOf: lifestyleLines(
+            checkIns: checkIns, from: start, to: end, language: language, calendar: calendar
+        ))
         lines.append(contentsOf: noteLines(
             notes: medicationNotes,
             medications: medications,
             symptomEntries: symptomEntries,
             from: start,
-            to: end
+            to: end,
+            language: language
         ))
-        lines.append(contentsOf: questionLines(questionsKo))
+        lines.append(contentsOf: questionLines(questionsKo, language: language))
+
+        let title: String
+        if language == .english {
+            title = anchored
+                ? "\(Janjan.appNameEn) · Since the last visit"
+                : "\(Janjan.appNameEn) · 4-week summary"
+        } else {
+            title = anchored
+                ? "\(Janjan.appNameKo) · 지난 진료 이후"
+                : "\(Janjan.appNameKo) · 4주 요약"
+        }
 
         return ReportContent(
-            titleKo: anchored
-                ? "\(Janjan.appNameKo) · 지난 진료 이후"
-                : "\(Janjan.appNameKo) · 4주 요약",
-            periodKo: "\(dayText(start, calendar: calendar)) – \(dayText(endDay, calendar: calendar))",
+            titleKo: title,
+            periodKo: "\(dayText(start, language: language, calendar: calendar)) – \(dayText(endDay, language: language, calendar: calendar))",
             lines: lines,
-            disclaimerKo: Janjan.medicalDisclaimerKo
+            disclaimerKo: Janjan.medicalDisclaimer(language)
         )
     }
 
@@ -150,17 +170,22 @@ public enum ReportComposer {
     private static func adherenceLines(
         doseEvents: [DoseEvent],
         from start: Date,
-        to end: Date
+        to end: Date,
+        language: JanjanLanguage
     ) -> [ReportContent.Line] {
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "복약")]
+        let en = language == .english
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Medication" : "복약")]
 
         let counted = doseEvents.filter { event in
             event.kind == .scheduled && event.effectiveDate >= start && event.effectiveDate <= end
         }
 
         guard !counted.isEmpty else {
-            lines.append(.init(style: .body, text: "이 기간에는 셀 기록이 없습니다."))
+            lines.append(.init(
+                style: .body,
+                text: en ? "There is nothing to count in this period." : "이 기간에는 셀 기록이 없습니다."
+            ))
             return lines
         }
 
@@ -169,15 +194,22 @@ public enum ReportComposer {
         let unrecorded = counted.filter { $0.status == .unrecorded }.count
 
         if let rate = InventoryCalculator.adherenceRate(doseEvents: doseEvents, from: start, to: end) {
-            lines.append(.init(style: .body, text: "복약률 \(percentText(rate))"))
+            lines.append(.init(
+                style: .body,
+                text: en ? "Adherence \(percentText(rate))" : "복약률 \(percentText(rate))"
+            ))
         }
         lines.append(.init(
             style: .body,
-            text: "복용 \(taken)회 · 건너뜀 \(skipped)회 · 미기록 \(unrecorded)회"
+            text: en
+                ? "Taken \(taken) · Skipped \(skipped) · Unrecorded \(unrecorded)"
+                : "복용 \(taken)회 · 건너뜀 \(skipped)회 · 미기록 \(unrecorded)회"
         ))
         lines.append(.init(
             style: .caption,
-            text: "건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답하지 않은 예정분입니다."
+            text: en
+                ? "Skipped is a choice not to take; unrecorded is a scheduled dose with no answer."
+                : "건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답하지 않은 예정분입니다."
         ))
         return lines
     }
@@ -190,14 +222,19 @@ public enum ReportComposer {
         nextVisit: Date?,
         from start: Date,
         to end: Date,
+        language: JanjanLanguage,
         calendar: Calendar
     ) -> [ReportContent.Line] {
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "약")]
+        let en = language == .english
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Medications" : "약")]
 
         let listed = medications.filter { $0.status == .active }
         guard !listed.isEmpty else {
-            lines.append(.init(style: .body, text: "등록된 약이 없습니다."))
+            lines.append(.init(
+                style: .body,
+                text: en ? "No medications are registered." : "등록된 약이 없습니다."
+            ))
             return lines
         }
 
@@ -214,7 +251,7 @@ public enum ReportComposer {
 
             var parts: [String] = [medication.displayTitle]
             if medication.kind == .asNeeded {
-                parts.append("필요시")
+                parts.append(medication.kind.label(language))
             }
             if let rate = InventoryCalculator.adherenceRate(
                 doseEvents: doseEvents,
@@ -222,16 +259,23 @@ public enum ReportComposer {
                 from: start,
                 to: end
             ) {
-                parts.append("복약률 \(percentText(rate))")
+                parts.append(en ? "adherence \(percentText(rate))" : "복약률 \(percentText(rate))")
             }
             // 재고를 한 번도 세지 않았으면 0정이라고 말하지 않는다.
             if stockEvents.contains(where: { $0.medicationID == medication.id }) {
-                parts.append("남은 개수 \(DecimalQuantity.display(snapshot.remaining))정")
+                parts.append(en
+                    ? "\(DecimalQuantity.display(snapshot.remaining)) left"
+                    : "남은 개수 \(DecimalQuantity.display(snapshot.remaining))정")
             }
             lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
 
             if let shortfall = snapshot.shortfallDays, shortfall > 0 {
-                lines.append(.init(style: .caption, text: "다음 진료 전 \(shortfall)일 모자랍니다."))
+                lines.append(.init(
+                    style: .caption,
+                    text: en
+                        ? "About \(shortfall) days short before the next visit."
+                        : "다음 진료 전 \(shortfall)일 모자랍니다."
+                ))
             }
         }
         return lines
@@ -243,20 +287,25 @@ public enum ReportComposer {
         medications: [Medication],
         from start: Date,
         to end: Date,
+        language: JanjanLanguage,
         calendar: Calendar
     ) -> [ReportContent.Line] {
 
+        let en = language == .english
         let inWindow = doseChanges
             .filter { $0.changedAt >= start && $0.changedAt <= end }
             .sorted { $0.changedAt < $1.changedAt }
         guard !inWindow.isEmpty else { return [] }
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "용량 변경")]
+        var lines: [ReportContent.Line] = [
+            .init(style: .heading, text: en ? "Dose changes" : "용량 변경")
+        ]
         for change in inWindow {
-            let name = medications.first { $0.id == change.medicationID }?.name ?? "지운 약"
+            let name = medications.first { $0.id == change.medicationID }?.name
+                ?? (en ? "a deleted medication" : "지운 약")
             lines.append(.init(
                 style: .body,
-                text: "\(monthDayText(change.changedAt, calendar: calendar)) · \(name) \(change.arrowTextKo)"
+                text: "\(monthDayText(change.changedAt, language: language, calendar: calendar)) · \(name) \(change.arrowTextKo)"
             ))
             if let note = change.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
                 lines.append(.init(style: .caption, text: note))
@@ -270,19 +319,27 @@ public enum ReportComposer {
         from start: Date,
         to end: Date,
         windowLength: Int,
+        language: JanjanLanguage,
         calendar: Calendar
     ) -> [ReportContent.Line] {
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "기분")]
+        let en = language == .english
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Mood" : "기분")]
 
         let inWindow = checkIns.filter { $0.date >= start && $0.date <= end }
         guard !inWindow.isEmpty else {
-            lines.append(.init(style: .body, text: "이 기간에는 기분 기록이 없습니다."))
+            lines.append(.init(
+                style: .body,
+                text: en ? "No mood entries in this period." : "이 기간에는 기분 기록이 없습니다."
+            ))
             return lines
         }
 
         let days = Set(inWindow.map { calendar.startOfDay(for: $0.date) }).count
-        lines.append(.init(style: .body, text: "\(windowLength)일 중 \(days)일 기록"))
+        lines.append(.init(
+            style: .body,
+            text: en ? "Recorded \(days) of \(windowLength) days" : "\(windowLength)일 중 \(days)일 기록"
+        ))
 
         // 가장 자주 고른 값 하나만 적는다. 평균은 −3~+3 을 섞어 놓아 뜻이 흐려진다.
         var counts: [Int: Int] = [:]
@@ -290,8 +347,13 @@ public enum ReportComposer {
         if let top = counts.max(by: { lhs, rhs in
             lhs.value != rhs.value ? lhs.value < rhs.value : lhs.key < rhs.key
         }) {
-            let label = CheckIn.Mood(top.key).labelKo
-            lines.append(.init(style: .body, text: "가장 자주 고른 기분: \(label) (\(top.value)일)"))
+            let label = CheckIn.Mood(top.key).label(language)
+            lines.append(.init(
+                style: .body,
+                text: en
+                    ? "Most chosen mood: \(label) (\(dayCount(top.value, language: language)))"
+                    : "가장 자주 고른 기분: \(label) (\(top.value)일)"
+            ))
         }
         return lines
     }
@@ -302,8 +364,11 @@ public enum ReportComposer {
         checkIns: [CheckIn],
         from start: Date,
         to end: Date,
+        language: JanjanLanguage,
         calendar: Calendar
     ) -> [ReportContent.Line] {
+
+        let en = language == .english
 
         let dreamed = checkIns
             .filter { $0.date >= start && $0.date <= end && $0.dreamed == true }
@@ -311,13 +376,19 @@ public enum ReportComposer {
         // 꿈 기록이 없으면 구역 자체를 만들지 않는다. "꿈: 없음" 은 빈 칸 재촉이 된다.
         guard !dreamed.isEmpty else { return [] }
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "꿈")]
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Dreams" : "꿈")]
 
-        var parts = ["꿈을 기록한 날 \(dreamed.count)일"]
+        var parts = [en
+            ? "Dreams noted on \(dayCount(dreamed.count, language: language))"
+            : "꿈을 기록한 날 \(dreamed.count)일"]
         let vivid = dreamed.filter { ($0.dreamVividness ?? 0) >= 3 }.count
-        if vivid > 0 { parts.append("아주 생생함 \(vivid)일") }
+        if vivid > 0 {
+            parts.append(en ? "very vivid \(dayCount(vivid, language: language))" : "아주 생생함 \(vivid)일")
+        }
         let nightmares = dreamed.filter { $0.nightmare == true }.count
-        if nightmares > 0 { parts.append("악몽 \(nightmares)일") }
+        if nightmares > 0 {
+            parts.append(en ? "nightmares \(dayCount(nightmares, language: language))" : "악몽 \(nightmares)일")
+        }
         lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
 
         // 메모는 최근 것부터 세 개까지만. 종이 한 장의 자리를 지킨다.
@@ -332,7 +403,7 @@ public enum ReportComposer {
         for (date, note) in noted {
             lines.append(.init(
                 style: .caption,
-                text: "\(monthDayText(date, calendar: calendar)) · \(note)"
+                text: "\(monthDayText(date, language: language, calendar: calendar)) · \(note)"
             ))
         }
         return lines
@@ -345,8 +416,11 @@ public enum ReportComposer {
         checkIns: [CheckIn],
         from start: Date,
         to end: Date,
+        language: JanjanLanguage,
         calendar: Calendar
     ) -> [ReportContent.Line] {
+
+        let en = language == .english
 
         let inWindow = checkIns.filter { $0.date >= start && $0.date <= end }
 
@@ -362,13 +436,17 @@ public enum ReportComposer {
         let smoking = days(withTag: ActivityTag.smokingID)
 
         var parts: [String] = []
-        if alcohol > 0 { parts.append("술 마신 날 \(alcohol)일") }
-        if smoking > 0 { parts.append("담배 피운 날 \(smoking)일") }
+        if alcohol > 0 {
+            parts.append(en ? "Alcohol on \(dayCount(alcohol, language: language))" : "술 마신 날 \(alcohol)일")
+        }
+        if smoking > 0 {
+            parts.append(en ? "Smoking on \(dayCount(smoking, language: language))" : "담배 피운 날 \(smoking)일")
+        }
         // 하나도 없으면 구역 자체를 만들지 않는다. "0일" 은 빈 칸 재촉이 된다.
         guard !parts.isEmpty else { return [] }
 
         return [
-            .init(style: .heading, text: "생활"),
+            .init(style: .heading, text: en ? "Lifestyle" : "생활"),
             .init(style: .body, text: parts.joined(separator: " · "))
         ]
     }
@@ -382,19 +460,24 @@ public enum ReportComposer {
         medications: [Medication],
         symptomEntries: [SymptomEntry],
         from start: Date,
-        to end: Date
+        to end: Date,
+        language: JanjanLanguage
     ) -> [ReportContent.Line] {
 
+        let en = language == .english
         let observations = MedicationNoteDigest.observations(
             notes: notes,
             medications: medications,
             symptomEntries: symptomEntries,
             from: start,
-            to: end
+            to: end,
+            language: language
         )
         guard !observations.isEmpty else { return [] }
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "약에 적어 둔 것")]
+        var lines: [ReportContent.Line] = [
+            .init(style: .heading, text: en ? "Notes on medications" : "약에 적어 둔 것")
+        ]
         var lastMedication: String?
 
         for observation in observations {
@@ -404,22 +487,29 @@ public enum ReportComposer {
             }
             lines.append(.init(
                 style: .caption,
-                text: "\(observation.note.kind.labelKo) · \(MedicationNoteDigest.lineKo(for: observation))"
+                text: "\(observation.note.kind.label(language)) · \(MedicationNoteDigest.line(for: observation, language: language))"
             ))
         }
 
         lines.append(.init(
             style: .caption,
-            text: "옆의 횟수는 그 증상이 기록된 수이고, 원인을 말하지 않습니다."
+            text: en
+                ? "The count is how often that symptom was recorded; it does not name a cause."
+                : "옆의 횟수는 그 증상이 기록된 수이고, 원인을 말하지 않습니다."
         ))
         return lines
     }
 
-    private static func questionLines(_ questionsKo: String) -> [ReportContent.Line] {
+    private static func questionLines(
+        _ questionsKo: String,
+        language: JanjanLanguage
+    ) -> [ReportContent.Line] {
         let trimmed = questionsKo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
 
-        var lines: [ReportContent.Line] = [.init(style: .heading, text: "의사에게 물어볼 것")]
+        var lines: [ReportContent.Line] = [
+            .init(style: .heading, text: language == .english ? "Questions for my doctor" : "의사에게 물어볼 것")
+        ]
         for raw in trimmed.split(separator: "\n", omittingEmptySubsequences: true) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if !line.isEmpty { lines.append(.init(style: .body, text: line)) }
@@ -434,22 +524,36 @@ public enum ReportComposer {
         "\(DecimalQuantity.floorToInt(rate * 100))%"
     }
 
-    static func dayText(_ date: Date, calendar: Calendar = .current) -> String {
+    static func dayText(
+        _ date: Date,
+        language: JanjanLanguage = .korean,
+        calendar: Calendar = .current
+    ) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: language.localeIdentifier)
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy년 M월 d일"
+        formatter.dateFormat = language == .english ? "MMMM d, yyyy" : "yyyy년 M월 d일"
         return formatter.string(from: date)
     }
 
     /// "9월 3일". 기간 안의 날짜라 연도는 머리글이 이미 말했다.
-    static func monthDayText(_ date: Date, calendar: Calendar = .current) -> String {
+    static func monthDayText(
+        _ date: Date,
+        language: JanjanLanguage = .korean,
+        calendar: Calendar = .current
+    ) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: language.localeIdentifier)
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "M월 d일"
+        formatter.dateFormat = language == .english ? "MMM d" : "M월 d일"
         return formatter.string(from: date)
+    }
+
+    /// "1 day" / "3 days". 한국어는 조수사가 규칙적이라 이 도우미가 필요 없다.
+    private static func dayCount(_ count: Int, language: JanjanLanguage) -> String {
+        guard language == .english else { return "\(count)일" }
+        return count == 1 ? "1 day" : "\(count) days"
     }
 }

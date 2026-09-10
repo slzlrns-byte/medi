@@ -35,18 +35,48 @@ public enum Janjan {
     public static let medicalDisclaimerKo =
         "이 앱은 의료 조언이 아닙니다. 복용 변경은 담당 의사와 상의해 주세요."
 
+    public static let medicalDisclaimerEn =
+        "This app does not give medical advice. Please talk with your doctor before changing your medication."
+
+    public static func medicalDisclaimer(_ language: JanjanLanguage) -> String {
+        language == .english ? medicalDisclaimerEn : medicalDisclaimerKo
+    }
+
+    public static func appName(_ language: JanjanLanguage) -> String {
+        language == .english ? appNameEn : appNameKo
+    }
+
     /// 위기 상담 연락처. 안전 카드와 설정 화면에서 같은 값을 쓴다.
     public struct CrisisContact: Hashable, Sendable, Identifiable {
         public let id: String
         public let titleKo: String
         public let subtitleKo: String
+        public let titleEn: String
+        public let subtitleEn: String
         public let number: String
 
-        public init(id: String, titleKo: String, subtitleKo: String, number: String) {
+        public init(
+            id: String,
+            titleKo: String,
+            subtitleKo: String,
+            titleEn: String,
+            subtitleEn: String,
+            number: String
+        ) {
             self.id = id
             self.titleKo = titleKo
             self.subtitleKo = subtitleKo
+            self.titleEn = titleEn
+            self.subtitleEn = subtitleEn
             self.number = number
+        }
+
+        public func title(_ language: JanjanLanguage) -> String {
+            language == .english ? titleEn : titleKo
+        }
+
+        public func subtitle(_ language: JanjanLanguage) -> String {
+            language == .english ? subtitleEn : subtitleKo
         }
 
         /// tel: URL 에 쓸 수 있게 하이픈을 뗀 번호.
@@ -60,12 +90,16 @@ public enum Janjan {
             id: "suicide_prevention",
             titleKo: "자살예방상담전화",
             subtitleKo: "24시간 언제든",
+            titleEn: "Suicide prevention hotline (Korea)",
+            subtitleEn: "Any time, 24 hours",
             number: "109"
         ),
         CrisisContact(
             id: "mental_health_crisis",
             titleKo: "정신건강위기상담",
             subtitleKo: "24시간 언제든",
+            titleEn: "Mental health crisis line (Korea)",
+            subtitleEn: "Any time, 24 hours",
             number: "1577-0199"
         )
     ]
@@ -91,7 +125,21 @@ public enum Janjan {
     public static let safetyCardMessageKo =
         "기록은 그대로 저장됐어요. 지금 이야기할 곳이 필요하면 여기로 연락할 수 있어요."
 
+    public static let safetyCardMessageEn =
+        "Your note was saved as written. If you need someone to talk to right now, you can reach out here."
+
+    public static func safetyCardMessage(_ language: JanjanLanguage) -> String {
+        language == .english ? safetyCardMessageEn : safetyCardMessageKo
+    }
+
     /// 번호를 확인하지 못한 지역에서 쓰는 문장. 번호를 지어내지 않는다.
     public static let safetyCardWithoutContactsKo =
         "기록은 그대로 저장됐어요. 지금 이야기할 곳이 필요하면 지역의 응급 번호로 연락할 수 있어요."
+
+    public static let safetyCardWithoutContactsEn =
+        "Your note was saved as written. If you need someone to talk to right now, you can call your local emergency number."
+
+    public static func safetyCardWithoutContacts(_ language: JanjanLanguage) -> String {
+        language == .english ? safetyCardWithoutContactsEn : safetyCardWithoutContactsKo
+    }
 }

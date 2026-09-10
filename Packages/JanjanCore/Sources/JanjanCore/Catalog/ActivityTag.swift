@@ -11,10 +11,16 @@ public struct ActivityTag: Identifiable, Hashable, Sendable {
 
     public let id: String
     public let nameKo: String
+    public let nameEn: String
 
-    public init(id: String, nameKo: String) {
+    public init(id: String, nameKo: String, nameEn: String) {
         self.id = id
         self.nameKo = nameKo
+        self.nameEn = nameEn
+    }
+
+    public func name(_ language: JanjanLanguage) -> String {
+        language == .english ? nameEn : nameKo
     }
 
     /// 리포트가 일수를 세는 두 태그. 의사가 진료 때 실제로 묻는 항목이라
@@ -23,23 +29,28 @@ public struct ActivityTag: Identifiable, Hashable, Sendable {
     public static let smokingID = "smoking"
 
     public static let presets: [ActivityTag] = [
-        ActivityTag(id: "outdoors", nameKo: "외출"),
-        ActivityTag(id: "exercise", nameKo: "운동"),
-        ActivityTag(id: "people", nameKo: "사람 만남"),
-        ActivityTag(id: "work", nameKo: "일·학업"),
-        ActivityTag(id: "chores", nameKo: "집안일"),
-        ActivityTag(id: "sunlight", nameKo: "햇빛"),
-        ActivityTag(id: "nap", nameKo: "낮잠"),
-        ActivityTag(id: "alcohol", nameKo: "술"),
-        ActivityTag(id: "caffeine", nameKo: "카페인"),
-        ActivityTag(id: "smoking", nameKo: "담배"),
-        ActivityTag(id: "period", nameKo: "생리"),
-        ActivityTag(id: "unwell", nameKo: "몸이 아픔")
+        ActivityTag(id: "outdoors", nameKo: "외출", nameEn: "Went out"),
+        ActivityTag(id: "exercise", nameKo: "운동", nameEn: "Exercise"),
+        ActivityTag(id: "people", nameKo: "사람 만남", nameEn: "Saw people"),
+        ActivityTag(id: "work", nameKo: "일·학업", nameEn: "Work or study"),
+        ActivityTag(id: "chores", nameKo: "집안일", nameEn: "Chores"),
+        ActivityTag(id: "sunlight", nameKo: "햇빛", nameEn: "Sunlight"),
+        ActivityTag(id: "nap", nameKo: "낮잠", nameEn: "Nap"),
+        ActivityTag(id: "alcohol", nameKo: "술", nameEn: "Alcohol"),
+        ActivityTag(id: "caffeine", nameKo: "카페인", nameEn: "Caffeine"),
+        ActivityTag(id: "smoking", nameKo: "담배", nameEn: "Smoking"),
+        ActivityTag(id: "period", nameKo: "생리", nameEn: "Period"),
+        ActivityTag(id: "unwell", nameKo: "몸이 아픔", nameEn: "Felt unwell")
     ]
 
     /// 저장된 id 를 화면에 보일 이름으로. 목록에 없는 id 는 그대로 보여 준다 —
     /// 나중에 태그를 지우더라도 옛 기록의 글자가 사라지지는 않게.
     public static func nameKo(forID id: String) -> String {
         presets.first { $0.id == id }?.nameKo ?? id
+    }
+
+    public static func name(forID id: String, language: JanjanLanguage) -> String {
+        guard let tag = presets.first(where: { $0.id == id }) else { return id }
+        return tag.name(language)
     }
 }

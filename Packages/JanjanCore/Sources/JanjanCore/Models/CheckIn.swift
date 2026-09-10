@@ -14,6 +14,11 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
             "매우 힘듦", "힘듦", "조금 힘듦", "그저 그럼", "조금 괜찮음", "괜찮음", "좋음"
         ]
 
+        /// 영어도 같은 결: 평가하는 말(bad/great) 대신 무게를 말한다.
+        public static let labelsEn: [String] = [
+            "Very hard", "Hard", "A bit hard", "So-so", "A bit okay", "Okay", "Good"
+        ]
+
         public var score: Int
 
         public init(_ score: Int) {
@@ -24,6 +29,11 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         public var index: Int { score - Mood.range.lowerBound }
 
         public var labelKo: String { Mood.labelsKo[index] }
+        public var labelEn: String { Mood.labelsEn[index] }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
 
         public static func < (lhs: Mood, rhs: Mood) -> Bool { lhs.score < rhs.score }
     }
@@ -40,6 +50,18 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
             case .fair: return "그럭저럭"
             case .good: return "잘 잠"
             }
+        }
+
+        public var labelEn: String {
+            switch self {
+            case .poor: return "Slept poorly"
+            case .fair: return "So-so"
+            case .good: return "Slept well"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
         }
     }
 

@@ -19,6 +19,18 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
             }
         }
 
+        public var labelEn: String {
+            switch self {
+            case .taken: return "Taken"
+            case .skipped: return "Skipped"
+            case .unrecorded: return "Unrecorded"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
+
         /// 재고에서 실제로 빠지는 상태인가. 복용함만 차감한다.
         public var consumesStock: Bool { self == .taken }
     }
@@ -39,6 +51,20 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
             case .widget: return "위젯"
             case .siri: return "시리"
             }
+        }
+
+        public var labelEn: String {
+            switch self {
+            case .phone: return "iPhone"
+            case .watch: return "Apple Watch"
+            case .notificationAction: return "Notification"
+            case .widget: return "Widget"
+            case .siri: return "Siri"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
         }
     }
 

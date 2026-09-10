@@ -78,6 +78,60 @@ final class TokensTests: XCTestCase {
         XCTAssertTrue(restored.isPro)
     }
 
+    func testLanguageRoundTripAndLabels() {
+        XCTAssertEqual(JanjanLanguage(rawValue: "ko"), .korean)
+        XCTAssertEqual(JanjanLanguage(rawValue: "en"), .english)
+        XCTAssertNil(JanjanLanguage(rawValue: "jp"))
+        XCTAssertEqual(JanjanLanguage.standard, .korean)
+        // 언어 고르는 줄은 그 언어로 적는다.
+        XCTAssertEqual(JanjanLanguage.korean.labelNative, "한국어")
+        XCTAssertEqual(JanjanLanguage.english.labelNative, "English")
+    }
+
+    func testEveryBilingualLabelExists() {
+        // 두 벌이 어긋나면 영어 화면에 한국어가 섞여 나온다. 표본이 아니라 전수.
+        XCTAssertEqual(CheckIn.Mood.labelsEn.count, CheckIn.Mood.labelsKo.count)
+        for slot in DoseSlot.presets {
+            XCTAssertFalse(slot.labelEn.isEmpty)
+        }
+        for weekday in Weekday.allCases {
+            XCTAssertFalse(weekday.labelEn.isEmpty)
+        }
+        for status in DoseEvent.Status.allCases {
+            XCTAssertFalse(status.labelEn.isEmpty)
+        }
+        for tag in ActivityTag.presets {
+            XCTAssertFalse(tag.nameEn.isEmpty)
+        }
+        for theme in JanjanTheme.allCases {
+            XCTAssertFalse(theme.labelEn.isEmpty)
+            XCTAssertFalse(theme.detailEn.isEmpty)
+        }
+        for feature in ProFeature.allCases {
+            XCTAssertFalse(feature.titleEn.isEmpty)
+        }
+        // 영어 문장에도 느낌표는 없다 - 말투 규칙은 언어를 가리지 않는다.
+        XCTAssertFalse(Janjan.medicalDisclaimerEn.contains("!"))
+        XCTAssertFalse(Janjan.safetyCardMessageEn.contains("!"))
+    }
+
+    func testWatchSnapshotCarriesTheLanguage() throws {
+        let snapshot = WatchSnapshot(
+            dateText: "9/10",
+            slots: [],
+            remainingCountToday: 0,
+            languageRaw: JanjanLanguage.english.rawValue
+        )
+        XCTAssertEqual(snapshot.language, .english)
+
+        // 언어 키가 없던 옛 스냅샷은 한국어로 되살아난다.
+        let legacy = Data("""
+        {"generatedAt":0,"dateText":"9/10","slots":[],"remainingCountToday":0}
+        """.utf8)
+        let restored = try JSONDecoder().decode(WatchSnapshot.self, from: legacy)
+        XCTAssertEqual(restored.language, .korean)
+    }
+
     func testPlaceholderStartsLocked() {
         // 폰이 아직 아무것도 안 보냈으면 잠긴 상태다. 기본이 열림이면
         // 무료 사용자의 첫 화면에 Pro 버튼이 보이고, 그 기록은 폰이 버린다.

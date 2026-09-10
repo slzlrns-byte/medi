@@ -54,7 +54,8 @@ public enum AppointmentReminder {
         visitDates: [Date],
         leadDays: Int,
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        language: JanjanLanguage = .standard
     ) -> [Reminder] {
 
         guard leadDays != off, leadDays >= 0 else { return [] }
@@ -84,8 +85,8 @@ public enum AppointmentReminder {
                 Reminder(
                     visitDate: visitDay,
                     fireAt: fireAt,
-                    titleKo: "다음 진료",
-                    bodyKo: bodyKo(daysUntilVisit: remaining),
+                    titleKo: language == .english ? "Next visit" : "다음 진료",
+                    bodyKo: body(daysUntilVisit: remaining, language: language),
                     id: key
                 )
             )
@@ -105,6 +106,19 @@ public enum AppointmentReminder {
         }
     }
 
+    public static func bodyEn(daysUntilVisit days: Int) -> String {
+        switch days {
+        case ..<0: return "It has passed."
+        case 0: return "It is today."
+        case 1: return "It is tomorrow."
+        default: return "It is in \(days) days."
+        }
+    }
+
+    public static func body(daysUntilVisit days: Int, language: JanjanLanguage) -> String {
+        language == .english ? bodyEn(daysUntilVisit: days) : bodyKo(daysUntilVisit: days)
+    }
+
     /// 설정 화면의 선택지 라벨.
     public static func leadLabelKo(forDays days: Int) -> String {
         switch days {
@@ -114,6 +128,20 @@ public enum AppointmentReminder {
         case 2: return "이틀 전 저녁"
         default: return "\(days)일 전 저녁"
         }
+    }
+
+    public static func leadLabelEn(forDays days: Int) -> String {
+        switch days {
+        case off: return "Off"
+        case 0: return "Morning of the visit"
+        case 1: return "Evening before"
+        case 2: return "Two evenings before"
+        default: return "\(days) evenings before"
+        }
+    }
+
+    public static func leadLabel(forDays days: Int, language: JanjanLanguage) -> String {
+        language == .english ? leadLabelEn(forDays: days) : leadLabelKo(forDays: days)
     }
 
     /// 알림 식별자. `visit-20260830` 처럼 날짜 하나에 하나.

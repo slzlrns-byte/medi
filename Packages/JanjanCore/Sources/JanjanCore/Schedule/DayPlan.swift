@@ -307,16 +307,18 @@ public enum DayPlan {
         calendar: Calendar = .current,
         generatedAt: Date = Date(),
         isPro: Bool = true,
-        themeRaw: String = JanjanTheme.standard.rawValue
+        themeRaw: String = JanjanTheme.standard.rawValue,
+        language: JanjanLanguage = .standard
     ) -> WatchSnapshot {
 
         // 구독하지 않았으면 오늘 일정을 담지 않는다. 워치 앱 전체가 Pro 이므로
         // "잠긴 기능이 반쯤 동작하는" 경로를 여기서도 만들지 않는다.
         guard isPro else {
             return .locked(
-                dateText: shortDateText(for: day),
+                dateText: shortDateText(for: day, language: language),
                 generatedAt: generatedAt,
-                themeRaw: themeRaw
+                themeRaw: themeRaw,
+                languageRaw: language.rawValue
             )
         }
 
@@ -330,11 +332,13 @@ public enum DayPlan {
 
         return WatchSnapshot(
             generatedAt: generatedAt,
-            dateText: shortDateText(for: day),
+            dateText: shortDateText(for: day, language: language),
             slots: lines.map { line in
                 WatchSnapshot.SlotLine(
                     slotKey: line.slotKey,
-                    labelKo: line.slot.labelKo,
+                    // 이름이 labelKo 지만 폰이 고른 언어로 구워 보낸다 - 워치는
+                    // 받은 글자를 그대로 그릴 뿐이다.
+                    labelKo: line.slot.label(language),
                     // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 워치가 안 그린다.
                     timeText: line.slot.isCustom ? "" : line.time.description,
                     medicationNames: line.medicationNames,
@@ -343,14 +347,15 @@ public enum DayPlan {
                 )
             },
             remainingCountToday: pendingCount(in: lines),
-            themeRaw: themeRaw
+            themeRaw: themeRaw,
+            languageRaw: language.rawValue
         )
     }
 
     /// "8/17". 워치 화면 맨 위 한 줄.
-    static func shortDateText(for day: Date) -> String {
+    static func shortDateText(for day: Date, language: JanjanLanguage = .standard) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: language.localeIdentifier)
         formatter.setLocalizedDateFormatFromTemplate("Md")
         return formatter.string(from: day)
     }

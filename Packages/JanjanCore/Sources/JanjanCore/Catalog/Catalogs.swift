@@ -19,12 +19,20 @@ public enum SymptomAuxField: String, Codable, Sendable, CaseIterable {
 public struct SymptomGroup: Codable, Hashable, Sendable, Identifiable {
     public let id: String
     public let nameKo: String
+    /// 영어 이름. 카탈로그가 아직 번역되지 않은 항목은 한국어로 떨어진다 -
+    /// 빈 칸보다 낫다.
+    public let nameEn: String?
     public let auxNote: String?
+
+    public func name(_ language: JanjanLanguage) -> String {
+        language == .english ? (nameEn ?? nameKo) : nameKo
+    }
 }
 
 public struct SymptomItem: Codable, Hashable, Sendable, Identifiable {
     public let id: String
     public let nameKo: String
+    public let nameEn: String?
     public let group: String
     public let auxField: SymptomAuxField
     /// 저장할 때 안전 카드를 띄우는 항목(자해·자살 생각).
@@ -32,6 +40,10 @@ public struct SymptomItem: Codable, Hashable, Sendable, Identifiable {
 
     /// nil 을 매번 풀어 쓰지 않도록.
     public var isSafetyItem: Bool { safety == true }
+
+    public func name(_ language: JanjanLanguage) -> String {
+        language == .english ? (nameEn ?? nameKo) : nameKo
+    }
 }
 
 public struct SymptomCatalog: Codable, Hashable, Sendable {
@@ -64,12 +76,22 @@ public struct SymptomCatalog: Codable, Hashable, Sendable {
 public struct EmotionGroup: Codable, Hashable, Sendable, Identifiable {
     public let id: String
     public let nameKo: String
+    public let nameEn: String?
+
+    public func name(_ language: JanjanLanguage) -> String {
+        language == .english ? (nameEn ?? nameKo) : nameKo
+    }
 }
 
 public struct EmotionWord: Codable, Hashable, Sendable, Identifiable {
     public let id: String
     public let nameKo: String
+    public let nameEn: String?
     public let group: String
+
+    public func name(_ language: JanjanLanguage) -> String {
+        language == .english ? (nameEn ?? nameKo) : nameKo
+    }
 }
 
 public struct EmotionWordList: Codable, Hashable, Sendable {
@@ -97,6 +119,11 @@ public struct EmotionWordList: Codable, Hashable, Sendable {
 public struct QuestionCard: Codable, Hashable, Sendable, Identifiable {
     public let id: String
     public let textKo: String
+    public let textEn: String?
+
+    public func text(_ language: JanjanLanguage) -> String {
+        language == .english ? (textEn ?? textKo) : textKo
+    }
 }
 
 public struct QuestionCardDeck: Codable, Hashable, Sendable {
