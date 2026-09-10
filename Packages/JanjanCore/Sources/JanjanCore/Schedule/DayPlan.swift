@@ -330,7 +330,8 @@ public enum DayPlan {
                 WatchSnapshot.SlotLine(
                     slotKey: line.slotKey,
                     labelKo: line.slot.labelKo,
-                    timeText: line.time.description,
+                    // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 워치가 안 그린다.
+                    timeText: line.slot.isCustom ? "" : line.time.description,
                     medicationNames: line.medicationNames,
                     isCompleted: line.isCompleted
                 )

@@ -27,10 +27,13 @@ struct SettingsView: View {
     @State private var isShowingPaywall = false
     @State private var isShowingLicenses = false
 
+    @AppStorage("janjan.janjani.enabled") private var isJanjaniOn = true
+
     var body: some View {
         NavigationStack {
             Form {
                 proSection
+                janjaniSection
                 notificationsSection
                 securitySection
                 privacySection
@@ -121,6 +124,16 @@ struct SettingsView: View {
     }
 
     // MARK: - 알림
+
+    private var janjaniSection: some View {
+        Section {
+            Toggle("잔잔이 보이기", isOn: $isJanjaniOn)
+        } header: {
+            Text("잔잔이")
+        } footer: {
+            Text("오늘 화면과 위젯의 수달이에요. 꺼도 사라질 뿐, 기록에는 아무 일도 없어요.")
+        }
+    }
 
     private var notificationsSection: some View {
         Section {

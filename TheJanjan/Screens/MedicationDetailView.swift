@@ -152,7 +152,9 @@ struct MedicationDetailView: View {
 
                 ForEach(mine) { schedule in
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                        Text("\(schedule.slot.labelKo) \(schedule.timeOfDay.description)")
+                        Text(schedule.slot.isCustom
+                             ? schedule.timeOfDay.description
+                             : "\(schedule.slot.labelKo) \(schedule.timeOfDay.description)")
                             .janjanBody(15)
                             .foregroundStyle(Color.ink2)
                         PillChip(text: "\(DecimalQuantity.display(schedule.dosePerIntake))정")

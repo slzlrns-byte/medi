@@ -21,6 +21,9 @@ struct TodayView: View {
     @Query private var doseRecords: [DoseEventRecord]
     @Query private var stockRecords: [StockEventRecord]
     @Query private var checkInRecords: [CheckInRecord]
+    /// 잔잔이를 보일지. 끄면 사라질 뿐, 다른 일은 아무것도 일어나지 않는다.
+    @AppStorage("janjan.janjani.enabled") private var isJanjaniOn = true
+
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
@@ -69,6 +72,15 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     hero
+                    if isJanjaniOn {
+                        JanjaniTile(
+                            moodScore: todaysMoodScore,
+                            keepsakes: JanjaniKeepsakes.recordedDayCount(
+                                checkIns: checkInRecords.map(\.core),
+                                doseEvents: doseRecords.map(\.core)
+                            )
+                        )
+                    }
                     if hasAnyMedication {
                         slotSection
                     } else {
@@ -198,9 +210,12 @@ struct TodayView: View {
                             Text(line.slot.labelKo)
                                 .janjanDisplay(22)
                                 .foregroundStyle(Color.ink)
-                            Text(line.time.description)
-                                .janjanBody(13)
-                                .foregroundStyle(Color.ink2)
+                            // 직접 넣은 시간대는 이름이 곧 시각이라 두 번 말하지 않는다.
+                            if !line.slot.isCustom {
+                                Text(line.time.description)
+                                    .janjanBody(13)
+                                    .foregroundStyle(Color.ink2)
+                            }
                         }
                         Text(line.medicationNames.joined(separator: " · "))
                             .janjanBody(14)
@@ -432,7 +447,7 @@ private struct SlotRecordSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("\(line.slot.labelKo) \(line.time.description)")
+            .navigationTitle(line.slot.isCustom ? line.time.description : "\(line.slot.labelKo) \(line.time.description)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

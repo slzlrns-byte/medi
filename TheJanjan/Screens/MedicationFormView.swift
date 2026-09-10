@@ -36,29 +36,40 @@ struct MedicationFormView: View {
     }
 
     /// 시간대 한 줄의 초안. 켜진 것만 스케줄이 된다.
+    ///
+    /// id 는 UUID 다. 예전에는 slot.storageKey 를 썼는데, 직접 넣은 시간대는
+    /// 시각을 옮기는 순간 키가 바뀌어 줄의 정체성이 흔들린다.
     private struct SlotDraft: Identifiable {
-        let slot: DoseSlot
+        let id = UUID()
+        /// 아침·점심·저녁·취침이면 그 값. 직접 추가한 줄이면 nil — 시각이 곧 정체성이다.
+        let preset: DoseSlot?
         var isOn: Bool
         /// DatePicker 가 Date 만 다뤄서 시·분을 Date 에 얹어 들고 있는다.
         var time: Date
         var dose: Decimal
-
-        var id: String { slot.storageKey }
 
         var timeOfDay: TimeOfDay {
             let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
             return TimeOfDay(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
         }
 
+        /// 저장에 쓰는 시간대. 직접 추가한 줄은 고른 시각 그대로 custom 이 된다.
+        var slot: DoseSlot { preset ?? .custom(timeOfDay) }
+
         static func presets() -> [SlotDraft] {
             DoseSlot.presets.map { slot in
                 SlotDraft(
-                    slot: slot,
+                    preset: slot,
                     isOn: false,
                     time: slot.defaultTime.date(on: Date()),
                     dose: 1
                 )
             }
+        }
+
+        /// 하루 네 번으로 모자랄 때 더하는 줄. 더했다는 것이 곧 쓰겠다는 뜻이라 켜진 채 온다.
+        static func custom() -> SlotDraft {
+            SlotDraft(preset: nil, isOn: true, time: Date(), dose: 1)
         }
     }
 
@@ -163,45 +174,65 @@ struct MedicationFormView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
-                ForEach(drafts.indices, id: \.self) { index in
-                    slotRow(index)
+                ForEach($drafts) { $draft in
+                    slotRow($draft)
+                }
+
+                // 정신과 처방은 하루 네 번을 넘기도 한다(분복 등). 모자라면 더 넣는다.
+                WhitePillButton(title: "시간대 추가", systemImage: "plus") {
+                    drafts.append(.custom())
                 }
             }
         }
     }
 
-    private func slotRow(_ index: Int) -> some View {
+    private func slotRow(_ draft: Binding<SlotDraft>) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack {
-                TogglePill(text: drafts[index].slot.labelKo, isOn: drafts[index].isOn) {
-                    drafts[index].isOn.toggle()
+                if let preset = draft.wrappedValue.preset {
+                    TogglePill(text: preset.labelKo, isOn: draft.wrappedValue.isOn) {
+                        draft.wrappedValue.isOn.toggle()
+                    }
+                } else {
+                    // 직접 넣은 줄에는 켜고 끄기가 없다. 안 쓸 거면 빼면 된다.
+                    Button {
+                        drafts.removeAll { $0.id == draft.wrappedValue.id }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(Color.ink2)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("이 시간대 빼기"))
                 }
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
-                if drafts[index].isOn {
+                if draft.wrappedValue.isOn {
                     DatePicker(
                         "",
-                        selection: $drafts[index].time,
+                        selection: draft.time,
                         displayedComponents: .hourAndMinute
                     )
                     .labelsHidden()
-                    .accessibilityLabel(Text("\(drafts[index].slot.labelKo) 시각"))
+                    .accessibilityLabel(Text("\(draft.wrappedValue.slot.labelKo) 시각"))
                 }
             }
 
-            if drafts[index].isOn {
-                doseStepper(index)
+            if draft.wrappedValue.isOn {
+                doseStepper(draft)
             }
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
     }
 
-    private func doseStepper(_ index: Int) -> some View {
+    private func doseStepper(_ draft: Binding<SlotDraft>) -> some View {
         CountStepper(
-            text: "1회 \(DecimalQuantity.display(drafts[index].dose))정",
+            text: "1회 \(DecimalQuantity.display(draft.wrappedValue.dose))정",
             decreaseLabelKo: "개수 줄이기",
             increaseLabelKo: "개수 늘리기",
-            onDecrease: { adjust(index, by: -doseStep) },
-            onIncrease: { adjust(index, by: doseStep) }
+            onDecrease: { adjust(draft, by: -doseStep) },
+            onIncrease: { adjust(draft, by: doseStep) }
         )
     }
 
@@ -269,9 +300,9 @@ struct MedicationFormView: View {
         return drafts.contains { $0.isOn } && !weekdays.isEmpty
     }
 
-    private func adjust(_ index: Int, by delta: Decimal) {
-        let next = DecimalQuantity.snapToQuarter(drafts[index].dose + delta)
-        drafts[index].dose = max(next, doseStep)
+    private func adjust(_ draft: Binding<SlotDraft>, by delta: Decimal) {
+        let next = DecimalQuantity.snapToQuarter(draft.wrappedValue.dose + delta)
+        draft.wrappedValue.dose = max(next, doseStep)
     }
 
     private func toggle(_ day: Weekday) {

@@ -95,7 +95,8 @@ struct NextDoseProvider: TimelineProvider {
             date: now,
             slotKey: line.slotKey,
             slotLabelKo: line.slot.labelKo,
-            timeText: line.time.description,
+            // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 아래에서 안 그린다.
+            timeText: line.slot.isCustom ? "" : line.time.description,
             medicationNames: line.medicationNames,
             pendingCount: line.pendingCount,
             hasAnyMedication: true
@@ -164,9 +165,11 @@ struct NextDoseWidgetView: View {
             HStack(spacing: 6) {
                 Text(entry.slotLabelKo)
                     .font(.system(size: 20, weight: .semibold))
-                Text(entry.timeText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                if !entry.timeText.isEmpty {
+                    Text(entry.timeText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
             }
             // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
             Text("\(entry.pendingCount)개 남음")
@@ -247,7 +250,7 @@ struct NextDoseLockScreenView: View {
         default:
             VStack(alignment: .leading, spacing: 1) {
                 if entry.slotKey != nil {
-                    Text("\(entry.slotLabelKo) \(entry.timeText)")
+                    Text([entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " "))
                         .font(.headline)
                     Text(entry.medicationNames.isEmpty
                          ? "\(entry.pendingCount)개 남음"
@@ -268,6 +271,7 @@ struct NextDoseLockScreenView: View {
         guard entry.slotKey != nil else {
             return entry.hasAnyMedication ? "오늘 약 완료" : "약 등록 전"
         }
-        return "\(entry.slotLabelKo) \(entry.timeText) · \(entry.pendingCount)개"
+        let head = [entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " ")
+        return "\(head) · \(entry.pendingCount)개"
     }
 }

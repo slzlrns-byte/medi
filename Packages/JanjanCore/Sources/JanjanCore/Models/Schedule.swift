@@ -127,6 +127,15 @@ public enum DoseSlot: Hashable, Codable, Sendable {
         }
     }
 
+    /// 직접 넣은 시간대인가.
+    ///
+    /// 직접 넣은 시간대의 labelKo 는 시각 그 자체다("14:30"). 라벨과 시각을 나란히
+    /// 그리는 화면들이 같은 말을 두 번 하지 않으려면 이걸 물어봐야 한다.
+    public var isCustom: Bool {
+        if case .custom = self { return true }
+        return false
+    }
+
     /// 저장·알림 식별자에 쓰는 안정적인 문자열.
     public var storageKey: String {
         switch self {
