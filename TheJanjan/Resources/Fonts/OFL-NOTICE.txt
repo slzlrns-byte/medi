@@ -1,6 +1,6 @@
 번들 서체 라이선스 고지 (SIL Open Font License 1.1)
 
-이 폴더의 서체 6개는 모두 SIL Open Font License 1.1 (OFL 1.1) 로 배포되며,
+이 폴더의 서체 11개는 모두 SIL Open Font License 1.1 (OFL 1.1) 로 배포되며,
 앱에 번들해 재배포하는 것이 허용됩니다.
 
   Pretendard-Light.otf     Pretendard  (c) Kil Hyung-jin (길형진)
@@ -9,6 +9,11 @@
   Pretendard-SemiBold.otf  Pretendard  (c) Kil Hyung-jin (길형진)
   SUIT-Light.otf           SUIT        (c) SUNN (선앤도트)
   SUIT-Regular.otf         SUIT        (c) SUNN (선앤도트)
+  IBMPlexSansKR-Light.ttf     IBM Plex Sans KR  (c) IBM Corp.
+  IBMPlexSansKR-Regular.ttf   IBM Plex Sans KR  (c) IBM Corp.
+  IBMPlexSansKR-Medium.ttf    IBM Plex Sans KR  (c) IBM Corp.
+  IBMPlexSansKR-SemiBold.ttf  IBM Plex Sans KR  (c) IBM Corp.
+  GowunDodum-Regular.ttf      고운돋움          (c) 윤디자인그룹 이한나
 
 OFL 1.1 전문: https://openfontlicense.org
 Pretendard:   https://github.com/orioncactus/pretendard

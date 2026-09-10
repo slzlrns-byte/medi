@@ -11,6 +11,5 @@ struct TheJanjanWidgetsBundle: WidgetBundle {
     var body: some Widget {
         NextDoseWidget()
         NextDoseLockScreenWidget()
-        JanjaniWidget()
     }
 }

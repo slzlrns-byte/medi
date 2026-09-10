@@ -17,6 +17,11 @@ enum JanjanFont {
             JanjanFontName.displayRegular,
             JanjanFontName.bodyLight,
             JanjanFontName.bodyRegular,
+            JanjanFontName.plexLight,
+            JanjanFontName.plexRegular,
+            JanjanFontName.plexMedium,
+            JanjanFontName.plexSemiBold,
+            JanjanFontName.gowunRegular,
             JanjanFontName.bodyMedium,
             JanjanFontName.bodySemiBold
         ] where UIFont(name: name, size: 12) != nil {
@@ -29,16 +34,29 @@ enum JanjanFont {
 
     /// 제목·큰 숫자. 얇고 크게.
     static func display(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
-        if availableNames.contains(JanjanFontName.displayLight) {
-            return .custom(JanjanFontName.displayLight, size: size, relativeTo: style)
+        let name: String
+        switch JanjanFontChoice.current {
+        case .standard: name = JanjanFontName.displayLight
+        case .plex: name = JanjanFontName.plexLight
+        case .gowun: name = JanjanFontName.gowunRegular
+        }
+        if availableNames.contains(name) {
+            return .custom(name, size: size, relativeTo: style)
         }
         return .system(size: size, weight: .light, design: .default)
     }
 
     /// 굵게 강조해야 하는 제목. 설계상 자주 쓰지 않는다.
     static func displayStrong(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
-        if availableNames.contains(JanjanFontName.displayRegular) {
-            return .custom(JanjanFontName.displayRegular, size: size, relativeTo: style)
+        let name: String
+        switch JanjanFontChoice.current {
+        case .standard: name = JanjanFontName.displayRegular
+        case .plex: name = JanjanFontName.plexMedium
+        // 고운돋움은 한 굵기뿐이다. 강조는 크기가 대신한다.
+        case .gowun: name = JanjanFontName.gowunRegular
+        }
+        if availableNames.contains(name) {
+            return .custom(name, size: size, relativeTo: style)
         }
         return .system(size: size, weight: .regular, design: .default)
     }
@@ -50,11 +68,15 @@ enum JanjanFont {
         case semibold
 
         var postScriptName: String {
+            // 본문을 플렉스로 통째 갈아입는 것은 plex 선택뿐이다.
+            // gowun 은 제목만 바꾸고 본문은 프리텐다드를 지킨다 - 한 굵기짜리
+            // 서체로 본문 넉 단계 굵기를 흉내 낼 수는 없다.
+            let usesPlex = JanjanFontChoice.current == .plex
             switch self {
-            case .light: return JanjanFontName.bodyLight
-            case .regular: return JanjanFontName.bodyRegular
-            case .medium: return JanjanFontName.bodyMedium
-            case .semibold: return JanjanFontName.bodySemiBold
+            case .light: return usesPlex ? JanjanFontName.plexLight : JanjanFontName.bodyLight
+            case .regular: return usesPlex ? JanjanFontName.plexRegular : JanjanFontName.bodyRegular
+            case .medium: return usesPlex ? JanjanFontName.plexMedium : JanjanFontName.bodyMedium
+            case .semibold: return usesPlex ? JanjanFontName.plexSemiBold : JanjanFontName.bodySemiBold
             }
         }
 
@@ -105,5 +127,40 @@ extension View {
         font(JanjanFont.body(size, weight: weight, relativeTo: style))
             .tracking(CGFloat(JanjanTypography.tracking(forSize: Double(size))))
             .lineSpacing(CGFloat(JanjanTypography.lineSpacing(forSize: Double(size), role: .body)))
+    }
+}
+
+
+/// 설정에서 고르는 서체 옷.
+///
+/// 셋 다 OFL 이라 번들해도 된다. 기본은 지금까지의 SUIT + 프리텐다드다 -
+/// 이미 쓰던 사람의 화면이 어느 날 말없이 바뀌면 안 된다.
+enum JanjanFontChoice: String, CaseIterable {
+
+    case standard
+    case plex
+    case gowun
+
+    static let defaultsKey = "janjan.fontChoice"
+
+    /// 매 호출마다 읽는다. 값이 바뀌면 화면이 다시 그려지며 자연히 새 옷을 입는다.
+    static var current: JanjanFontChoice {
+        JanjanFontChoice(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .standard
+    }
+
+    var labelKo: String {
+        switch self {
+        case .standard: return "기본"
+        case .plex: return "또렷하게"
+        case .gowun: return "둥글게"
+        }
+    }
+
+    var detailKo: String {
+        switch self {
+        case .standard: return "SUIT 제목과 프리텐다드 본문"
+        case .plex: return "IBM Plex Sans KR"
+        case .gowun: return "고운돋움 제목과 프리텐다드 본문"
+        }
     }
 }

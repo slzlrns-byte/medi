@@ -116,6 +116,11 @@ targets:
           - "Pretendard-Regular.otf"
           - "Pretendard-Medium.otf"
           - "Pretendard-SemiBold.otf"
+          - "IBMPlexSansKR-Light.ttf"
+          - "IBMPlexSansKR-Regular.ttf"
+          - "IBMPlexSansKR-Medium.ttf"
+          - "IBMPlexSansKR-SemiBold.ttf"
+          - "GowunDodum-Regular.ttf"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app
@@ -180,8 +185,6 @@ targets:
       - path: TheJanjan/Persistence/Records.swift
       - path: TheJanjan/Persistence/JanjanModelContainer.swift
       - path: TheJanjan/Persistence/DoseRecorder.swift
-      # 잔잔이 장면은 앱 타일과 위젯이 같은 그림을 쓴다.
-      - path: TheJanjan/Janjani
       - path: TheJanjan/Shared
     dependencies:
       - package: JanjanCore

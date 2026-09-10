@@ -21,9 +21,6 @@ struct TodayView: View {
     @Query private var doseRecords: [DoseEventRecord]
     @Query private var stockRecords: [StockEventRecord]
     @Query private var checkInRecords: [CheckInRecord]
-    /// 잔잔이를 보일지. 끄면 사라질 뿐, 다른 일은 아무것도 일어나지 않는다.
-    @AppStorage("janjan.janjani.enabled") private var isJanjaniOn = true
-
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
@@ -72,15 +69,6 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     hero
-                    if isJanjaniOn {
-                        JanjaniTile(
-                            moodScore: todaysMoodScore,
-                            keepsakes: JanjaniKeepsakes.recordedDayCount(
-                                checkIns: checkInRecords.map(\.core),
-                                doseEvents: doseRecords.map(\.core)
-                            )
-                        )
-                    }
                     if hasAnyMedication {
                         slotSection
                     } else {

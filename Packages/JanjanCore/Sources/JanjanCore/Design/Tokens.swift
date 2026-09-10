@@ -218,6 +218,13 @@ public enum JanjanFontName {
     public static let bodyMedium = "Pretendard-Medium"
     public static let bodySemiBold = "Pretendard-SemiBold"
 
+    // 설정에서 고를 수 있는 두 번째·세 번째 옷. 전부 OFL 이다.
+    public static let plexLight = "IBMPlexSansKR-Light"
+    public static let plexRegular = "IBMPlexSansKR-Regular"
+    public static let plexMedium = "IBMPlexSansKR-Medium"
+    public static let plexSemiBold = "IBMPlexSansKR-SemiBold"
+    public static let gowunRegular = "GowunDodum-Regular"
+
     /// UIAppFonts 에 적어 둔 파일명. project.yml 과 반드시 같아야 한다.
     public static let bundledFiles = [
         "SUIT-Light.otf",
@@ -225,7 +232,12 @@ public enum JanjanFontName {
         "Pretendard-Light.otf",
         "Pretendard-Regular.otf",
         "Pretendard-Medium.otf",
-        "Pretendard-SemiBold.otf"
+        "Pretendard-SemiBold.otf",
+        "IBMPlexSansKR-Light.ttf",
+        "IBMPlexSansKR-Regular.ttf",
+        "IBMPlexSansKR-Medium.ttf",
+        "IBMPlexSansKR-SemiBold.ttf",
+        "GowunDodum-Regular.ttf"
     ]
 }
 

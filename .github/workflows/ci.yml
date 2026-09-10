@@ -111,11 +111,20 @@ jobs:
 
       - name: 번들 서체 무결성 확인
         run: |
-          # OTF 는 'OTTO' 로 시작한다. LFS 포인터나 HTML 오류 페이지가 커밋되면 여기서 걸린다.
+          # OTF 는 'OTTO', TTF 는 00 01 00 00 으로 시작한다.
+          # LFS 포인터나 HTML 오류 페이지가 커밋되면 여기서 걸린다.
           for f in TheJanjan/Resources/Fonts/*.otf; do
             MAGIC=$(head -c 4 "$f")
             if [ "$MAGIC" != "OTTO" ]; then
               echo "::error::$f 가 올바른 OTF 가 아닙니다 (magic=$MAGIC)"
+              exit 1
+            fi
+            echo "ok $f"
+          done
+          for f in TheJanjan/Resources/Fonts/*.ttf; do
+            MAGIC=$(head -c 4 "$f" | xxd -p)
+            if [ "$MAGIC" != "00010000" ]; then
+              echo "::error::$f 가 올바른 TTF 가 아닙니다 (magic=$MAGIC)"
               exit 1
             fi
             echo "ok $f"
