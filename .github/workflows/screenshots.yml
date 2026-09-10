@@ -6,8 +6,8 @@
 # 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
 #
 # 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
-# 마지막 실행: 2026-09-10 풋사과 크림 테마 + 새 기능(달 보기·받아 온 개수·아침 시트)
-#   볼 것 - 모노톤 바탕에 테마 색이 요소에만 들어갔는지. 시트가 늘어 30분을 넘겨 45분.
+# 마지막 실행: 2026-09-10 워치 두 크기(큰·작은) 잘림 확인
+#   볼 것 - 작은 워치(40/41mm)에서 복약 시트 버튼·기분 원·홈 줄이 잘리는지.
 
 name: Screenshots
 
@@ -261,8 +261,11 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          UDID=$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
+          # 아이폰과 같은 이유로 두 대를 고른다: 가장 큰 워치에서 여백을,
+          # 가장 작은 워치(40/41mm)에서 잘림·넘침을 본다. 크기는 이름의
+          # "(NNmm)" 에서 읽는다 — simctl 은 화면 크기를 따로 주지 않는다.
+          xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
 
           runtimes = json.load(sys.stdin)["devices"]
 
@@ -278,17 +281,23 @@ jobs:
               watches = [d for d in devices if d.get("isAvailable") and "Apple Watch" in d["name"]]
               if not watches:
                   continue
-              candidate = (version(identifier), identifier, watches[0])
+              candidate = (version(identifier), identifier, watches)
               if best is None or candidate[0] > best[0]:
                   best = candidate
 
           if best is None:
               sys.exit("사용할 수 있는 Apple Watch 시뮬레이터가 없습니다.")
 
-          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
-          print(best[2]["udid"])
-          ')
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          def size_mm(device):
+              match = re.search(r"\((\d+)mm\)", device["name"])
+              return int(match.group(1)) if match else 0
+
+          watches = sorted(best[2], key=size_mm)
+          small, large = watches[0], watches[-1]
+          sys.stderr.write("작은 기기: {}\n큰 기기: {}\n".format(small["name"], large["name"]))
+          print("udid={}".format(large["udid"]))
+          print("udid_small={}".format(small["udid"] if small["udid"] != large["udid"] else ""))
+          ' >> "$GITHUB_OUTPUT"
 
       - name: 워치 앱 빌드
         if: always() && steps.watch.outcome == 'success'
@@ -309,7 +318,6 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          UDID="${{ steps.watch.outputs.udid }}"
           BUNDLE="com.thejanjan.app.watchkitapp"
 
           APP=$(find build/watch-dd/Build/Products -name 'TheJanjanWatch.app' -type d | head -1)
@@ -320,37 +328,51 @@ jobs:
           fi
           echo "앱: $APP"
 
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl install "$UDID" "$APP"
-
           mkdir -p build/named
 
-          # 한 화면이 실패해도 나머지는 찍는다. 여기서 죽으면 세 장을 다 잃는데,
+          # 한 화면이 실패해도 나머지는 찍는다. 여기서 죽으면 나머지를 다 잃는데,
           # 워치 사진은 한 번 찍는 데 macOS 러너 몇 분이 든다.
           capture () {
-            name="$1"; screen="$2"
-            xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
-            if ! xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"; then
+            udid="$1"; name="$2"; screen="$3"
+            xcrun simctl terminate "$udid" "$BUNDLE" >/dev/null 2>&1 || true
+            if ! xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"; then
               echo "::warning::${name} 을 띄우지 못했습니다. 다음 화면으로 넘어갑니다."
               return 0
             fi
             # 화면이 자리를 잡을 틈. 워치는 폰보다 느리게 뜨고,
             # 시트는 뜬 뒤에 한 박자 늦게 올라온다.
             sleep 6
-            xcrun simctl io "$UDID" screenshot "build/named/${name}.png" \
+            xcrun simctl io "$udid" screenshot "build/named/${name}.png" \
               || echo "::warning::${name} 을 찍지 못했습니다."
           }
 
-          # 설치 직후 첫 실행은 느리다. 그 느린 실행이 첫 사진이 되지 않도록
-          # 한 번 버리고 시작한다.
-          xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData >/dev/null 2>&1 || true
-          sleep 8
+          # 한 기기의 네 화면을 전부 찍는다. 접미사는 아이폰의 -좁은화면 과 같은 관례다.
+          capture_all () {
+            udid="$1"; suffix="$2"
+            xcrun simctl boot "$udid" || true
+            xcrun simctl bootstatus "$udid" -b
+            xcrun simctl install "$udid" "$APP"
 
-          capture "11-워치-홈" home
-          capture "12-워치-기분" mood
-          capture "13-워치-증상" symptom
-          capture "14-워치-복약" dose
+            # 설치 직후 첫 실행은 느리다. 그 느린 실행이 첫 사진이 되지 않도록
+            # 한 번 버리고 시작한다.
+            xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData >/dev/null 2>&1 || true
+            sleep 8
+
+            capture "$udid" "11-워치-홈${suffix}" home
+            capture "$udid" "12-워치-기분${suffix}" mood
+            capture "$udid" "13-워치-증상${suffix}" symptom
+            capture "$udid" "14-워치-복약${suffix}" dose
+
+            xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+          }
+
+          capture_all "${{ steps.watch.outputs.udid }}" ""
+          SMALL="${{ steps.watch.outputs.udid_small }}"
+          if [ -n "$SMALL" ]; then
+            capture_all "$SMALL" "-작은화면"
+          else
+            echo "::warning::작은 워치 시뮬레이터가 따로 없어 큰 기기만 찍었습니다."
+          fi
 
           ls -la build/named
 
