@@ -20,11 +20,14 @@ enum JanjanModelContainer {
         case localFile
         case inMemory
 
-        var labelKo: String {
+        var label: String {
             switch self {
-            case .cloudKit: return "iCloud 동기화 사용 중"
-            case .localFile: return "이 기기에만 저장 중"
-            case .inMemory: return "임시 저장 (앱을 닫으면 사라집니다)"
+            case .cloudKit:
+                return t("iCloud 동기화 사용 중", "Syncing with iCloud")
+            case .localFile:
+                return t("이 기기에만 저장 중", "Stored on this device only")
+            case .inMemory:
+                return t("임시 저장 (앱을 닫으면 사라집니다)", "Temporary (cleared when the app closes)")
             }
         }
     }

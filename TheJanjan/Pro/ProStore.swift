@@ -42,8 +42,10 @@ final class ProStore: ObservableObject {
     /// 사용자에게 보여 줄 마지막 안내. 사용자가 닫을 수 있어야 하니 var 로 둔다.
     @Published var lastError: String?
 
-    static let storeUnavailableMessageKo =
-        "지금은 스토어에 연결할 수 없어요. 무료 기능은 그대로 쓸 수 있어요."
+    static var storeUnavailableMessage: String {
+        t("지금은 스토어에 연결할 수 없어요. 무료 기능은 그대로 쓸 수 있어요.",
+          "Can't reach the store right now. Free features keep working as they are.")
+    }
 
     private var updatesTask: Task<Void, Never>?
 
@@ -102,12 +104,12 @@ final class ProStore: ObservableObject {
             }
             storeUnavailable = products.isEmpty
             if products.isEmpty {
-                lastError = Self.storeUnavailableMessageKo
+                lastError = Self.storeUnavailableMessage
             }
         } catch {
             products = []
             storeUnavailable = true
-            lastError = Self.storeUnavailableMessageKo
+            lastError = Self.storeUnavailableMessage
         }
 
         await refreshEntitlements()
@@ -165,18 +167,21 @@ final class ProStore: ObservableObject {
                     await refreshEntitlements()
                 case .unverified:
                     // 서명이 맞지 않는 거래는 권한으로 세지 않는다.
-                    lastError = "구매를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+                    lastError = t("구매를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                                  "Couldn't verify the purchase. Please try again in a moment.")
                 }
             case .userCancelled:
                 break
             case .pending:
                 // 가족 승인 대기 등. 승인되면 Transaction.updates 로 들어온다.
-                lastError = "승인을 기다리는 중이에요. 승인되면 자동으로 열려요."
+                lastError = t("승인을 기다리는 중이에요. 승인되면 자동으로 열려요.",
+                              "Waiting for approval. It opens automatically once approved.")
             @unknown default:
                 break
             }
         } catch {
-            lastError = "구매를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요."
+            lastError = t("구매를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                          "Couldn't complete the purchase. Please try again in a moment.")
         }
     }
 
@@ -190,10 +195,12 @@ final class ProStore: ObservableObject {
             try await AppStore.sync()
             await refreshEntitlements()
             if !isPro {
-                lastError = "이 애플 계정에서 복원할 구독을 찾지 못했어요."
+                lastError = t("이 애플 계정에서 복원할 구독을 찾지 못했어요.",
+                              "Couldn't find a subscription to restore on this Apple account.")
             }
         } catch {
-            lastError = "복원을 마치지 못했어요. 잠시 뒤 다시 시도해 주세요."
+            lastError = t("복원을 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                          "Couldn't finish restoring. Please try again in a moment.")
         }
     }
 }

@@ -48,8 +48,7 @@ struct LockScreenView: View {
             Text(Janjan.appName(JanjanLanguage.current))
                 .janjanDisplay(36)
                 .foregroundStyle(Color.ink)
-            // Janjan.sloganKo 에는 영어 짝이 코어에 없어, 슬로건은 한국어로 남는다.
-            Text(Janjan.sloganKo)
+            Text(Janjan.slogan(JanjanLanguage.current))
                 .janjanBody(13)
                 .foregroundStyle(Color.muted)
         }
@@ -67,13 +66,11 @@ struct LockScreenView: View {
 
     private var messageText: String {
         // `now` 를 읽어 1초마다 남은 시간이 다시 계산되게 한다.
-        // PasscodeThrottle.messageKo 와 AppLockManager.failureMessageKo 는
-        // 코어·로직 파일(이 팀 소유 아님)에 한국어로만 있어 언어를 못 따라간다.
         _ = now
         if lock.isThrottled {
-            return PasscodeThrottle.messageKo(forRemaining: lock.remainingLockout) ?? ""
+            return PasscodeThrottle.message(forRemaining: lock.remainingLockout, language: .current) ?? ""
         }
-        return lock.failureMessageKo ?? ""
+        return lock.failureMessage ?? ""
     }
 
     private var recoveryBlock: some View {

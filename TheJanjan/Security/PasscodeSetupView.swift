@@ -204,8 +204,7 @@ struct PasscodeSetupView: View {
 
         case .fresh:
             guard Passcode.validate(entered) == .ok else {
-                // Passcode.Validation.messageKo 는 코어에 한국어만 있다.
-                reject(Passcode.validate(entered).messageKo)
+                reject(Passcode.validate(entered).message(JanjanLanguage.current))
                 return
             }
             firstEntry = entered

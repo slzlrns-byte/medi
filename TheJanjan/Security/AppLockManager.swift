@@ -47,7 +47,7 @@ final class AppLockManager: ObservableObject {
     @Published private(set) var isAuthenticating = false
 
     /// 사용자에게 보여 줄 만한 실패 사유. 스스로 취소한 경우에는 아무 말도 하지 않는다(`nil`).
-    @Published private(set) var failureMessageKo: String?
+    @Published private(set) var failureMessage: String?
 
     /// 기기 인증으로 되찾아 들어왔다. 새 번호를 정해야 한다.
     @Published var needsNewPasscode = false
@@ -195,7 +195,7 @@ final class AppLockManager: ObservableObject {
         isLocked = true
         // 잠글 때 하던 말은 지운다. 다음에 열 때 지난번 실패 문구가 남아 있으면
         // 방금 무언가 잘못한 것처럼 보인다.
-        failureMessageKo = nil
+        failureMessage = nil
     }
 
     // MARK: - 번호로 열기
@@ -206,7 +206,7 @@ final class AppLockManager: ObservableObject {
     @discardableResult
     func unlock(with pin: String) -> Bool {
         guard !isThrottled else {
-            failureMessageKo = PasscodeThrottle.messageKo(forRemaining: remainingLockout)
+            failureMessage = PasscodeThrottle.message(forRemaining: remainingLockout, language: .current)
             return false
         }
 
@@ -216,7 +216,7 @@ final class AppLockManager: ObservableObject {
         }
 
         clearFailures()
-        failureMessageKo = nil
+        failureMessage = nil
         lastBackgroundedAt = nil
         isLocked = false
         return true
@@ -228,12 +228,12 @@ final class AppLockManager: ObservableObject {
         storedLastFailureAt = Date().timeIntervalSince1970
 
         let waiting = remainingLockout
-        if let message = PasscodeThrottle.messageKo(forRemaining: waiting) {
-            failureMessageKo = message
+        if let message = PasscodeThrottle.message(forRemaining: waiting, language: .current) {
+            failureMessage = message
         } else {
             // 남은 횟수를 세어 보이지 않는다. 세어 보이면 재촉이 되고,
             // 곁에서 보는 사람에게는 얼마나 더 눌러 볼 수 있는지 알려 주는 셈이 된다.
-            failureMessageKo = "번호가 맞지 않아요."
+            failureMessage = t("번호가 맞지 않아요.", "That code isn't right.")
         }
     }
 
@@ -255,11 +255,12 @@ final class AppLockManager: ObservableObject {
         defer { isAuthenticating = false }
 
         let context = LAContext()
-        context.localizedCancelTitle = "취소"
+        context.localizedCancelTitle = t("취소", "Cancel")
 
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
-            failureMessageKo = forRecovery
-                ? "이 기기에는 잠금을 열 방법이 없어요. 번호로 열어 주세요."
+            failureMessage = forRecovery
+                ? t("이 기기에는 잠금을 열 방법이 없어요. 번호로 열어 주세요.",
+                    "This device has no way to unlock. Please use your code.")
                 : nil
             return false
         }
@@ -267,10 +268,12 @@ final class AppLockManager: ObservableObject {
         do {
             _ = try await context.evaluatePolicy(
                 .deviceOwnerAuthentication,
-                localizedReason: forRecovery ? "새 번호를 정하기 위해 확인합니다" : "더잔잔 잠금을 해제합니다"
+                localizedReason: forRecovery
+                    ? t("새 번호를 정하기 위해 확인합니다", "Confirming so you can set a new code")
+                    : t("더잔잔 잠금을 해제합니다", "Unlocking The Janjan")
             )
             clearFailures()
-            failureMessageKo = nil
+            failureMessage = nil
             lastBackgroundedAt = nil
             isLocked = false
             // 되찾아 들어왔으면 새 번호를 정하게 한다. 잊은 번호를 그대로 두면
@@ -278,10 +281,11 @@ final class AppLockManager: ObservableObject {
             if forRecovery { needsNewPasscode = true }
             return true
         } catch let error as LAError {
-            failureMessageKo = Self.messageKo(forCode: error.code)
+            failureMessage = Self.message(forCode: error.code)
             return false
         } catch {
-            failureMessageKo = "지금은 확인할 수 없어요. 잠시 후 다시 해 주세요."
+            failureMessage = t("지금은 확인할 수 없어요. 잠시 후 다시 해 주세요.",
+                               "Couldn't verify right now. Please try again in a moment.")
             return false
         }
     }
@@ -293,12 +297,13 @@ final class AppLockManager: ObservableObject {
     func setPasscode(_ pin: String) -> Bool {
         guard Passcode.validate(pin) == .ok else { return false }
         guard PasscodeStore.save(pin) else {
-            failureMessageKo = "번호를 저장하지 못했어요. 잠시 후 다시 해 주세요."
+            failureMessage = t("번호를 저장하지 못했어요. 잠시 후 다시 해 주세요.",
+                               "Couldn't save the code. Please try again in a moment.")
             return false
         }
         clearFailures()
         isEnabled = true
-        failureMessageKo = nil
+        failureMessage = nil
         needsNewPasscode = false
         isLocked = false
         lastBackgroundedAt = nil
@@ -310,7 +315,7 @@ final class AppLockManager: ObservableObject {
         PasscodeStore.remove()
         clearFailures()
         isEnabled = false
-        failureMessageKo = nil
+        failureMessage = nil
         needsNewPasscode = false
         isLocked = false
         lastBackgroundedAt = nil
@@ -319,20 +324,25 @@ final class AppLockManager: ObservableObject {
     // MARK: - 안쪽
 
     /// LAError 는 사용자가 취소한 것까지 오류로 알려 준다. 취소는 잘못이 아니므로 `nil`.
-    private static func messageKo(forCode code: LAError.Code) -> String? {
+    private static func message(forCode code: LAError.Code) -> String? {
         switch code {
         case .userCancel, .appCancel, .systemCancel:
             return nil
         case .authenticationFailed:
-            return "확인하지 못했어요. 번호로 열어 주세요."
+            return t("확인하지 못했어요. 번호로 열어 주세요.",
+                     "Couldn't verify. Please use your code.")
         case .biometryLockout:
-            return "생체인식이 잠겼어요. 번호나 기기 암호로 열어 주세요."
+            return t("생체인식이 잠겼어요. 번호나 기기 암호로 열어 주세요.",
+                     "Biometrics is locked. Please use your code or device passcode.")
         case .biometryNotAvailable, .biometryNotEnrolled:
-            return "이 기기에서는 번호로 열어 주세요."
+            return t("이 기기에서는 번호로 열어 주세요.",
+                     "Please use your code on this device.")
         case .passcodeNotSet:
-            return "이 기기에는 암호가 없어요. 번호로 열어 주세요."
+            return t("이 기기에는 암호가 없어요. 번호로 열어 주세요.",
+                     "This device has no passcode. Please use your code.")
         default:
-            return "지금은 확인할 수 없어요. 잠시 후 다시 해 주세요."
+            return t("지금은 확인할 수 없어요. 잠시 후 다시 해 주세요.",
+                     "Couldn't verify right now. Please try again in a moment.")
         }
     }
 }

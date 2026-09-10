@@ -253,7 +253,7 @@ struct SettingsView: View {
                 Picker(t("다시 잠그기", "Lock again"), selection: graceSecondsBinding) {
                     ForEach(LockPolicy.allowedGraceSeconds, id: \.self) { seconds in
                         // LockPolicy 는 코어에 한국어 라벨만 있다(그래프 라벨에 언어 인자가 없음).
-                        Text(LockPolicy.graceLabelKo(forSeconds: seconds)).tag(seconds)
+                        Text(LockPolicy.graceLabel(forSeconds: seconds, language: JanjanLanguage.current)).tag(seconds)
                     }
                 }
             }
@@ -294,9 +294,7 @@ struct SettingsView: View {
     }
 
     private var securityFooterKo: String {
-        // AppLockManager 는 코어가 아니라 이 팀 소유가 아닌 로직 파일이라
-        // failureMessageKo 는 언어를 따라가지 못하고 한국어로 남는다.
-        if let message = lock.failureMessageKo { return message }
+        if let message = lock.failureMessage { return message }
         if lock.isEnabled {
             guard lock.canRecoverWithDevice else {
                 return t(
@@ -320,8 +318,7 @@ struct SettingsView: View {
     private var privacySection: some View {
         Section {
             LabeledContent(t("저장 위치", "Storage")) {
-                // JanjanModelContainer 는 이 팀 소유 파일이 아니라 labelKo 만 있다.
-                Text(JanjanModelContainer.activeStorage.labelKo)
+                Text(JanjanModelContainer.activeStorage.label)
                     .foregroundStyle(Color.muted)
             }
 

@@ -23,6 +23,18 @@ public enum Passcode {
             case .notDigits: return "숫자만 쓸 수 있어요."
             }
         }
+
+        public var messageEn: String? {
+            switch self {
+            case .ok: return nil
+            case .wrongLength: return "Please enter four digits."
+            case .notDigits: return "Only numbers can be used."
+            }
+        }
+
+        public func message(_ language: JanjanLanguage) -> String? {
+            language == .english ? messageEn : messageKo
+        }
     }
 
     public static func validate(_ text: String) -> Validation {
@@ -121,5 +133,20 @@ public enum PasscodeThrottle {
         }
         let minutes = Int((seconds / 60).rounded(.up))
         return "\(minutes)분 뒤에 다시 해 볼 수 있어요."
+    }
+
+    public static func messageEn(forRemaining seconds: TimeInterval) -> String? {
+        guard seconds > 0 else { return nil }
+        if seconds < 60 {
+            return "You can try again in \(Int(seconds.rounded(.up))) seconds."
+        }
+        let minutes = Int((seconds / 60).rounded(.up))
+        return minutes == 1
+            ? "You can try again in 1 minute."
+            : "You can try again in \(minutes) minutes."
+    }
+
+    public static func message(forRemaining seconds: TimeInterval, language: JanjanLanguage) -> String? {
+        language == .english ? messageEn(forRemaining: seconds) : messageKo(forRemaining: seconds)
     }
 }

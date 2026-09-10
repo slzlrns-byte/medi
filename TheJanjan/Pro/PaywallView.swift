@@ -340,7 +340,7 @@ struct PaywallView: View {
     private var storeUnavailableCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(ProStore.storeUnavailableMessageKo)
+                Text(ProStore.storeUnavailableMessage)
                     .janjanBody(14)
                     .foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)

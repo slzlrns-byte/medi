@@ -6,6 +6,11 @@ public enum Janjan {
     public static let appNameKo = "더잔잔"
     public static let appNameEn = "The Janjan"
     public static let sloganKo = "더 잔잔한 하루를 위해"
+    public static let sloganEn = "For a calmer day"
+
+    public static func slogan(_ language: JanjanLanguage) -> String {
+        language == .english ? sloganEn : sloganKo
+    }
 
     /// iCloud 컨테이너. entitlements 파일과 반드시 같아야 한다.
     public static let cloudKitContainerID = "iCloud.com.thejanjan.app"

@@ -42,4 +42,15 @@ public struct LockPolicy: Hashable, Sendable {
         if seconds < 60 { return "\(seconds)초 후" }
         return "\(seconds / 60)분 후"
     }
+
+    public static func graceLabelEn(forSeconds seconds: Int) -> String {
+        if seconds <= 0 { return "Right away" }
+        if seconds < 60 { return "After \(seconds) seconds" }
+        let minutes = seconds / 60
+        return minutes == 1 ? "After 1 minute" : "After \(minutes) minutes"
+    }
+
+    public static func graceLabel(forSeconds seconds: Int, language: JanjanLanguage) -> String {
+        language == .english ? graceLabelEn(forSeconds: seconds) : graceLabelKo(forSeconds: seconds)
+    }
 }

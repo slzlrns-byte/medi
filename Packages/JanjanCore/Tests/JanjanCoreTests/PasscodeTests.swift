@@ -152,4 +152,36 @@ final class PasscodeTests: XCTestCase {
             }
         }
     }
+
+    func testEnglishMessagesMatchTheSameRules() {
+        // 기다림 문구: 올림 규칙과 단수형이 한국어 판과 같은 결로 간다.
+        XCTAssertNil(PasscodeThrottle.message(forRemaining: 0, language: .english))
+        XCTAssertEqual(
+            PasscodeThrottle.message(forRemaining: 40.2, language: .english),
+            "You can try again in 41 seconds."
+        )
+        XCTAssertEqual(
+            PasscodeThrottle.message(forRemaining: 60, language: .english),
+            "You can try again in 1 minute."
+        )
+        XCTAssertEqual(
+            PasscodeThrottle.message(forRemaining: 301, language: .english),
+            "You can try again in 6 minutes."
+        )
+        XCTAssertEqual(
+            PasscodeThrottle.message(forRemaining: 300, language: .korean),
+            PasscodeThrottle.messageKo(forRemaining: 300)
+        )
+
+        // 검증 문구: 두 언어 모두 있고, 느낌표가 없다.
+        XCTAssertNil(Passcode.Validation.ok.message(.english))
+        for bad in [Passcode.Validation.wrongLength, .notDigits] {
+            for language in JanjanLanguage.allCases {
+                guard let message = bad.message(language) else {
+                    return XCTFail("문구가 없습니다: \(bad) \(language)")
+                }
+                XCTAssertFalse(message.contains("!"))
+            }
+        }
+    }
 }
