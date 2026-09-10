@@ -60,6 +60,22 @@ enum DemoSeed {
             // "안 고르면 nil" 이라는 원칙이 화면에서 안 보이니 이틀만 채운다.
             let checkIn: CheckIn
             switch offset {
+            case 0:
+                // 오늘 기록에도 꿈을 반쯤 채워 둔다 - 화면 찍기(05-기록-펼침)가
+                // 3척도 줄과 "안 적음" 상태를 같이 보여 주려면 오늘이어야 한다.
+                checkIn = CheckIn(
+                    date: calendar.startOfDay(for: day),
+                    mood: CheckIn.Mood(score),
+                    energy: max(1, min(5, 3 + score)),
+                    anxiety: max(1, min(5, 3 - score)),
+                    emotionWords: ["anxious", "worn_out"],
+                    sleepMinutes: 6 * 60,
+                    dreamed: true,
+                    dreamVividness: 2,
+                    activities: ["outdoors", "caffeine"],
+                    note: notes.indices.contains(offset) ? notes[offset] : nil,
+                    updatedAt: day
+                )
             case 3:
                 checkIn = CheckIn(
                     date: calendar.startOfDay(for: day),
