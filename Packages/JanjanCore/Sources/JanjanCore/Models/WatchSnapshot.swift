@@ -15,6 +15,9 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         public let timeText: String
         /// 그 시간대에 예정된 약 이름들.
         public let medicationNames: [String]
+        /// 같은 순서의 약 ID. 워치가 "먹었어요" 를 보낼 때 이 ID 로 말한다 —
+        /// 폰의 저장 규칙(DoseRecorder)이 ID 단위라, 이름만으로는 기록할 수 없다.
+        public let medicationIDs: [UUID]
         /// 이미 기록이 끝났는지.
         public let isCompleted: Bool
 
@@ -23,13 +26,31 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
             labelKo: String,
             timeText: String,
             medicationNames: [String],
+            medicationIDs: [UUID] = [],
             isCompleted: Bool
         ) {
             self.slotKey = slotKey
             self.labelKo = labelKo
             self.timeText = timeText
             self.medicationNames = medicationNames
+            self.medicationIDs = medicationIDs
             self.isCompleted = isCompleted
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case slotKey, labelKo, timeText, medicationNames, medicationIDs, isCompleted
+        }
+
+        /// ID 키가 없던 시절의 스냅샷도 되살아난다. 그 줄로는 기록을 못 보내지만
+        /// 화면은 그대로 그려진다 — 다음 스냅샷이 오면 ID 가 채워진다.
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            slotKey = try container.decode(String.self, forKey: .slotKey)
+            labelKo = try container.decode(String.self, forKey: .labelKo)
+            timeText = try container.decode(String.self, forKey: .timeText)
+            medicationNames = try container.decode([String].self, forKey: .medicationNames)
+            medicationIDs = try container.decodeIfPresent([UUID].self, forKey: .medicationIDs) ?? []
+            isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
         }
 
         public var summaryKo: String {

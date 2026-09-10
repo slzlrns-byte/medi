@@ -16,6 +16,8 @@ enum WatchDemoSeed {
         case home
         case mood
         case symptom
+        /// 아직 답하지 않은 첫 시간대의 복약 시트.
+        case dose
     }
 
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }

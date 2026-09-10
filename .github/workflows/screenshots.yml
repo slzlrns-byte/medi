@@ -350,6 +350,7 @@ jobs:
           capture "11-워치-홈" home
           capture "12-워치-기분" mood
           capture "13-워치-증상" symptom
+          capture "14-워치-복약" dose
 
           ls -la build/named
 

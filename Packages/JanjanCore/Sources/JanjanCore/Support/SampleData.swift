@@ -140,6 +140,7 @@ public enum SampleData {
                 labelKo: DoseSlot.morning.labelKo,
                 timeText: TimeOfDay(hour: 8, minute: 0).description,
                 medicationNames: [escitalopram.name],
+                medicationIDs: [escitalopram.id],
                 isCompleted: true
             ),
             WatchSnapshot.SlotLine(
@@ -147,6 +148,7 @@ public enum SampleData {
                 labelKo: DoseSlot.bedtime.labelKo,
                 timeText: TimeOfDay(hour: 22, minute: 30).description,
                 medicationNames: [lamotrigine.name, quetiapine.name],
+                medicationIDs: [lamotrigine.id, quetiapine.id],
                 isCompleted: false
             )
         ]

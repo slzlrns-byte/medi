@@ -9,6 +9,8 @@ struct WatchHomeView: View {
 
     @State private var isShowingSymptom = false
     @State private var isShowingMood = false
+    /// 눌러서 기록할 시간대. nil 이면 시트가 닫혀 있다.
+    @State private var openSlot: WatchSnapshot.SlotLine?
 
     #if DEBUG
     /// 화면 찍기용 시트를 두 번 열지 않기 위한 표시.
@@ -66,6 +68,7 @@ struct WatchHomeView: View {
                     case .home: break
                     case .mood: isShowingMood = true
                     case .symptom: isShowingSymptom = true
+                    case .dose: openSlot = session.snapshot.slots.first { !$0.isCompleted }
                     }
                 }
                 #endif
@@ -78,6 +81,10 @@ struct WatchHomeView: View {
                 MoodQuickView()
                     .environmentObject(session)
             }
+            .sheet(item: $openSlot) { slot in
+                DoseQuickView(slot: slot)
+                    .environmentObject(session)
+            }
         }
     }
 
@@ -86,7 +93,22 @@ struct WatchHomeView: View {
         return text == "—" ? "오늘" : "오늘 \(text)"
     }
 
+    /// 아직 답하지 않은 시간대는 눌러서 바로 기록한다. 끝난 줄은 그냥 정보다 —
+    /// 되돌리기는 실수하기 쉬운 작은 화면 대신 아이폰이 맡는다.
+    @ViewBuilder
     private func slotRow(_ slot: WatchSnapshot.SlotLine) -> some View {
+        if slot.isCompleted {
+            slotRowBody(slot)
+        } else {
+            Button {
+                openSlot = slot
+            } label: {
+                slotRowBody(slot)
+            }
+        }
+    }
+
+    private func slotRowBody(_ slot: WatchSnapshot.SlotLine) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(slot.labelKo)

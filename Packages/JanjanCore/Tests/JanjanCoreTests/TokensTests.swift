@@ -78,6 +78,17 @@ final class TokensTests: XCTestCase {
         XCTAssertTrue(restored.isPro)
     }
 
+    func testSlotLineWithoutIDsStillDecodes() throws {
+        // 약 ID 키가 없던 시절의 줄. 화면은 그려지고, 기록만 못 보낸다.
+        let legacy = Data("""
+        {"slotKey":"morning","labelKo":"아침","timeText":"08:00",\
+        "medicationNames":["에스시탈로프람"],"isCompleted":false}
+        """.utf8)
+        let line = try JSONDecoder().decode(WatchSnapshot.SlotLine.self, from: legacy)
+        XCTAssertEqual(line.medicationIDs, [])
+        XCTAssertEqual(line.medicationNames, ["에스시탈로프람"])
+    }
+
     func testHexParsing() {
         let ink = JanjanRGB(hex: "#1C1C1B")
         XCTAssertNotNil(ink)
