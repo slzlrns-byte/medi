@@ -77,10 +77,12 @@ final class TokensTests: XCTestCase {
 
     func testBundledFontFileNamesMatchPostScriptNames() {
         // UIAppFonts(project.yml)에 적은 파일명과 코드가 부르는 이름이 짝을 이뤄야 한다.
-        XCTAssertEqual(JanjanFontName.bundledFiles.count, 6)
+        XCTAssertEqual(JanjanFontName.bundledFiles.count, 11)
         XCTAssertTrue(JanjanFontName.bundledFiles.contains("\(JanjanFontName.displayLight).otf"))
         XCTAssertTrue(JanjanFontName.bundledFiles.contains("\(JanjanFontName.bodyRegular).otf"))
-        XCTAssertTrue(JanjanFontName.bundledFiles.allSatisfy { $0.hasSuffix(".otf") })
+        XCTAssertTrue(JanjanFontName.bundledFiles.contains("\(JanjanFontName.plexRegular).ttf"))
+        XCTAssertTrue(JanjanFontName.bundledFiles.contains("\(JanjanFontName.gowunRegular).ttf"))
+        XCTAssertTrue(JanjanFontName.bundledFiles.allSatisfy { $0.hasSuffix(".otf") || $0.hasSuffix(".ttf") })
     }
 
     func testSlotStorageKeysRoundTrip() {
