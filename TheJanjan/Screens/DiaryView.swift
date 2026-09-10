@@ -48,6 +48,7 @@ struct DiaryView: View {
 
                     if let record = todayRecord {
                         noteCard(record)
+                        lifestyleCard(record)
                         expandButton
                         if isExpanded {
                             emotionWordCard(record)
@@ -133,6 +134,34 @@ struct DiaryView: View {
                         RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
                             .fill(Color.janjan(.surface2))
                     )
+            }
+        }
+    }
+
+    /// 술·담배 원탭 (사용자 결정 2026-09-10). 2층의 활동 칩과 같은 저장소를 쓴다 —
+    /// 어느 쪽에서 누르든 한 곳(activities)에 적힌다. 여기 따로 둔 이유는
+    /// 약과 영향을 주고받아 진료 때 자주 묻는 항목이라, 2층을 펼치지 않은
+    /// 날에도 손이 닿아야 해서다.
+    private func lifestyleCard(_ record: CheckInRecord) -> some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    TogglePill(
+                        text: "술 마셨어요",
+                        isOn: record.activities.contains(ActivityTag.alcoholID)
+                    ) {
+                        toggleActivity(ActivityTag.alcoholID, in: record)
+                    }
+                    TogglePill(
+                        text: "담배 피웠어요",
+                        isOn: record.activities.contains(ActivityTag.smokingID)
+                    ) {
+                        toggleActivity(ActivityTag.smokingID, in: record)
+                    }
+                }
+                Text("진료 때 자주 묻는 항목이라 리포트에 함께 실려요.")
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
             }
         }
     }

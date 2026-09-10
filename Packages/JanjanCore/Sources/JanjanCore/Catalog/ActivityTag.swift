@@ -17,6 +17,11 @@ public struct ActivityTag: Identifiable, Hashable, Sendable {
         self.nameKo = nameKo
     }
 
+    /// 리포트가 일수를 세는 두 태그. 의사가 진료 때 실제로 묻는 항목이라
+    /// 활동 칩 중 이 둘만 요약에 실린다 — 세기만 하고 평가하지 않는 것은 같다.
+    public static let alcoholID = "alcohol"
+    public static let smokingID = "smoking"
+
     public static let presets: [ActivityTag] = [
         ActivityTag(id: "outdoors", nameKo: "외출"),
         ActivityTag(id: "exercise", nameKo: "운동"),

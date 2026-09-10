@@ -122,6 +122,7 @@ public enum ReportComposer {
             calendar: calendar
         ))
         lines.append(contentsOf: dreamLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
+        lines.append(contentsOf: lifestyleLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
         lines.append(contentsOf: noteLines(
             notes: medicationNotes,
             medications: medications,
@@ -332,6 +333,41 @@ public enum ReportComposer {
             ))
         }
         return lines
+    }
+
+    /// 술·담배 (사용자 결정 2026-09-10). 약과 영향을 주고받을 수 있어 의사가
+    /// 진료 때 실제로 묻는 항목이라, 활동 칩 중 이 둘만 일수로 센다.
+    /// 세기만 한다 — 줄였다·늘었다·괜찮다 같은 말은 만들지 않는다.
+    private static func lifestyleLines(
+        checkIns: [CheckIn],
+        from start: Date,
+        to end: Date,
+        calendar: Calendar
+    ) -> [ReportContent.Line] {
+
+        let inWindow = checkIns.filter { $0.date >= start && $0.date <= end }
+
+        func days(withTag id: String) -> Int {
+            Set(
+                inWindow
+                    .filter { $0.activities.contains(id) }
+                    .map { calendar.startOfDay(for: $0.date) }
+            ).count
+        }
+
+        let alcohol = days(withTag: ActivityTag.alcoholID)
+        let smoking = days(withTag: ActivityTag.smokingID)
+
+        var parts: [String] = []
+        if alcohol > 0 { parts.append("술 마신 날 \(alcohol)일") }
+        if smoking > 0 { parts.append("담배 피운 날 \(smoking)일") }
+        // 하나도 없으면 구역 자체를 만들지 않는다. "0일" 은 빈 칸 재촉이 된다.
+        guard !parts.isEmpty else { return [] }
+
+        return [
+            .init(style: .heading, text: "생활"),
+            .init(style: .body, text: parts.joined(separator: " · "))
+        ]
     }
 
     /// 진료에서 들은 것과 실제 기록을 나란히 놓는다.

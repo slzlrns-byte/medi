@@ -172,6 +172,26 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertTrue(texts(report).contains("8월 14일 · 쫓기는 꿈"))
     }
 
+    // MARK: - 생활
+
+    func testLifestyleCountsAlcoholAndSmokingDays() {
+        let checkIns = [
+            CheckIn(date: Fixed.date(2026, 8, 14), mood: .init(0), activities: ["alcohol"]),
+            CheckIn(date: Fixed.date(2026, 8, 15), mood: .init(0), activities: ["alcohol", "smoking"]),
+            CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0), activities: ["work"])
+        ]
+        let report = content(checkIns: checkIns)
+        XCTAssertTrue(texts(report).contains("술 마신 날 2일 · 담배 피운 날 1일"))
+    }
+
+    func testNoLifestyleSectionWithoutAlcoholOrSmoking() {
+        // "0일" 은 빈 칸 재촉이다. 둘 다 없으면 구역 자체가 없어야 한다.
+        let report = content(checkIns: [
+            CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0), activities: ["work"])
+        ])
+        XCTAssertFalse(texts(report).contains("생활"))
+    }
+
     func testNoDreamsMeansNoDreamSection() {
         // "꿈: 없음" 은 빈 칸 재촉이다. 구역 자체가 없어야 한다.
         let report = content(checkIns: [CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0))])

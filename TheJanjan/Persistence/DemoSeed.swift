@@ -72,7 +72,8 @@ enum DemoSeed {
                     sleepMinutes: 6 * 60,
                     dreamed: true,
                     dreamVividness: 2,
-                    activities: ["outdoors", "caffeine"],
+                    // 술 칩이 켜진 모습도 화면 찍기에 보이게 한다.
+                    activities: ["outdoors", "caffeine", "alcohol"],
                     note: notes.indices.contains(offset) ? notes[offset] : nil,
                     updatedAt: day
                 )
