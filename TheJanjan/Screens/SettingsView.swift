@@ -28,6 +28,7 @@ struct SettingsView: View {
     @State private var isShowingLicenses = false
 
     @AppStorage(JanjanFontChoice.defaultsKey) private var fontChoiceRaw = JanjanFontChoice.standard.rawValue
+    @AppStorage(JanjanTheme.defaultsKey) private var themeRaw = JanjanTheme.standard.rawValue
 
     var body: some View {
         NavigationStack {
@@ -127,6 +128,15 @@ struct SettingsView: View {
 
     private var fontSection: some View {
         Section {
+            Picker("테마", selection: $themeRaw) {
+                ForEach(JanjanTheme.allCases, id: \.rawValue) { theme in
+                    Text(theme.labelKo).tag(theme.rawValue)
+                }
+            }
+            .onChange(of: themeRaw) { _, _ in
+                // 워치의 기분 원도 같은 색을 쓰게 새 스냅샷을 민다.
+                AppServices.shared.pushWatchSnapshot()
+            }
             Picker("서체", selection: $fontChoiceRaw) {
                 ForEach(JanjanFontChoice.allCases, id: \.rawValue) { choice in
                     Text(choice.labelKo).tag(choice.rawValue)
@@ -135,8 +145,14 @@ struct SettingsView: View {
         } header: {
             Text("화면")
         } footer: {
-            Text(JanjanFontChoice(rawValue: fontChoiceRaw)?.detailKo ?? "")
+            Text(footerForScreenSection)
         }
+    }
+
+    private var footerForScreenSection: String {
+        let theme = JanjanTheme(rawValue: themeRaw) ?? .standard
+        let font = JanjanFontChoice(rawValue: fontChoiceRaw)?.detailKo ?? ""
+        return "\(theme.detailKo)\n\(font)"
     }
 
     private var notificationsSection: some View {

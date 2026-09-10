@@ -123,9 +123,11 @@ final class AppLayerTests: XCTestCase {
     // MARK: - 디자인 토큰이 UIColor 로 살아 나오는지
 
     func testEveryTokenBecomesAUIColor() {
-        for token in JanjanColor.allCases {
-            XCTAssertNotNil(UIColor(janjanHex: token.lightHex), "\(token) 라이트")
-            XCTAssertNotNil(UIColor(janjanHex: token.darkHex), "\(token) 다크")
+        for theme in JanjanTheme.allCases {
+            for token in JanjanColor.allCases {
+                XCTAssertNotNil(UIColor(janjanHex: token.lightHex(theme)), "\(theme) \(token) 라이트")
+                XCTAssertNotNil(UIColor(janjanHex: token.darkHex(theme)), "\(theme) \(token) 다크")
+            }
         }
         XCTAssertNil(UIColor(janjanHex: "not-a-color"))
     }

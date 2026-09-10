@@ -6,9 +6,12 @@ struct RootTabView: View {
 
     @State private var selection: Tab = .today
     @State private var isShowingSettings = false
-    /// 서체 선택. 값이 바뀌면 각 탭의 내용을 id 로 갈아 끼워 새 서체로 다시 그린다.
+    /// 서체·테마 선택. 값이 바뀌면 각 탭의 내용을 id 로 갈아 끼워 새 값으로 다시 그린다.
     /// TabView 자체에 id 를 걸면 열려 있는 설정 시트까지 닫혀 버려서 내용에만 건다.
     @AppStorage(JanjanFontChoice.defaultsKey) private var fontChoiceRaw = JanjanFontChoice.standard.rawValue
+    @AppStorage(JanjanTheme.defaultsKey) private var themeRaw = JanjanTheme.standard.rawValue
+
+    private var redrawKey: String { "\(fontChoiceRaw)-\(themeRaw)" }
 
     enum Tab: Hashable {
         case today
@@ -20,22 +23,22 @@ struct RootTabView: View {
     var body: some View {
         TabView(selection: $selection) {
             TodayView(isShowingSettings: $isShowingSettings)
-                .id(fontChoiceRaw)
+                .id(redrawKey)
                 .tabItem { Label("오늘", systemImage: "sun.horizon") }
                 .tag(Tab.today)
 
             MedicationsView()
-                .id(fontChoiceRaw)
+                .id(redrawKey)
                 .tabItem { Label("약", systemImage: "pills") }
                 .tag(Tab.medications)
 
             DiaryView()
-                .id(fontChoiceRaw)
+                .id(redrawKey)
                 .tabItem { Label("기록", systemImage: "book.closed") }
                 .tag(Tab.diary)
 
             ReportView()
-                .id(fontChoiceRaw)
+                .id(redrawKey)
                 .tabItem { Label("리포트", systemImage: "chart.bar") }
                 .tag(Tab.report)
         }

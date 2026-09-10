@@ -48,23 +48,31 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     /// 워치에 StoreKit 을 올리지 않는 이유는 이 앱의 원칙 그대로다 —
     /// 워치는 아무것도 계산하지 않고 받은 그림만 그린다.
     public let isPro: Bool
+    /// 폰에서 고른 테마. 워치의 기분 원이 폰과 같은 색을 쓰기 위한 값이다.
+    public let themeRaw: String
+
+    public var theme: JanjanTheme {
+        JanjanTheme(rawValue: themeRaw) ?? .standard
+    }
 
     public init(
         generatedAt: Date = Date(),
         dateText: String,
         slots: [SlotLine],
         remainingCountToday: Int,
-        isPro: Bool = true
+        isPro: Bool = true,
+        themeRaw: String = JanjanTheme.standard.rawValue
     ) {
         self.generatedAt = generatedAt
         self.dateText = dateText
         self.slots = slots
         self.remainingCountToday = remainingCountToday
         self.isPro = isPro
+        self.themeRaw = themeRaw
     }
 
     private enum CodingKeys: String, CodingKey {
-        case generatedAt, dateText, slots, remainingCountToday, isPro
+        case generatedAt, dateText, slots, remainingCountToday, isPro, themeRaw
     }
 
     /// 키가 없던 시절의 스냅샷이 남아 있어도 되살아나게 한다.
@@ -76,6 +84,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         slots = try container.decode([SlotLine].self, forKey: .slots)
         remainingCountToday = try container.decode(Int.self, forKey: .remainingCountToday)
         isPro = try container.decodeIfPresent(Bool.self, forKey: .isPro) ?? true
+        themeRaw = try container.decodeIfPresent(String.self, forKey: .themeRaw)
+            ?? JanjanTheme.standard.rawValue
     }
 
     public static let placeholder = WatchSnapshot(
@@ -85,13 +95,18 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     )
 
     /// 구독하지 않은 사용자의 워치에 보내는 그림. 오늘 일정은 담기지 않는다.
-    public static func locked(dateText: String, generatedAt: Date = Date()) -> WatchSnapshot {
+    public static func locked(
+        dateText: String,
+        generatedAt: Date = Date(),
+        themeRaw: String = JanjanTheme.standard.rawValue
+    ) -> WatchSnapshot {
         WatchSnapshot(
             generatedAt: generatedAt,
             dateText: dateText,
             slots: [],
             remainingCountToday: 0,
-            isPro: false
+            isPro: false,
+            themeRaw: themeRaw
         )
     }
 }

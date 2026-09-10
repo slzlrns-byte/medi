@@ -4,29 +4,78 @@ import XCTest
 /// design/tokens.json 과 Tokens.swift 가 어긋나지 않도록 지키는 최소한의 그물.
 final class TokensTests: XCTestCase {
 
-    func testEveryColorHasParsableLightAndDarkHex() {
-        for token in JanjanColor.allCases {
-            XCTAssertNotNil(JanjanRGB(hex: token.lightHex), "라이트 값 파싱 실패: \(token)")
-            XCTAssertNotNil(JanjanRGB(hex: token.darkHex), "다크 값 파싱 실패: \(token)")
-            XCTAssertNotEqual(token.lightHex, token.darkHex, "\(token) 은 라이트/다크가 같으면 안 된다")
+    func testEveryColorHasParsableLightAndDarkHexInEveryTheme() {
+        for theme in JanjanTheme.allCases {
+            for token in JanjanColor.allCases {
+                XCTAssertNotNil(
+                    JanjanRGB(hex: token.lightHex(theme)),
+                    "라이트 값 파싱 실패: \(theme) \(token)"
+                )
+                XCTAssertNotNil(
+                    JanjanRGB(hex: token.darkHex(theme)),
+                    "다크 값 파싱 실패: \(theme) \(token)"
+                )
+                XCTAssertNotEqual(
+                    token.lightHex(theme), token.darkHex(theme),
+                    "\(theme) \(token) 은 라이트/다크가 같으면 안 된다"
+                )
+            }
         }
         XCTAssertEqual(JanjanColor.allCases.count, 23)
+        XCTAssertEqual(JanjanTheme.allCases.count, 3)
     }
 
     func testCoreBrandColorsMatchTheDesignDocument() {
-        XCTAssertEqual(JanjanColor.fog.lightHex, "#F2F2F0")
-        XCTAssertEqual(JanjanColor.sage.lightHex, "#CBDAD5")
-        XCTAssertEqual(JanjanColor.lav.lightHex, "#DDD9F2")
-        XCTAssertEqual(JanjanColor.butter.lightHex, "#F1EEA9")
-        XCTAssertEqual(JanjanColor.peach.lightHex, "#F4E1D6")
-        XCTAssertEqual(JanjanColor.ink.lightHex, "#1C1C1B")
+        // 바탕·글자·선은 모노톤이라 테마와 무관하다 (2026-09-10 결정).
+        for theme in JanjanTheme.allCases {
+            XCTAssertEqual(JanjanColor.fog.lightHex(theme), "#F7F7F6")
+            XCTAssertEqual(JanjanColor.ink.lightHex(theme), "#1A1A19")
+            XCTAssertEqual(JanjanColor.fog.darkHex(theme), "#161716")
+            XCTAssertEqual(JanjanColor.surface.darkHex(theme), "#1F201E")
+        }
 
-        XCTAssertEqual(JanjanColor.fog.darkHex, "#161716")
-        XCTAssertEqual(JanjanColor.surface.darkHex, "#1F201E")
+        // 테마 색 표본 하나씩 — 표 전체를 다시 적지 않고 어긋남만 잡는다.
+        XCTAssertEqual(JanjanColor.sage.lightHex(.sprout), "#D5E4C9")
+        XCTAssertEqual(JanjanColor.butter.lightHex(.sunset), "#FFE8CD")
+        XCTAssertEqual(JanjanColor.mood7.lightHex(.sky), "#4E97D1")
+        XCTAssertEqual(JanjanColor.mood1.lightHex(.sky), "#A183C2")
+
+        // 테마를 모르는 곳의 기본은 풋사과 크림이고, 기본 인자가 그 값을 쓴다.
+        XCTAssertEqual(JanjanTheme.standard, .sprout)
+        XCTAssertEqual(JanjanColor.mood7.lightHex(), JanjanColor.mood7.lightHex(.sprout))
 
         // tokens.json 은 바탕을 `paper` 라고 부른다.
         XCTAssertEqual(JanjanColor.fog.tokenKey, "paper")
         XCTAssertEqual(JanjanColor.sageInk.tokenKey, "sage-ink")
+    }
+
+    func testThemeLabelsAndStorageRoundTrip() {
+        for theme in JanjanTheme.allCases {
+            XCTAssertEqual(JanjanTheme(rawValue: theme.rawValue), theme)
+            XCTAssertFalse(theme.labelKo.isEmpty)
+            XCTAssertFalse(theme.detailKo.isEmpty)
+        }
+        // 저장된 값이 이상해도 조용히 기본으로 돌아간다.
+        XCTAssertNil(JanjanTheme(rawValue: "없는테마"))
+    }
+
+    func testWatchSnapshotCarriesTheTheme() throws {
+        let snapshot = WatchSnapshot(
+            dateText: "9/10",
+            slots: [],
+            remainingCountToday: 0,
+            themeRaw: JanjanTheme.sky.rawValue
+        )
+        XCTAssertEqual(snapshot.theme, .sky)
+
+        // 테마 키가 없던 옛 스냅샷도 기본 테마로 되살아난다.
+        // 워치에 마지막으로 건너간 그림은 앱을 지우기 전까지 남아 있기 때문이다.
+        let legacy = Data("""
+        {"generatedAt":0,"dateText":"9/10","slots":[],"remainingCountToday":0}
+        """.utf8)
+        let restored = try JSONDecoder().decode(WatchSnapshot.self, from: legacy)
+        XCTAssertEqual(restored.theme, .standard)
+        XCTAssertTrue(restored.isPro)
     }
 
     func testHexParsing() {

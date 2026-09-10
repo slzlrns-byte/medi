@@ -1,6 +1,6 @@
 import Foundation
 
-// design/tokens.json (v0.6.0) 을 Swift 로 옮긴 것.
+// design/tokens.json (v0.7.0) 을 Swift 로 옮긴 것.
 //
 // SwiftUI 를 import 하지 않는다. 순수 값이라 macOS 러너에서 그대로 테스트할 수 있고,
 // 앱 계층에서 Color / UIColor 로 감싸 쓴다.
@@ -10,6 +10,38 @@ import Foundation
 public enum JanjanColorScheme: String, Sendable, CaseIterable {
     case light
     case dark
+}
+
+/// 화면의 옷. 셋 중 하나를 설정에서 고른다 (2026-09-10 결정).
+///
+/// 바탕·카드·글자·선은 세 테마가 똑같이 무채색이다 — 색이 있는 곳은 시간대
+/// 타일, 기분 원, 막대 같은 디자인 요소뿐이라, 테마의 차이는 포인트 색뿐이다.
+public enum JanjanTheme: String, Sendable, CaseIterable {
+    /// 맑은 하늘 — 파랑. 기분은 흐린 보라(힘듦)에서 맑은 파랑(좋음)으로.
+    case sky
+    /// 풋사과 크림 — 초록. 기존 물결(보라→초록)의 결을 잇는다.
+    case sprout
+    /// 복숭아 노을 — 살구. 기분은 노을 보라에서 살구빛으로.
+    case sunset
+
+    /// 선택을 모르는 곳(워치 기본값·테스트)이 쓰는 값.
+    public static let standard: JanjanTheme = .sprout
+
+    public var labelKo: String {
+        switch self {
+        case .sky: return "맑은 하늘"
+        case .sprout: return "풋사과 크림"
+        case .sunset: return "복숭아 노을"
+        }
+    }
+
+    public var detailKo: String {
+        switch self {
+        case .sky: return "기분이 흐린 보라에서 맑은 파랑으로 흘러요."
+        case .sprout: return "기분이 보라에서 풋사과 초록으로 흘러요."
+        case .sunset: return "기분이 노을 보라에서 살구빛으로 흘러요."
+        }
+    }
 }
 
 /// 팔레트 토큰. 진한 색은 글자·점·검은 버튼뿐이고 면은 전부 파스텔이거나 흰색이다.
@@ -78,35 +110,112 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         }
     }
 
-    public var lightHex: String {
+    /// 라이트 값. 무채색은 테마와 무관하고, 색은 테마마다 다르다.
+    public func lightHex(_ theme: JanjanTheme = .standard) -> String {
         switch self {
-        case .fog: return "#F2F2F0"
+        case .fog: return "#F7F7F6"
         case .surface: return "#FFFFFF"
-        case .surface2: return "#E9EAE7"
-        case .ink: return "#1C1C1B"
-        case .ink2: return "#4E4F4B"
+        case .surface2: return "#EEEEEC"
+        case .ink: return "#1A1A19"
+        case .ink2: return "#4A4B48"
         case .muted: return "#8B8C87"
-        case .line: return "#E4E5E1"
-        case .line2: return "#D2D3CF"
-        case .sage: return "#CBDAD5"
-        case .sageInk: return "#3E5F58"
-        case .lav: return "#DDD9F2"
-        case .lavInk: return "#4F4A7A"
-        case .butter: return "#F1EEA9"
-        case .butterInk: return "#6E6A1E"
-        case .peach: return "#F4E1D6"
-        case .peachInk: return "#8A5A45"
-        case .mood1: return "#A29BCB"
-        case .mood2: return "#B9B4D9"
-        case .mood3: return "#D0CDE3"
-        case .mood4: return "#DADAD6"
-        case .mood5: return "#C4D8D0"
-        case .mood6: return "#A6C7BB"
-        case .mood7: return "#7FAF9F"
+        case .line: return "#E6E6E4"
+        case .line2: return "#D4D4D1"
+        case .sage:
+            switch theme {
+            case .sky: return "#C9DCE4"
+            case .sprout: return "#D5E4C9"
+            case .sunset: return "#EFD9C2"
+            }
+        case .sageInk:
+            switch theme {
+            case .sky: return "#2F5B66"
+            case .sprout: return "#55703F"
+            case .sunset: return "#8A6238"
+            }
+        case .lav:
+            switch theme {
+            case .sky: return "#C5D3EC"
+            case .sprout: return "#DCEAE0"
+            case .sunset: return "#E8DBEF"
+            }
+        case .lavInk:
+            switch theme {
+            case .sky: return "#2F4A72"
+            case .sprout: return "#4F7259"
+            case .sunset: return "#5F4B82"
+            }
+        case .butter:
+            switch theme {
+            case .sky: return "#DBE2EF"
+            case .sprout: return "#F7ECD9"
+            case .sunset: return "#FFE8CD"
+            }
+        case .butterInk:
+            switch theme {
+            case .sky: return "#33587E"
+            case .sprout: return "#8A6A2F"
+            case .sunset: return "#9A6B2A"
+            }
+        case .peach:
+            switch theme {
+            case .sky: return "#E8E2DA"
+            case .sprout: return "#F1E4DC"
+            case .sunset: return "#F5DCD3"
+            }
+        case .peachInk:
+            switch theme {
+            case .sky: return "#6E6254"
+            case .sprout: return "#8A5A45"
+            case .sunset: return "#8A5A45"
+            }
+        case .mood1:
+            switch theme {
+            case .sky: return "#A183C2"
+            case .sprout: return "#C0AECB"
+            case .sunset: return "#B9A0C9"
+            }
+        case .mood2:
+            switch theme {
+            case .sky: return "#BBA4CE"
+            case .sprout: return "#D2C5DA"
+            case .sunset: return "#CDB8D8"
+            }
+        case .mood3:
+            switch theme {
+            case .sky: return "#D4C8DE"
+            case .sprout: return "#E2DCD2"
+            case .sunset: return "#E4D8E3"
+            }
+        case .mood4:
+            switch theme {
+            case .sky: return "#E3E4E6"
+            case .sprout: return "#E9E8E3"
+            case .sunset: return "#EDEAE4"
+            }
+        case .mood5:
+            switch theme {
+            case .sky: return "#BCD7E8"
+            case .sprout: return "#D5E4C9"
+            case .sunset: return "#F4D9BF"
+            }
+        case .mood6:
+            switch theme {
+            case .sky: return "#8FBEDF"
+            case .sprout: return "#B7D2A2"
+            case .sunset: return "#EFC29B"
+            }
+        case .mood7:
+            switch theme {
+            case .sky: return "#4E97D1"
+            case .sprout: return "#8FB877"
+            case .sunset: return "#E3A272"
+            }
         }
     }
 
-    public var darkHex: String {
+    /// 다크 값. 무채색은 기존 다크 그대로, 색은 테마마다 어두운 판을 따로 만들었다.
+    public func darkHex(_ theme: JanjanTheme = .standard) -> String {
         switch self {
         case .fog: return "#161716"
         case .surface: return "#1F201E"
@@ -116,32 +225,102 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .muted: return "#8E8F8A"
         case .line: return "#2E2F2C"
         case .line2: return "#3B3C39"
-        case .sage: return "#2C3B37"
-        case .sageInk: return "#A9CFC3"
-        case .lav: return "#2E2B45"
-        case .lavInk: return "#C4BDEF"
-        case .butter: return "#3A3820"
-        case .butterInk: return "#E4DF8C"
-        case .peach: return "#3E2E27"
-        case .peachInk: return "#E8B9A3"
-        case .mood1: return "#6F68A0"
-        case .mood2: return "#7F79AA"
-        case .mood3: return "#8F8BAE"
+        case .sage:
+            switch theme {
+            case .sky: return "#21333B"
+            case .sprout: return "#2A3524"
+            case .sunset: return "#3B3222"
+            }
+        case .sageInk:
+            switch theme {
+            case .sky: return "#9CC6D8"
+            case .sprout: return "#B4D19E"
+            case .sunset: return "#E0C9A0"
+            }
+        case .lav:
+            switch theme {
+            case .sky: return "#232C41"
+            case .sprout: return "#24332A"
+            case .sunset: return "#322B41"
+            }
+        case .lavInk:
+            switch theme {
+            case .sky: return "#B4C8EE"
+            case .sprout: return "#A8CBB4"
+            case .sunset: return "#C4B0E0"
+            }
+        case .butter:
+            switch theme {
+            case .sky: return "#26313F"
+            case .sprout: return "#362E1E"
+            case .sunset: return "#3B2F1E"
+            }
+        case .butterInk:
+            switch theme {
+            case .sky: return "#A8C4E8"
+            case .sprout: return "#E0C48C"
+            case .sunset: return "#E8C48C"
+            }
+        case .peach:
+            switch theme {
+            case .sky: return "#33302B"
+            case .sprout: return "#382E28"
+            case .sunset: return "#3B2B24"
+            }
+        case .peachInk:
+            switch theme {
+            case .sky: return "#CBC0AE"
+            case .sprout: return "#E0B9A3"
+            case .sunset: return "#E8B49B"
+            }
+        case .mood1:
+            switch theme {
+            case .sky: return "#8A6BB0"
+            case .sprout: return "#937FA8"
+            case .sunset: return "#8E77A4"
+            }
+        case .mood2:
+            switch theme {
+            case .sky: return "#9A82BC"
+            case .sprout: return "#A392B6"
+            case .sunset: return "#9E88B2"
+            }
+        case .mood3:
+            switch theme {
+            case .sky: return "#9C93AE"
+            case .sprout: return "#999489"
+            case .sunset: return "#968A92"
+            }
         case .mood4: return "#8E8F8A"
-        case .mood5: return "#7E9C90"
-        case .mood6: return "#79AC96"
-        case .mood7: return "#7FBBA3"
+        case .mood5:
+            switch theme {
+            case .sky: return "#6E93B0"
+            case .sprout: return "#83A26E"
+            case .sunset: return "#AA8A5C"
+            }
+        case .mood6:
+            switch theme {
+            case .sky: return "#5A94C4"
+            case .sprout: return "#74A85A"
+            case .sunset: return "#B28352"
+            }
+        case .mood7:
+            switch theme {
+            case .sky: return "#4A88C8"
+            case .sprout: return "#62984B"
+            case .sunset: return "#BA7846"
+            }
         }
     }
 
-    public func hex(for scheme: JanjanColorScheme) -> String {
-        scheme == .dark ? darkHex : lightHex
+    public func hex(for scheme: JanjanColorScheme, theme: JanjanTheme = .standard) -> String {
+        scheme == .dark ? darkHex(theme) : lightHex(theme)
     }
 
-    public func rgb(for scheme: JanjanColorScheme) -> JanjanRGB {
+    public func rgb(for scheme: JanjanColorScheme, theme: JanjanTheme = .standard) -> JanjanRGB {
         // 위의 값은 전부 손으로 확인한 6자리 hex 라 파싱이 실패할 수 없지만,
         // 그래도 강제 언래핑은 쓰지 않는다.
-        JanjanRGB(hex: hex(for: scheme)) ?? JanjanRGB(red: 0, green: 0, blue: 0)
+        JanjanRGB(hex: hex(for: scheme, theme: theme)) ?? JanjanRGB(red: 0, green: 0, blue: 0)
     }
 }
 

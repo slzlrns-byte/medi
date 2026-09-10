@@ -5,6 +5,17 @@ import JanjanCore
 // JanjanCore 의 순수 토큰을 SwiftUI Color 로 감싼다.
 // 다크 모드는 UIColor 의 동적 제공자로 처리해서, 뷰마다 colorScheme 를 읽지 않아도 된다.
 
+extension JanjanTheme {
+
+    /// 설정의 테마 선택. 서체(JanjanFontChoice)와 같은 방식으로 UserDefaults 에 둔다 —
+    /// 기기별 화면 취향이라 CloudKit 으로 따라다닐 필요가 없다.
+    static let defaultsKey = "janjan.theme"
+
+    static var current: JanjanTheme {
+        JanjanTheme(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .standard
+    }
+}
+
 extension UIColor {
 
     /// "#RRGGBB" 로부터. 형식이 어긋나면 nil — 강제 언래핑하지 않는다.
@@ -18,10 +29,12 @@ extension UIColor {
         )
     }
 
-    /// 라이트/다크를 함께 들고 있는 동적 색.
+    /// 라이트/다크를 함께 들고 있는 동적 색. 지금 고른 테마를 읽는다 —
+    /// 테마가 바뀌면 RootTabView 가 .id 로 화면을 다시 그려 새 값을 가져간다.
     static func janjan(_ token: JanjanColor) -> UIColor {
         UIColor { traits in
-            let hex = traits.userInterfaceStyle == .dark ? token.darkHex : token.lightHex
+            let scheme: JanjanColorScheme = traits.userInterfaceStyle == .dark ? .dark : .light
+            let hex = token.hex(for: scheme, theme: JanjanTheme.current)
             return UIColor(janjanHex: hex) ?? UIColor.label
         }
     }

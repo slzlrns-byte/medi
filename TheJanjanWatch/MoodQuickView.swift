@@ -40,8 +40,10 @@ struct MoodQuickView: View {
     }
 
     /// 워치는 시스템 서체·시스템 색을 쓰지만 기분 색만은 폰과 같아야 한다.
+    /// 테마도 폰이 스냅샷에 실어 보낸 것을 그대로 따른다.
     private func color(for score: Int) -> Color {
-        let rgb = JanjanMood.color(forScore: score).rgb(for: .dark)
+        let rgb = JanjanMood.color(forScore: score)
+            .rgb(for: .dark, theme: session.snapshot.theme)
         return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
     }
 }

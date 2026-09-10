@@ -306,13 +306,18 @@ public enum DayPlan {
         doseEvents: [DoseEvent],
         calendar: Calendar = .current,
         generatedAt: Date = Date(),
-        isPro: Bool = true
+        isPro: Bool = true,
+        themeRaw: String = JanjanTheme.standard.rawValue
     ) -> WatchSnapshot {
 
         // 구독하지 않았으면 오늘 일정을 담지 않는다. 워치 앱 전체가 Pro 이므로
         // "잠긴 기능이 반쯤 동작하는" 경로를 여기서도 만들지 않는다.
         guard isPro else {
-            return .locked(dateText: shortDateText(for: day), generatedAt: generatedAt)
+            return .locked(
+                dateText: shortDateText(for: day),
+                generatedAt: generatedAt,
+                themeRaw: themeRaw
+            )
         }
 
         let lines = slots(
@@ -336,7 +341,8 @@ public enum DayPlan {
                     isCompleted: line.isCompleted
                 )
             },
-            remainingCountToday: pendingCount(in: lines)
+            remainingCountToday: pendingCount(in: lines),
+            themeRaw: themeRaw
         )
     }
 
