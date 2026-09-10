@@ -211,6 +211,42 @@ final class InventoryCalculatorTests: XCTestCase {
         )
     }
 
+    // MARK: - 복약률의 기기 간 중복
+
+    func testAdherenceCollapsesDuplicateEventsAcrossDevices() {
+        // 워치와 폰이 오프라인에서 같은 시간대를 서로 다르게 적은 뒤 동기화됐다.
+        // remaining() 과 같은 규칙: 가장 나중 것 하나만 세야 한다.
+        let earlier = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 8, 16, 8),
+            actualAt: Fixed.date(2026, 8, 16, 8, 5),
+            status: .skipped,
+            slotKey: "morning"
+        )
+        let later = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 8, 16, 8),
+            actualAt: Fixed.date(2026, 8, 16, 9, 0),
+            status: .taken,
+            slotKey: "morning"
+        )
+        let otherDay = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 8, 17, 8),
+            actualAt: Fixed.date(2026, 8, 17, 8, 5),
+            status: .taken,
+            slotKey: "morning"
+        )
+
+        let rate = InventoryCalculator.adherenceRate(
+            doseEvents: [earlier, later, otherDay],
+            from: Fixed.date(2026, 8, 10),
+            to: Fixed.date(2026, 8, 18)
+        )
+        // 중복을 안 묶으면 2/3(66%)가 나온다. 묶으면 2/2 = 100%.
+        XCTAssertEqual(rate, 1)
+    }
+
     // MARK: - 받아 온 개수
 
     func testLastRefillQuantityPicksTheMostRecentRefill() {

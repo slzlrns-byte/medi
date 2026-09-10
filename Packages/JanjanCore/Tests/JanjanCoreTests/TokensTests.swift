@@ -78,6 +78,30 @@ final class TokensTests: XCTestCase {
         XCTAssertTrue(restored.isPro)
     }
 
+    func testPlaceholderStartsLocked() {
+        // 폰이 아직 아무것도 안 보냈으면 잠긴 상태다. 기본이 열림이면
+        // 무료 사용자의 첫 화면에 Pro 버튼이 보이고, 그 기록은 폰이 버린다.
+        XCTAssertFalse(WatchSnapshot.placeholder.isPro)
+    }
+
+    func testSameDayCheckInsCollapseToTheLatestEdit() {
+        let day = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let older = CheckIn(
+            date: day, mood: .init(-1), dreamed: true,
+            updatedAt: day.addingTimeInterval(60)
+        )
+        let newer = CheckIn(
+            date: day.addingTimeInterval(3600), mood: .init(2),
+            updatedAt: day.addingTimeInterval(7200)
+        )
+        let otherDay = CheckIn(date: day.addingTimeInterval(86_400 * 3), mood: .init(0))
+
+        let collapsed = CheckIn.collapsedByDay([newer, older, otherDay])
+        XCTAssertEqual(collapsed.count, 2)
+        // 같은 날은 나중에 손댄 쪽만 남는다.
+        XCTAssertEqual(collapsed.first?.id, newer.id)
+    }
+
     func testSlotLineWithoutIDsStillDecodes() throws {
         // 약 ID 키가 없던 시절의 줄. 화면은 그려지고, 기록만 못 보낸다.
         let legacy = Data("""

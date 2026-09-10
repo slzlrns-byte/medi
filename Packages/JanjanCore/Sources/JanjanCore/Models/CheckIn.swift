@@ -116,6 +116,30 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         self.updatedAt = updatedAt
     }
 
+    /// 같은 날의 체크인이 여러 줄이면 가장 나중에 손댄 것만 남긴다.
+    ///
+    /// 하루 1개는 CheckInRecorder 가 지키지만, 오프라인 두 기기가 각자 적은 뒤
+    /// iCloud 로 만나면 같은 날 두 줄이 생길 수 있다. 리포트가 그대로 세면
+    /// "꿈을 기록한 날" 같은 일수가 부풀어 거짓말이 된다(QA 2026-09-10).
+    /// MonthWave 와 같은 규칙: updatedAt 이 나중인 쪽, 같으면 id 가 큰 쪽.
+    public static func collapsedByDay(
+        _ checkIns: [CheckIn],
+        calendar: Calendar = .current
+    ) -> [CheckIn] {
+        var latest: [Date: CheckIn] = [:]
+        for checkIn in checkIns {
+            let day = calendar.startOfDay(for: checkIn.date)
+            if let kept = latest[day], isLater(kept, than: checkIn) { continue }
+            latest[day] = checkIn
+        }
+        return latest.values.sorted { $0.date < $1.date }
+    }
+
+    private static func isLater(_ lhs: CheckIn, than rhs: CheckIn) -> Bool {
+        if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
+        return lhs.id.uuidString > rhs.id.uuidString
+    }
+
     /// 1층만 채운 최소 기록인지. 리포트에서 "가볍게 남긴 날" 로 구분한다.
     public var isQuickOnly: Bool {
         energy == nil && anxiety == nil && emotionWords.isEmpty

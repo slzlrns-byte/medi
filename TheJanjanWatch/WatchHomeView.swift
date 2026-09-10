@@ -44,13 +44,34 @@ struct WatchHomeView: View {
                     Button("기분") { isShowingMood = true }
                 }
 
+                if session.lastSendWasQueued {
+                    // 전송이 큐에 쌓였다는 사실을 숨기지 않는다 - 시트가 닫혔다고
+                    // 폰에 이미 적혔다고 믿게 두면 안 된다.
+                    Text("아이폰과 만나면 방금 기록이 전달돼요.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                }
+
                 Text("자세한 건 iPhone에서")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
             }
             .navigationTitle(navigationTitleText)
+            // 구독이 끝난 스냅샷이 오면 열려 있던 시트도 닫는다 - 잠긴 기능이
+            // 시트 안에서 반쯤 살아 있으면, 거기서 보낸 기록을 폰이 버린다.
+            .onChange(of: session.snapshot.isPro) { _, isPro in
+                if !isPro {
+                    isShowingMood = false
+                    isShowingSymptom = false
+                    openSlot = nil
+                }
+            }
             .onAppear {
+                // 화면에 돌아올 때마다 최신 그림을 청한다. 폰의 push 가 유실됐어도
+                // 여기서 따라잡는다 - 워치에는 당겨서 새로고침이 없다.
+                session.requestSnapshot()
                 // watchOS 는 XCUITest 가 없어 눌러서 열 수 없다. 화면을 찍을 때만
                 // 실행 인자로 어느 시트를 열지 고른다.
                 //
@@ -95,9 +116,13 @@ struct WatchHomeView: View {
 
     /// 아직 답하지 않은 시간대는 눌러서 바로 기록한다. 끝난 줄은 그냥 정보다 —
     /// 되돌리기는 실수하기 쉬운 작은 화면 대신 아이폰이 맡는다.
+    ///
+    /// **약 ID 가 없는 줄도 눌리지 않는다.** ID 키가 없던 옛 스냅샷인데, ID 없이
+    /// 보내면 폰이 무엇을 기록할지 몰라 조용히 버린다(QA 2026-09-10).
+    /// 다음 스냅샷이 오면 ID 가 채워져 저절로 눌리게 된다.
     @ViewBuilder
     private func slotRow(_ slot: WatchSnapshot.SlotLine) -> some View {
-        if slot.isCompleted {
+        if slot.isCompleted || slot.medicationIDs.isEmpty {
             slotRowBody(slot)
         } else {
             Button {

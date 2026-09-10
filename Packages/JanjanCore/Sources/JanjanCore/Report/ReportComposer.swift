@@ -95,6 +95,9 @@ public enum ReportComposer {
         let (start, anchored) = window(endingAt: end, lastVisit: lastVisit, calendar: calendar)
         let windowLength = (calendar.dateComponents([.day], from: start, to: endDay).day ?? 0) + 1
 
+        // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
+        let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
+
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(doseEvents: doseEvents, from: start, to: end))
         lines.append(contentsOf: medicationLines(

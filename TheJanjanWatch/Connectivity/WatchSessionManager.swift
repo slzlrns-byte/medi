@@ -45,28 +45,79 @@ final class WatchSessionManager: NSObject, ObservableObject {
         session.activate()
     }
 
+    /// 활성화가 끝나기 전에 눌린 전송. 미활성 세션에 보내면 WCSession 이
+    /// 에러를 내므로, 잠깐 들고 있다가 활성화 콜백에서 흘려보낸다.
+    private var pendingPayloads: [(payload: [String: Any], isRecord: Bool)] = []
+
     /// 폰에 사건을 보낸다. 닿으면 즉시, 아니면 큐에.
     func send(_ message: WatchMessage) {
         guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        let payload = message.payload
+        // 큐 표시("아이폰과 만나면 전달돼요")는 기록에만 붙인다.
+        // 스냅샷 요청은 기록이 아니고, 폰이 없는 화면 찍기에서도 매번 나간다.
+        let isRecord: Bool
+        if case .requestSnapshot = message { isRecord = false } else { isRecord = true }
+        deliver(message.payload, isRecord: isRecord)
+    }
 
-        guard session.isReachable else {
-            queue(payload)
+    private func deliver(_ payload: [String: Any], isRecord: Bool) {
+        let session = WCSession.default
+
+        guard session.activationState == .activated else {
+            onMain { $0.pendingPayloads.append((payload, isRecord)) }
+            session.activate()
             return
         }
 
-        setQueuedFlag(false)
+        guard session.isReachable else {
+            queue(payload, isRecord: isRecord)
+            return
+        }
+
+        if isRecord { setQueuedFlag(false) }
         session.sendMessage(payload, replyHandler: nil) { [weak self] error in
             guard let self else { return }
             self.logger.error("즉시 전송 실패, 큐로 돌립니다: \(error.localizedDescription, privacy: .public)")
-            self.queue(payload)
+            self.queue(payload, isRecord: isRecord)
         }
     }
 
-    private func queue(_ payload: [String: Any]) {
+    /// 방금 보낸 기록을 화면에 먼저 반영한다(낙관적 갱신).
+    ///
+    /// 폰이 새 스냅샷을 밀어주기 전까지 그 줄이 "미완료" 로 남아 있으면
+    /// 사용자가 같은 시간대를 두 번 누르게 된다(QA 2026-09-10). 진짜 스냅샷이
+    /// 오면 그대로 덮여서, 폰이 처리하지 못한 경우에도 다시 미완료로 돌아온다.
+    func markSlotCompleted(_ slotKey: String) {
+        onMain { manager in
+            let old = manager.snapshot
+            var completedCount = 0
+            let slots = old.slots.map { slot -> WatchSnapshot.SlotLine in
+                guard slot.slotKey == slotKey, !slot.isCompleted else { return slot }
+                completedCount = slot.medicationIDs.isEmpty
+                    ? slot.medicationNames.count
+                    : slot.medicationIDs.count
+                return WatchSnapshot.SlotLine(
+                    slotKey: slot.slotKey,
+                    labelKo: slot.labelKo,
+                    timeText: slot.timeText,
+                    medicationNames: slot.medicationNames,
+                    medicationIDs: slot.medicationIDs,
+                    isCompleted: true
+                )
+            }
+            manager.snapshot = WatchSnapshot(
+                generatedAt: old.generatedAt,
+                dateText: old.dateText,
+                slots: slots,
+                remainingCountToday: max(0, old.remainingCountToday - completedCount),
+                isPro: old.isPro,
+                themeRaw: old.themeRaw
+            )
+        }
+    }
+
+    private func queue(_ payload: [String: Any], isRecord: Bool) {
         guard WCSession.isSupported() else { return }
-        setQueuedFlag(true)
+        if isRecord { setQueuedFlag(true) }
         WCSession.default.transferUserInfo(payload)
     }
 
@@ -119,6 +170,12 @@ extension WatchSessionManager: WCSessionDelegate {
         }
         setReachable(session.isReachable)
         if activationState == .activated {
+            // 활성화 전에 눌려 들고 있던 전송부터 흘려보낸다.
+            onMain { manager in
+                let held = manager.pendingPayloads
+                manager.pendingPayloads = []
+                for item in held { manager.deliver(item.payload, isRecord: item.isRecord) }
+            }
             requestSnapshot()
         }
     }

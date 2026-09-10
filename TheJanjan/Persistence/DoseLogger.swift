@@ -49,6 +49,13 @@ final class SwiftDataDoseLogger: DoseLogging {
             return
         }
 
+        guard !medicationIDs.isEmpty else {
+            // 워치가 ID 없는 옛 스냅샷 줄을 눌리지 않게 막고 있지만, 여기서도
+            // 조용히 지나가지 않는다 - 빈 기록이 성공처럼 보이면 안 된다.
+            logger.error("약 ID 없는 복용 기록이 왔습니다. 무시합니다. slotKey=\(slotKey, privacy: .public)")
+            return
+        }
+
         let status: DoseEvent.Status = (action == .taken) ? .taken : .skipped
 
         // 저장 규칙은 DoseRecorder 한 곳에만 있다. 같은 시간대의 기록은 덮어쓴다 —

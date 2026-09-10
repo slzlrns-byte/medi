@@ -137,22 +137,35 @@ public enum InventoryCalculator {
         doseEvents: [DoseEvent],
         medicationID: UUID? = nil,
         from start: Date,
-        to end: Date
+        to end: Date,
+        calendar: Calendar = .current
     ) -> Decimal? {
 
-        var taken = 0
-        var total = 0
+        // 기기 간 중복(같은 약·시간대·날짜의 두 줄)은 가장 나중 것만 센다 —
+        // remaining() 의 collapsedDoses 와 같은 규칙이다. 여기서만 원본을 그대로
+        // 세면 분모가 부풀어 복약률이 실제와 다르게 나온다(QA 2026-09-10).
+        var latest: [String: DoseEvent] = [:]
 
         for event in doseEvents {
             if let medicationID, event.medicationID != medicationID { continue }
             guard event.kind == .scheduled else { continue }
             let when = event.effectiveDate
             guard when >= start, when <= end else { continue }
-            total += 1
-            if event.status == .taken { taken += 1 }
+
+            guard let slotKey = event.slotKey else {
+                // 시간대 열쇠가 없으면 묶을 기준이 없다. 그대로 센다.
+                latest[event.id.uuidString] = event
+                continue
+            }
+            let day = calendar.startOfDay(for: event.scheduledAt)
+            let key = "\(event.medicationID.uuidString)|\(slotKey)|\(day.timeIntervalSinceReferenceDate)"
+            if let kept = latest[key], isLater(kept, than: event) { continue }
+            latest[key] = event
         }
 
+        let total = latest.count
         guard total > 0 else { return nil }
+        let taken = latest.values.filter { $0.status == .taken }.count
         return Decimal(taken) / Decimal(total)
     }
 

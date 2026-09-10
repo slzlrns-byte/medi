@@ -112,6 +112,40 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertEqual(report.titleKo, "더잔잔 · 4주 요약")
     }
 
+    func testAnchorBoundaryIsAWindowOfNinetyDays() {
+        // maxAnchoredDays 는 "며칠 전까지" 가 아니라 **창의 최대 길이**다.
+        // 89일 전 진료 → 90일짜리 창으로 앵커, 90일 전 진료 → 4주로 되돌아간다.
+        let calendar = Fixed.calendar
+        let endDay = calendar.startOfDay(for: end)
+
+        let visit89 = calendar.date(byAdding: .day, value: -89, to: endDay)!
+        XCTAssertEqual(content(lastVisit: visit89).titleKo, "더잔잔 · 지난 진료 이후")
+
+        let visit90 = calendar.date(byAdding: .day, value: -90, to: endDay)!
+        XCTAssertEqual(content(lastVisit: visit90).titleKo, "더잔잔 · 4주 요약")
+    }
+
+    // MARK: - 같은 날 두 줄 (동기화 충돌)
+
+    func testSameDayDuplicateCheckInsCountOnce() {
+        let day = Fixed.date(2026, 8, 14)
+        let older = CheckIn(
+            date: day, mood: .init(-1), dreamed: true, nightmare: true,
+            updatedAt: Fixed.date(2026, 8, 14, 10)
+        )
+        let newer = CheckIn(
+            date: day, mood: .init(2), dreamed: true,
+            updatedAt: Fixed.date(2026, 8, 14, 12)
+        )
+        let report = content(checkIns: [older, newer])
+
+        // 나중에 손댄 줄만 남는다: 꿈 1일, 악몽 없음, 기분도 한 줄만.
+        XCTAssertTrue(texts(report).contains("꿈을 기록한 날 1일"))
+        XCTAssertFalse(texts(report).contains { $0.contains("악몽") })
+        XCTAssertTrue(texts(report).contains("28일 중 1일 기록"))
+        XCTAssertTrue(texts(report).contains("가장 자주 고른 기분: 괜찮음 (1일)"))
+    }
+
     // MARK: - 용량 변경
 
     func testDoseChangeIsListedAsWritten() {

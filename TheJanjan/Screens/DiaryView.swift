@@ -33,7 +33,11 @@ struct DiaryView: View {
     private var calendar: Calendar { .current }
 
     private var todayRecord: CheckInRecord? {
-        checkInRecords.first { calendar.isDate($0.date, inSameDayAs: today) }
+        // 동기화 충돌로 같은 날 두 줄이 생겼어도 가장 나중에 손댄 줄을 편집한다.
+        // first 로 고르면 어느 줄이 걸릴지 기기마다 달라진다.
+        checkInRecords
+            .filter { calendar.isDate($0.date, inSameDayAs: today) }
+            .max { $0.updatedAt < $1.updatedAt }
     }
 
     private var todaysSymptoms: [SymptomEntryRecord] {

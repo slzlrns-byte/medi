@@ -109,10 +109,14 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
             ?? JanjanTheme.standard.rawValue
     }
 
+    /// 폰이 아직 아무것도 보내 주지 않았을 때. **잠긴 상태로 시작한다** —
+    /// 기본을 열림으로 두면 첫 실행·미페어링에서 무료 사용자에게도 Pro 화면이
+    /// 보이고, 거기서 보낸 기록은 폰이 조용히 버린다(QA 2026-09-10).
     public static let placeholder = WatchSnapshot(
         dateText: "—",
         slots: [],
-        remainingCountToday: 0
+        remainingCountToday: 0,
+        isPro: false
     )
 
     /// 구독하지 않은 사용자의 워치에 보내는 그림. 오늘 일정은 담기지 않는다.

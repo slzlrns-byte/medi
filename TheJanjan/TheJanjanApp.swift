@@ -40,10 +40,15 @@ struct TheJanjanApp: App {
                 .task {
                     // 화면이 올라온 뒤 한 번만. 여기서 알림 권한을 조르지는 않는다 —
                     // 권한은 온보딩에서 "왜 필요한지" 한 문장을 보여 준 뒤에 묻는다.
-                    await AppServices.shared.start(container: modelContainer)
-                    // 상품·권한 확인. 실패해도 무료 기능은 그대로 돈다(체크리스트 3.6).
+                    //
+                    // **구독 판정이 activate() 보다 먼저다.** 워치가 큐에 쌓아 둔
+                    // 기록은 세션이 열리자마자 도착하는데, 그때 isPro 가 아직
+                    // 기본값(false)이면 유료 사용자의 기록이 조용히 버려진다
+                    // (QA 2026-09-10). 상품 확인이 실패해도 무료 기능은 그대로
+                    // 돈다(체크리스트 3.6).
                     await proStore.reload()
                     AppServices.shared.updatePro(proStore.isPro)
+                    await AppServices.shared.start(container: modelContainer)
                 }
                 // 시트가 아니라 fullScreenCover 로 덮는다.
                 //

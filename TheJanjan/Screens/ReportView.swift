@@ -9,6 +9,8 @@ import JanjanCore
 /// 화면과 PDF 가 다른 말을 하지 않도록.
 struct ReportView: View {
 
+    @EnvironmentObject private var pro: ProStore
+
     @Query private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
     @Query private var doseRecords: [DoseEventRecord]
@@ -276,7 +278,10 @@ struct ReportView: View {
             symptomEntries: symptomEntries,
             doseChanges: doseChangeRecords.map(\.core),
             lastVisit: lastVisit,
-            nextVisit: nextVisit,
+            // 다음 진료 기준 "N일 모자랍니다" 는 소진 예측(Pro)과 같은 계산이다.
+            // PDF 가 무료가 되면서 이 줄이 유료 기능의 뒷문이 되지 않게,
+            // 무료에서는 진료일을 넘기지 않아 부족 캡션 자체가 생기지 않는다.
+            nextVisit: pro.isPro ? nextVisit : nil,
             questionsKo: questions
         )
 

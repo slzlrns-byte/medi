@@ -374,22 +374,44 @@ struct MedicationDetailView: View {
     private func saveDoseChange(changedAt: Date, fromText: String, toText: String, note: String?) {
         let change = DoseChange(
             medicationID: medicationID,
-            changedAt: changedAt,
+            // DatePicker 가 미래를 막지만 저장 규칙은 화면에 기대지 않는다.
+            changedAt: min(changedAt, Date()),
             fromText: fromText,
             toText: toText,
             note: note
         )
         context.insert(DoseChangeRecord.make(from: change))
-        // 지금 먹는 용량 표기도 함께 갱신한다 — 안 그러면 머리글의 강도 칩이
-        // 방금 적어 둔 변경과 어긋나 버린다.
-        record?.strengthText = change.toText
+        refreshStrengthText(including: change)
         try? context.save()
     }
 
     private func deleteDoseChange(_ entry: DoseChangeRecord) {
+        let deletedID = entry.id
         context.delete(entry)
         pendingDoseChangeDeletion = nil
+        refreshStrengthText(excluding: deletedID)
         try? context.save()
+    }
+
+    /// 머리글의 강도 칩은 **가장 최근 변경의 새 표기**를 따른다.
+    ///
+    /// 방금 넣은 변경의 값을 무조건 쓰면, 과거 이력을 뒤늦게 보정해 넣었을 때
+    /// 표기가 옛 용량으로 퇴행한다(QA 2026-09-10). 잘못 넣은 변경을 지웠을 때도
+    /// 같은 규칙으로 되돌린다. 남은 변경이 없으면 표기는 손대지 않는다 —
+    /// 등록할 때 적은 값이 그대로 사실이다.
+    private func refreshStrengthText(including newChange: DoseChange? = nil, excluding deletedID: UUID? = nil) {
+        var changes = doseChangeRecords
+            .filter { $0.medicationID == medicationID && $0.id != deletedID }
+            .map(\.core)
+        if let newChange { changes.append(newChange) }
+
+        let latest = changes.max { lhs, rhs in
+            if lhs.changedAt != rhs.changedAt { return lhs.changedAt < rhs.changedAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+        if let latest {
+            record?.strengthText = latest.toText
+        }
     }
 }
 

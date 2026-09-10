@@ -57,8 +57,10 @@ struct TodayView: View {
 
     private var todaysMoodScore: Int? {
         let calendar = Calendar.current
+        // 같은 날 두 줄이 생긴 경우(동기화 충돌) 가장 나중에 손댄 값을 보여 준다.
         return checkInRecords
-            .first { calendar.isDate($0.date, inSameDayAs: today) }?
+            .filter { calendar.isDate($0.date, inSameDayAs: today) }
+            .max { $0.updatedAt < $1.updatedAt }?
             .moodScore
     }
 
