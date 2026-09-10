@@ -29,17 +29,19 @@ struct LogNearestDoseIntent: AppIntent {
 
         let medicationCount = (try? context.fetchCount(FetchDescriptor<MedicationRecord>())) ?? 0
         guard medicationCount > 0 else {
-            return .result(dialog: "\(t(
+            let text = t(
                 "아직 등록된 약이 없어요. 앱에서 먼저 약을 추가해 주세요.",
                 "There are no medications registered yet. You can add one in the app."
-            ))")
+            )
+            return .result(dialog: "\(text)")
         }
 
         guard let line = TodayPlanReader.nearestPending(at: now, in: context) else {
-            return .result(dialog: "\(t(
+            let text = t(
                 "오늘 약은 이미 다 챙기셨어요.",
                 "You have already taken care of today's meds."
-            ))")
+            )
+            return .result(dialog: "\(text)")
         }
 
         let recorded = TodayPlanReader.recordRestTaken(
@@ -53,17 +55,18 @@ struct LogNearestDoseIntent: AppIntent {
         WidgetCenter.shared.reloadAllTimelines()
 
         guard recorded > 0 else {
-            return .result(dialog: "\(t(
+            let text = t(
                 "\(line.slot.labelKo)에는 적을 약이 남아 있지 않았어요.",
                 "There was nothing left to log for \(line.slot.labelEn.lowercased())."
-            ))")
+            )
+            return .result(dialog: "\(text)")
         }
-        let loggedEn = recorded == 1
-            ? "Logged 1 \(line.slot.labelEn.lowercased()) med as taken."
-            : "Logged \(recorded) \(line.slot.labelEn.lowercased()) meds as taken."
-        return .result(dialog: "\(t(
+        let text = t(
             "\(line.slot.labelKo) 약 \(recorded)개를 복용함으로 적었어요.",
-            loggedEn
-        ))")
+            recorded == 1
+                ? "Logged 1 \(line.slot.labelEn.lowercased()) med as taken."
+                : "Logged \(recorded) \(line.slot.labelEn.lowercased()) meds as taken."
+        )
+        return .result(dialog: "\(text)")
     }
 }
