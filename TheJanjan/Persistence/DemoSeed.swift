@@ -39,6 +39,7 @@ enum DemoSeed {
         seedCheckIns(context: context, now: now)
         seedSymptoms(context: context, now: now)
         seedNotes(context: context, now: now)
+        seedDoseChanges(context: context, now: now)
 
         try? context.save()
     }
@@ -55,17 +56,55 @@ enum DemoSeed {
 
         for (offset, score) in scores.enumerated() {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { continue }
-            let checkIn = CheckIn(
-                date: calendar.startOfDay(for: day),
-                mood: CheckIn.Mood(score),
-                energy: max(1, min(5, 3 + score)),
-                anxiety: max(1, min(5, 3 - score)),
-                emotionWords: offset % 3 == 0 ? ["anxious", "worn_out"] : [],
-                sleepMinutes: 6 * 60 + (offset % 4) * 30,
-                activities: offset % 4 == 0 ? ["outdoors", "caffeine"] : ["work"],
-                note: notes.indices.contains(offset) ? notes[offset] : nil,
-                updatedAt: day
-            )
+            // 꿈 3척도 화면을 확인하려면 예시가 몇 개는 있어야 한다. 매일 넣으면
+            // "안 고르면 nil" 이라는 원칙이 화면에서 안 보이니 이틀만 채운다.
+            let checkIn: CheckIn
+            switch offset {
+            case 3:
+                checkIn = CheckIn(
+                    date: calendar.startOfDay(for: day),
+                    mood: CheckIn.Mood(score),
+                    energy: max(1, min(5, 3 + score)),
+                    anxiety: max(1, min(5, 3 - score)),
+                    emotionWords: offset % 3 == 0 ? ["anxious", "worn_out"] : [],
+                    sleepMinutes: 6 * 60 + (offset % 4) * 30,
+                    dreamed: true,
+                    dreamVividness: 3,
+                    nightmare: true,
+                    dreamRecall: 3,
+                    dreamNote: "쫓기는 꿈을 꿨어요",
+                    activities: offset % 4 == 0 ? ["outdoors", "caffeine"] : ["work"],
+                    note: notes.indices.contains(offset) ? notes[offset] : nil,
+                    updatedAt: day
+                )
+            case 6:
+                checkIn = CheckIn(
+                    date: calendar.startOfDay(for: day),
+                    mood: CheckIn.Mood(score),
+                    energy: max(1, min(5, 3 + score)),
+                    anxiety: max(1, min(5, 3 - score)),
+                    emotionWords: offset % 3 == 0 ? ["anxious", "worn_out"] : [],
+                    sleepMinutes: 6 * 60 + (offset % 4) * 30,
+                    dreamed: true,
+                    dreamVividness: 2,
+                    dreamRecall: 1,
+                    activities: offset % 4 == 0 ? ["outdoors", "caffeine"] : ["work"],
+                    note: notes.indices.contains(offset) ? notes[offset] : nil,
+                    updatedAt: day
+                )
+            default:
+                checkIn = CheckIn(
+                    date: calendar.startOfDay(for: day),
+                    mood: CheckIn.Mood(score),
+                    energy: max(1, min(5, 3 + score)),
+                    anxiety: max(1, min(5, 3 - score)),
+                    emotionWords: offset % 3 == 0 ? ["anxious", "worn_out"] : [],
+                    sleepMinutes: 6 * 60 + (offset % 4) * 30,
+                    activities: offset % 4 == 0 ? ["outdoors", "caffeine"] : ["work"],
+                    note: notes.indices.contains(offset) ? notes[offset] : nil,
+                    updatedAt: day
+                )
+            }
             context.insert(CheckInRecord.make(from: checkIn))
         }
     }
@@ -111,6 +150,20 @@ enum DemoSeed {
         for note in notes {
             context.insert(MedicationNoteRecord.make(from: note))
         }
+    }
+
+    /// 리포트 축에 놓일 용량 변경 예시. SampleData 의 에스시탈로프람이 지금 10mg 이라
+    /// "5mg → 10mg" 로 넣으면 실제 처방과 어긋나지 않는다.
+    private static func seedDoseChanges(context: ModelContext, now: Date) {
+        let calendar = Calendar.current
+        guard let changedAt = calendar.date(byAdding: .day, value: -9, to: now) else { return }
+        let doseChange = DoseChange(
+            medicationID: SampleData.escitalopram.id,
+            changedAt: changedAt,
+            fromText: "5mg",
+            toText: "10mg"
+        )
+        context.insert(DoseChangeRecord.make(from: doseChange))
     }
 }
 #endif

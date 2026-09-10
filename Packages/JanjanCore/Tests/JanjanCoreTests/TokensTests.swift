@@ -128,6 +128,20 @@ final class TokensTests: XCTestCase {
         XCTAssertEqual(CheckIn.Mood(3).index, 6)
     }
 
+    func testDreamScalesClampToOneThroughThree() {
+        let checkIn = CheckIn(
+            date: Date(),
+            mood: .init(0),
+            dreamed: true,
+            dreamVividness: 9,
+            dreamRecall: 0
+        )
+        XCTAssertEqual(checkIn.dreamVividness, 3)
+        XCTAssertEqual(checkIn.dreamRecall, 1)
+        // 안 고른 척도는 안 고른 채로 남는다 - 0 이나 기본값으로 채우지 않는다.
+        XCTAssertNil(CheckIn(date: Date(), mood: .init(0)).dreamVividness)
+    }
+
     func testRadiiAndSpacingMatchTheDesignDocument() {
         XCTAssertEqual(JanjanRadius.card, 24)
         XCTAssertEqual(JanjanRadius.tile, 28)

@@ -17,11 +17,14 @@ struct MedicationDetailView: View {
     @Query private var doseRecords: [DoseEventRecord]
     @Query private var stockRecords: [StockEventRecord]
     @Query private var symptomRecords: [SymptomEntryRecord]
+    @Query private var doseChangeRecords: [DoseChangeRecord]
     @Query(sort: \MedicationNoteRecord.createdAt) private var noteRecords: [MedicationNoteRecord]
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
     @State private var composing: MedicationNote.Kind?
+    @State private var isShowingDoseChangeSheet = false
+    @State private var pendingDoseChangeDeletion: DoseChangeRecord?
 
     private var today: Date { Date() }
 
@@ -41,6 +44,7 @@ struct MedicationDetailView: View {
                 if let medication {
                     headerCard(medication)
                     stockCard(medication)
+                    doseChangeCard
                     scheduleCard
                     noteCard(.heardFromDoctor)
                     noteCard(.questionForDoctor)
@@ -70,6 +74,25 @@ struct MedicationDetailView: View {
             MedicationNoteComposer(kind: kind) { text, symptomID in
                 addNote(kind: kind, text: text, symptomID: symptomID)
             }
+        }
+        .sheet(isPresented: $isShowingDoseChangeSheet) {
+            if let medication {
+                DoseChangeSheet(previousText: medication.strengthText) { changedAt, fromText, toText, note in
+                    saveDoseChange(changedAt: changedAt, fromText: fromText, toText: toText, note: note)
+                }
+            }
+        }
+        .confirmationDialog(
+            "이 용량 변경 기록을 지울까요?",
+            isPresented: Binding(
+                get: { pendingDoseChangeDeletion != nil },
+                set: { if !$0 { pendingDoseChangeDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDoseChangeDeletion
+        ) { entry in
+            Button("지우기", role: .destructive) { deleteDoseChange(entry) }
+            Button("취소", role: .cancel) { pendingDoseChangeDeletion = nil }
         }
     }
 
@@ -136,6 +159,75 @@ struct MedicationDetailView: View {
                 }
             }
         }
+    }
+
+    /// 용량이 바뀐 순간들. **입력만 받는다** — 강점 결정서 D12 그대로,
+    /// 이 카드는 계산도 권고도 하지 않는다. "9/3 10mg → 15mg" 을 적어 두면
+    /// 해석은 진료실에서 사람이 한다.
+    private var doseChangeCard: some View {
+        let mine = doseChangeRecords
+            .filter { $0.medicationID == medicationID }
+            .sorted { $0.changedAt > $1.changedAt }
+
+        return JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text("용량 변경")
+                    .janjanBody(15, weight: .medium)
+                    .foregroundStyle(Color.ink)
+
+                if mine.isEmpty {
+                    Text("용량이 바뀌면 여기 적어 두세요. 리포트에 함께 실려요.")
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                ForEach(mine) { entry in
+                    doseChangeRow(entry)
+                }
+
+                WhitePillButton(title: "적어 두기", systemImage: "plus") {
+                    isShowingDoseChangeSheet = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
+            }
+        }
+    }
+
+    private func doseChangeRow(_ entry: DoseChangeRecord) -> some View {
+        HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(doseChangeDayText(entry.changedAt)) · \(entry.core.arrowTextKo)")
+                    .janjanBody(15)
+                    .foregroundStyle(Color.ink2)
+                    .monospacedDigit()
+                if let note = entry.note, !note.isEmpty {
+                    Text(note)
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Button {
+                // 다른 카드처럼 바로 지우지 않고 확인을 한 번 거친다.
+                pendingDoseChangeDeletion = entry
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.muted)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("이 용량 변경 기록 지우기"))
+        }
+    }
+
+    private func doseChangeDayText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter.string(from: date)
     }
 
     private var scheduleCard: some View {
@@ -278,6 +370,27 @@ struct MedicationDetailView: View {
         context.insert(MedicationNoteRecord.make(from: note))
         try? context.save()
     }
+
+    private func saveDoseChange(changedAt: Date, fromText: String, toText: String, note: String?) {
+        let change = DoseChange(
+            medicationID: medicationID,
+            changedAt: changedAt,
+            fromText: fromText,
+            toText: toText,
+            note: note
+        )
+        context.insert(DoseChangeRecord.make(from: change))
+        // 지금 먹는 용량 표기도 함께 갱신한다 — 안 그러면 머리글의 강도 칩이
+        // 방금 적어 둔 변경과 어긋나 버린다.
+        record?.strengthText = change.toText
+        try? context.save()
+    }
+
+    private func deleteDoseChange(_ entry: DoseChangeRecord) {
+        context.delete(entry)
+        pendingDoseChangeDeletion = nil
+        try? context.save()
+    }
 }
 
 /// 메모 한 줄을 받는 시트. 증상 카탈로그와 이어 두는 것은 선택이다.
@@ -363,6 +476,120 @@ private struct MedicationNoteComposer: View {
 
     private var isSavable: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// 용량이 바뀐 날 하나를 받는 시트.
+///
+/// 계산도 권고도 하지 않는다(강점 결정서 D12) — 날짜와 이전/새 용량,
+/// 덧붙일 말만 받아 그대로 적어 둔다.
+private struct DoseChangeSheet: View {
+
+    let previousText: String
+    let onSave: (Date, String, String, String?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var changedAt = Date()
+    @State private var fromText: String
+    @State private var toText = ""
+    @State private var note = ""
+
+    init(previousText: String, onSave: @escaping (Date, String, String, String?) -> Void) {
+        self.previousText = previousText
+        self.onSave = onSave
+        _fromText = State(initialValue: previousText)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                            Text("바뀐 날")
+                                .janjanBody(13, weight: .medium)
+                                .foregroundStyle(Color.muted)
+                            // 아직 오지 않은 날의 용량은 알 수 없으니 미래는 고를 수 없게 막는다.
+                            DatePicker(
+                                "",
+                                selection: $changedAt,
+                                in: ...Date(),
+                                displayedComponents: .date
+                            )
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                        }
+                    }
+
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                            doseField(label: "이전", placeholder: "10mg", text: $fromText)
+                            doseField(label: "새 용량", placeholder: "15mg", text: $toText)
+                        }
+                    }
+
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                            Text("덧붙일 말 (선택)")
+                                .janjanBody(13, weight: .medium)
+                                .foregroundStyle(Color.ink)
+                            TextField("", text: $note, axis: .vertical)
+                                .janjanBody(15)
+                                .foregroundStyle(Color.ink)
+                                .lineLimit(1...4)
+                                .padding(CGFloat(JanjanSpacing.s))
+                                .background(
+                                    RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                                        .fill(Color.janjan(.surface2))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle("용량 변경")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("닫기") { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("저장") {
+                        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(changedAt, fromText, toText, trimmedNote.isEmpty ? nil : trimmedNote)
+                        dismiss()
+                    }
+                    .foregroundStyle(isSavable ? Color.ink : Color.muted)
+                    .disabled(!isSavable)
+                }
+            }
+        }
+    }
+
+    private func doseField(label: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+            Text(label)
+                .janjanBody(12, weight: .medium)
+                .foregroundStyle(Color.muted)
+            TextField(placeholder, text: text)
+                .janjanBody(16)
+                .foregroundStyle(Color.ink)
+                .padding(CGFloat(JanjanSpacing.s))
+                .background(
+                    RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                        .fill(Color.janjan(.surface2))
+                )
+        }
+    }
+
+    private var isSavable: Bool {
+        !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

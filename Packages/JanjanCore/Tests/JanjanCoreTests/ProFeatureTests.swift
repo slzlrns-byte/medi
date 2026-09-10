@@ -8,7 +8,7 @@ final class ProFeatureTests: XCTestCase {
     func testLaunchHighlightsAreWhatTheAppActuallyLocks() {
         XCTAssertEqual(
             ProFeature.launchHighlights,
-            [.pharmacyScan, .runOutForecast, .reports]
+            [.pharmacyScan, .runOutForecast, .watchApp]
         )
         XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "약봉투 스캔")
     }
@@ -18,6 +18,9 @@ final class ProFeatureTests: XCTestCase {
     func testUnbuiltAndFreeFeaturesAreNotAdvertised() {
         // 기분 기록은 잠그지 않기로 했다. 잠그지 않은 것을 팔지 않는다.
         XCTAssertFalse(ProFeature.launchHighlights.contains(.detailedMoodDiary))
+        // 진료용 리포트는 무료로 열었다(2026-09-10) — 진료실 준비 노트가 이 앱의
+        // 자리라서다. 무료로 연 것이 페이월에 다시 들어오면 거짓말이 된다.
+        XCTAssertFalse(ProFeature.launchHighlights.contains(.reports))
     }
 
     func testProductIdentifiersMatchAppStoreConnectExactly() {

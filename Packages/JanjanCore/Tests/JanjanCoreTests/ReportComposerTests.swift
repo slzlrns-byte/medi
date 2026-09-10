@@ -24,6 +24,8 @@ final class ReportComposerTests: XCTestCase {
         doses: [DoseEvent] = [],
         stock: [StockEvent] = [],
         checkIns: [CheckIn] = [],
+        doseChanges: [DoseChange] = [],
+        lastVisit: Date? = nil,
         nextVisit: Date? = nil,
         questions: String = ""
     ) -> ReportContent {
@@ -34,6 +36,8 @@ final class ReportComposerTests: XCTestCase {
             doseEvents: doses,
             stockEvents: stock,
             checkIns: checkIns,
+            doseChanges: doseChanges,
+            lastVisit: lastVisit,
             nextVisit: nextVisit,
             questionsKo: questions,
             calendar: Fixed.calendar
@@ -55,9 +59,123 @@ final class ReportComposerTests: XCTestCase {
     }
 
     func testSectionsAreInOrder() {
-        let report = content(checkIns: [CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0))])
+        let report = content(
+            checkIns: [
+                CheckIn(
+                    date: Fixed.date(2026, 8, 16),
+                    mood: .init(0),
+                    dreamed: true,
+                    dreamVividness: 3
+                )
+            ],
+            doseChanges: [
+                DoseChange(
+                    medicationID: Fixed.medA,
+                    changedAt: Fixed.date(2026, 8, 10),
+                    fromText: "5mg",
+                    toText: "10mg"
+                )
+            ]
+        )
         let headings = report.lines.filter { $0.style == .heading }.map(\.text)
-        XCTAssertEqual(headings, ["복약", "약", "기분"])
+        XCTAssertEqual(headings, ["복약", "약", "용량 변경", "기분", "꿈"])
+    }
+
+    // MARK: - 진료 앵커
+
+    func testWindowAnchorsToLastVisit() {
+        // 8/5 에 진료를 다녀왔으면 8/5 부터 본다. 의사가 궁금한 것은 그 뒤의 일이다.
+        let report = content(lastVisit: Fixed.date(2026, 8, 5, 10, 0))
+        XCTAssertEqual(report.titleKo, "더잔잔 · 지난 진료 이후")
+        XCTAssertEqual(report.periodKo, "2026년 8월 5일 – 2026년 8월 17일")
+    }
+
+    func testAnchoredWindowCountsItsOwnLength() {
+        // 8/5~8/17 은 13일. "28일 중" 이라고 적으면 거짓말이 된다.
+        let report = content(
+            checkIns: [CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0))],
+            lastVisit: Fixed.date(2026, 8, 5)
+        )
+        XCTAssertTrue(texts(report).contains("13일 중 1일 기록"))
+    }
+
+    func testVisitTooLongAgoFallsBackToFourWeeks() {
+        // 반년 전 진료를 축으로 삼으면 요약이 아니라 목록이 된다.
+        let report = content(lastVisit: Fixed.date(2026, 2, 1))
+        XCTAssertEqual(report.titleKo, "더잔잔 · 4주 요약")
+        XCTAssertEqual(report.periodKo, "2026년 7월 21일 – 2026년 8월 17일")
+    }
+
+    func testFutureVisitDoesNotAnchor() {
+        // 아직 안 간 진료는 시작점이 될 수 없다.
+        let report = content(lastVisit: Fixed.date(2026, 9, 1))
+        XCTAssertEqual(report.titleKo, "더잔잔 · 4주 요약")
+    }
+
+    // MARK: - 용량 변경
+
+    func testDoseChangeIsListedAsWritten() {
+        let report = content(doseChanges: [
+            DoseChange(
+                medicationID: Fixed.medA,
+                changedAt: Fixed.date(2026, 8, 10),
+                fromText: "5mg",
+                toText: "10mg",
+                note: "저녁으로 옮김"
+            )
+        ])
+        XCTAssertTrue(texts(report).contains("8월 10일 · 에스시탈로프람 5mg → 10mg"))
+        XCTAssertTrue(texts(report).contains("저녁으로 옮김"))
+    }
+
+    func testDoseChangeOutsideWindowIsIgnoredAndSectionDisappears() {
+        let report = content(doseChanges: [
+            DoseChange(
+                medicationID: Fixed.medA,
+                changedAt: Fixed.date(2026, 6, 1),
+                fromText: "5mg",
+                toText: "10mg"
+            )
+        ])
+        XCTAssertFalse(texts(report).contains("용량 변경"))
+    }
+
+    func testDoseChangeWithoutPreviousTextSaysOnlyTheNewOne() {
+        let change = DoseChange(
+            medicationID: Fixed.medA,
+            changedAt: Fixed.date(2026, 8, 10),
+            fromText: "",
+            toText: "10mg"
+        )
+        XCTAssertEqual(change.arrowTextKo, "10mg")
+        let report = content(doseChanges: [change])
+        XCTAssertTrue(texts(report).contains("8월 10일 · 에스시탈로프람 10mg"))
+    }
+
+    // MARK: - 꿈
+
+    func testDreamSectionCountsScalesAndCarriesNotes() {
+        let checkIns = [
+            CheckIn(
+                date: Fixed.date(2026, 8, 14),
+                mood: .init(0),
+                dreamed: true,
+                dreamVividness: 3,
+                nightmare: true,
+                dreamNote: "쫓기는 꿈"
+            ),
+            CheckIn(date: Fixed.date(2026, 8, 15), mood: .init(0), dreamed: true, dreamVividness: 2),
+            CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(1))
+        ]
+        let report = content(checkIns: checkIns)
+        XCTAssertTrue(texts(report).contains("꿈을 기록한 날 2일 · 아주 생생함 1일 · 악몽 1일"))
+        XCTAssertTrue(texts(report).contains("8월 14일 · 쫓기는 꿈"))
+    }
+
+    func testNoDreamsMeansNoDreamSection() {
+        // "꿈: 없음" 은 빈 칸 재촉이다. 구역 자체가 없어야 한다.
+        let report = content(checkIns: [CheckIn(date: Fixed.date(2026, 8, 16), mood: .init(0))])
+        XCTAssertFalse(texts(report).contains("꿈"))
     }
 
     // MARK: - 복약

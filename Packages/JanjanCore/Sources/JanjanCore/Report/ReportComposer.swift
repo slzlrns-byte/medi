@@ -46,8 +46,34 @@ public struct ReportContent: Hashable, Sendable {
 /// 해석은 진료실에서 사람이 한다(설계 01절 원칙).
 public enum ReportComposer {
 
-    /// 요약이 보는 기간. 복약률과 같은 4주를 쓴다.
+    /// 진료 앵커가 없을 때 보는 기간. 복약률과 같은 4주를 쓴다.
     public static let windowDays = 28
+    /// 지난 진료가 이보다 오래됐으면 4주로 되돌린다 —
+    /// 반년치를 한 장에 접으면 요약이 아니라 목록이 된다.
+    public static let maxAnchoredDays = 90
+
+    /// 요약이 보는 기간. 화면(복약률 카드)과 PDF 가 같은 창을 써야 해서 공용이다.
+    ///
+    /// 지난 진료가 있으면 그날부터 본다 (강점 결정서 1위 — "지난 진료 이후").
+    /// 의사가 궁금한 것은 지난 4주가 아니라 마지막으로 본 뒤의 일이기 때문이다.
+    public static func window(
+        endingAt end: Date,
+        lastVisit: Date?,
+        calendar: Calendar = .current
+    ) -> (start: Date, anchoredToVisit: Bool) {
+        let endDay = calendar.startOfDay(for: end)
+
+        if let visit = lastVisit {
+            let day = calendar.startOfDay(for: visit)
+            if day <= endDay,
+               let oldest = calendar.date(byAdding: .day, value: -(maxAnchoredDays - 1), to: endDay),
+               day >= oldest {
+                return (day, true)
+            }
+        }
+        let start = calendar.date(byAdding: .day, value: -(windowDays - 1), to: endDay) ?? endDay
+        return (start, false)
+    }
 
     public static func make(
         endingAt end: Date,
@@ -58,13 +84,16 @@ public enum ReportComposer {
         checkIns: [CheckIn],
         medicationNotes: [MedicationNote] = [],
         symptomEntries: [SymptomEntry] = [],
+        doseChanges: [DoseChange] = [],
+        lastVisit: Date? = nil,
         nextVisit: Date? = nil,
         questionsKo: String = "",
         calendar: Calendar = .current
     ) -> ReportContent {
 
         let endDay = calendar.startOfDay(for: end)
-        let start = calendar.date(byAdding: .day, value: -(windowDays - 1), to: endDay) ?? endDay
+        let (start, anchored) = window(endingAt: end, lastVisit: lastVisit, calendar: calendar)
+        let windowLength = (calendar.dateComponents([.day], from: start, to: endDay).day ?? 0) + 1
 
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(doseEvents: doseEvents, from: start, to: end))
@@ -78,7 +107,21 @@ public enum ReportComposer {
             to: end,
             calendar: calendar
         ))
-        lines.append(contentsOf: moodLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
+        lines.append(contentsOf: doseChangeLines(
+            doseChanges: doseChanges,
+            medications: medications,
+            from: start,
+            to: end,
+            calendar: calendar
+        ))
+        lines.append(contentsOf: moodLines(
+            checkIns: checkIns,
+            from: start,
+            to: end,
+            windowLength: windowLength,
+            calendar: calendar
+        ))
+        lines.append(contentsOf: dreamLines(checkIns: checkIns, from: start, to: end, calendar: calendar))
         lines.append(contentsOf: noteLines(
             notes: medicationNotes,
             medications: medications,
@@ -89,7 +132,9 @@ public enum ReportComposer {
         lines.append(contentsOf: questionLines(questionsKo))
 
         return ReportContent(
-            titleKo: "\(Janjan.appNameKo) · 4주 요약",
+            titleKo: anchored
+                ? "\(Janjan.appNameKo) · 지난 진료 이후"
+                : "\(Janjan.appNameKo) · 4주 요약",
             periodKo: "\(dayText(start, calendar: calendar)) – \(dayText(endDay, calendar: calendar))",
             lines: lines,
             disclaimerKo: Janjan.medicalDisclaimerKo
@@ -188,10 +233,39 @@ public enum ReportComposer {
         return lines
     }
 
+    /// "9/3 에스시탈로프람 5mg → 10mg". 적힌 그대로만 옮긴다 — 강점 결정서 D12.
+    private static func doseChangeLines(
+        doseChanges: [DoseChange],
+        medications: [Medication],
+        from start: Date,
+        to end: Date,
+        calendar: Calendar
+    ) -> [ReportContent.Line] {
+
+        let inWindow = doseChanges
+            .filter { $0.changedAt >= start && $0.changedAt <= end }
+            .sorted { $0.changedAt < $1.changedAt }
+        guard !inWindow.isEmpty else { return [] }
+
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: "용량 변경")]
+        for change in inWindow {
+            let name = medications.first { $0.id == change.medicationID }?.name ?? "지운 약"
+            lines.append(.init(
+                style: .body,
+                text: "\(monthDayText(change.changedAt, calendar: calendar)) · \(name) \(change.arrowTextKo)"
+            ))
+            if let note = change.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+                lines.append(.init(style: .caption, text: note))
+            }
+        }
+        return lines
+    }
+
     private static func moodLines(
         checkIns: [CheckIn],
         from start: Date,
         to end: Date,
+        windowLength: Int,
         calendar: Calendar
     ) -> [ReportContent.Line] {
 
@@ -204,7 +278,7 @@ public enum ReportComposer {
         }
 
         let days = Set(inWindow.map { calendar.startOfDay(for: $0.date) }).count
-        lines.append(.init(style: .body, text: "\(windowDays)일 중 \(days)일 기록"))
+        lines.append(.init(style: .body, text: "\(windowLength)일 중 \(days)일 기록"))
 
         // 가장 자주 고른 값 하나만 적는다. 평균은 −3~+3 을 섞어 놓아 뜻이 흐려진다.
         var counts: [Int: Int] = [:]
@@ -214,6 +288,48 @@ public enum ReportComposer {
         }) {
             let label = CheckIn.Mood(top.key).labelKo
             lines.append(.init(style: .body, text: "가장 자주 고른 기분: \(label) (\(top.value)일)"))
+        }
+        return lines
+    }
+
+    /// 꿈 (강점 결정서 4위). 척도를 세고 메모를 옮길 뿐, 뜻풀이는 하지 않는다 —
+    /// 꿈 해석은 이 앱이 의도적으로 하지 않는 것 목록에 있다.
+    private static func dreamLines(
+        checkIns: [CheckIn],
+        from start: Date,
+        to end: Date,
+        calendar: Calendar
+    ) -> [ReportContent.Line] {
+
+        let dreamed = checkIns
+            .filter { $0.date >= start && $0.date <= end && $0.dreamed == true }
+            .sorted { $0.date < $1.date }
+        // 꿈 기록이 없으면 구역 자체를 만들지 않는다. "꿈: 없음" 은 빈 칸 재촉이 된다.
+        guard !dreamed.isEmpty else { return [] }
+
+        var lines: [ReportContent.Line] = [.init(style: .heading, text: "꿈")]
+
+        var parts = ["꿈을 기록한 날 \(dreamed.count)일"]
+        let vivid = dreamed.filter { ($0.dreamVividness ?? 0) >= 3 }.count
+        if vivid > 0 { parts.append("아주 생생함 \(vivid)일") }
+        let nightmares = dreamed.filter { $0.nightmare == true }.count
+        if nightmares > 0 { parts.append("악몽 \(nightmares)일") }
+        lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
+
+        // 메모는 최근 것부터 세 개까지만. 종이 한 장의 자리를 지킨다.
+        let noted = dreamed
+            .compactMap { checkIn -> (Date, String)? in
+                guard let note = checkIn.dreamNote?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !note.isEmpty
+                else { return nil }
+                return (checkIn.date, note)
+            }
+            .suffix(3)
+        for (date, note) in noted {
+            lines.append(.init(
+                style: .caption,
+                text: "\(monthDayText(date, calendar: calendar)) · \(note)"
+            ))
         }
         return lines
     }
@@ -285,6 +401,16 @@ public enum ReportComposer {
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "yyyy년 M월 d일"
+        return formatter.string(from: date)
+    }
+
+    /// "9월 3일". 기간 안의 날짜라 연도는 머리글이 이미 말했다.
+    static func monthDayText(_ date: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "M월 d일"
         return formatter.string(from: date)
     }
 }

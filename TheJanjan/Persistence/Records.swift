@@ -291,6 +291,11 @@ final class CheckInRecord {
     var sleepMinutes: Int?
     var sleepQualityRaw: String?
     var dreamed: Bool?
+    // 꿈 3척도 (강점 결정서 D15). 나머지 필드처럼 전부 옵셔널이라 CloudKit 제약도 지킨다.
+    var dreamVividness: Int?
+    var nightmare: Bool?
+    var dreamRecall: Int?
+    var dreamNote: String?
     var activities: [String] = []
     var note: String?
     var longText: String?
@@ -307,6 +312,10 @@ final class CheckInRecord {
         sleepMinutes: Int? = nil,
         sleepQualityRaw: String? = nil,
         dreamed: Bool? = nil,
+        dreamVividness: Int? = nil,
+        nightmare: Bool? = nil,
+        dreamRecall: Int? = nil,
+        dreamNote: String? = nil,
         activities: [String] = [],
         note: String? = nil,
         longText: String? = nil,
@@ -322,6 +331,10 @@ final class CheckInRecord {
         self.sleepMinutes = sleepMinutes
         self.sleepQualityRaw = sleepQualityRaw
         self.dreamed = dreamed
+        self.dreamVividness = dreamVividness
+        self.nightmare = nightmare
+        self.dreamRecall = dreamRecall
+        self.dreamNote = dreamNote
         self.activities = activities
         self.note = note
         self.longText = longText
@@ -340,6 +353,10 @@ final class CheckInRecord {
             sleepMinutes: core.sleepMinutes,
             sleepQualityRaw: core.sleepQuality?.rawValue,
             dreamed: core.dreamed,
+            dreamVividness: core.dreamVividness,
+            nightmare: core.nightmare,
+            dreamRecall: core.dreamRecall,
+            dreamNote: core.dreamNote,
             activities: core.activities,
             note: core.note,
             longText: core.longText,
@@ -359,6 +376,10 @@ final class CheckInRecord {
             sleepMinutes: sleepMinutes,
             sleepQuality: sleepQualityRaw.flatMap(CheckIn.SleepQuality.init(rawValue:)),
             dreamed: dreamed,
+            dreamVividness: dreamVividness,
+            nightmare: nightmare,
+            dreamRecall: dreamRecall,
+            dreamNote: dreamNote,
             activities: activities,
             note: note,
             longText: longText,
@@ -532,6 +553,55 @@ final class MedicationNoteRecord {
     }
 }
 
+@Model
+final class DoseChangeRecord {
+
+    var id: UUID = UUID()
+    var medicationID: UUID = UUID()
+    var changedAt: Date = Date()
+    var fromText: String = ""
+    var toText: String = ""
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        medicationID: UUID = UUID(),
+        changedAt: Date = Date(),
+        fromText: String = "",
+        toText: String = "",
+        note: String? = nil
+    ) {
+        self.id = id
+        self.medicationID = medicationID
+        self.changedAt = changedAt
+        self.fromText = fromText
+        self.toText = toText
+        self.note = note
+    }
+
+    static func make(from core: DoseChange) -> DoseChangeRecord {
+        DoseChangeRecord(
+            id: core.id,
+            medicationID: core.medicationID,
+            changedAt: core.changedAt,
+            fromText: core.fromText,
+            toText: core.toText,
+            note: core.note
+        )
+    }
+
+    var core: DoseChange {
+        DoseChange(
+            id: id,
+            medicationID: medicationID,
+            changedAt: changedAt,
+            fromText: fromText,
+            toText: toText,
+            note: note
+        )
+    }
+}
+
 /// 스키마 한 곳. ModelContainer 와 테스트가 같은 목록을 쓴다.
 enum JanjanSchema {
     static let allModels: [any PersistentModel.Type] = [
@@ -542,6 +612,7 @@ enum JanjanSchema {
         CheckInRecord.self,
         SymptomEntryRecord.self,
         PrescriptionRecord.self,
-        MedicationNoteRecord.self
+        MedicationNoteRecord.self,
+        DoseChangeRecord.self
     ]
 }

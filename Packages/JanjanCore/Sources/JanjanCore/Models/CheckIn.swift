@@ -56,6 +56,16 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
     public var sleepMinutes: Int?
     public var sleepQuality: SleepQuality?
     public var dreamed: Bool?
+    // 꿈 3척도 (강점 결정서 D15). SSRI 계열의 생생한 꿈은 부작용 축에서 함께
+    // 보는 것이 이 앱의 차별점이라, 척도만 받고 해석은 하지 않는다.
+    /// 얼마나 생생했는지. 1~3, 안 고르면 nil.
+    public var dreamVividness: Int?
+    /// 악몽이었는지. 안 고르면 nil.
+    public var nightmare: Bool?
+    /// 얼마나 기억나는지. 1~3, 안 고르면 nil.
+    public var dreamRecall: Int?
+    /// 꿈 한 줄 메모.
+    public var dreamNote: String?
     /// 활동 태그. 외출·운동·사람·술·카페인 등.
     public var activities: [String]
     /// 1층에서 조용히 펼쳐지는 한 줄.
@@ -76,6 +86,10 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         sleepMinutes: Int? = nil,
         sleepQuality: SleepQuality? = nil,
         dreamed: Bool? = nil,
+        dreamVividness: Int? = nil,
+        nightmare: Bool? = nil,
+        dreamRecall: Int? = nil,
+        dreamNote: String? = nil,
         activities: [String] = [],
         note: String? = nil,
         longText: String? = nil,
@@ -91,6 +105,10 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         self.sleepMinutes = sleepMinutes.map { max(0, $0) }
         self.sleepQuality = sleepQuality
         self.dreamed = dreamed
+        self.dreamVividness = dreamVividness.map { min(max($0, 1), 3) }
+        self.nightmare = nightmare
+        self.dreamRecall = dreamRecall.map { min(max($0, 1), 3) }
+        self.dreamNote = dreamNote
         self.activities = activities
         self.note = note
         self.longText = longText

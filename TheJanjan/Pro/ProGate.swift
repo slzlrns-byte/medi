@@ -71,8 +71,8 @@ extension View {
     VStack(spacing: 24) {
         ProBadge()
 
-        WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {}
-            .proGated(.reports)
+        WhitePillButton(title: "약봉투 스캔", systemImage: "camera") {}
+            .proGated(.pharmacyScan)
     }
     .padding(40)
     .fogBackground()

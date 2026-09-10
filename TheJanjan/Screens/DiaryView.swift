@@ -241,6 +241,55 @@ struct DiaryView: View {
                     record.dreamed = (record.dreamed == true) ? nil : true
                     touch(record)
                 }
+
+                // 토글이 꺼져 있으면 아래 3척도는 접어 둘 뿐 지우지 않는다.
+                // 실수로 "꿈을 꿨어요" 를 껐다가 다시 켠 사람이 이미 적어 둔
+                // 생생함·악몽·기억·한 줄을 그대로 다시 볼 수 있어야 한다.
+                if record.dreamed == true {
+                    dreamScaleRow("생생함", value: optionalInt(record, \.dreamVividness))
+
+                    TogglePill(text: "악몽이었어요", isOn: record.nightmare == true) {
+                        record.nightmare = (record.nightmare == true) ? nil : true
+                        touch(record)
+                    }
+
+                    dreamScaleRow("기억", value: optionalInt(record, \.dreamRecall))
+
+                    TextField("꿈 한 줄 (선택)", text: text(record, \.dreamNote), axis: .vertical)
+                        .janjanBody(15)
+                        .foregroundStyle(Color.ink)
+                        .lineLimit(1...4)
+                        .padding(CGFloat(JanjanSpacing.s))
+                        .background(
+                            RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                                .fill(Color.janjan(.surface2))
+                        )
+                }
+            }
+        }
+    }
+
+    /// 꿈 3척도 전용 1~3 세 칸. scaleRow 의 1~5 패턴과 같되 칸 수만 다르다.
+    /// 고른 칸을 다시 누르면 nil 로 되돌린다.
+    private func dreamScaleRow(_ title: String, value: Binding<Int?>) -> some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            HStack {
+                Text(title)
+                    .janjanBody(15, weight: .medium)
+                    .foregroundStyle(Color.ink)
+                Spacer()
+                if value.wrappedValue == nil {
+                    Text("안 적음")
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                }
+            }
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                ForEach(1...3, id: \.self) { step in
+                    TogglePill(text: "\(step)", isOn: value.wrappedValue == step) {
+                        value.wrappedValue = (value.wrappedValue == step) ? nil : step
+                    }
+                }
             }
         }
     }

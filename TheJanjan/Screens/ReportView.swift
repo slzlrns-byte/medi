@@ -4,8 +4,9 @@ import JanjanCore
 
 /// 리포트 — 진료 준비 (설계 03절).
 ///
-/// 지난 4주 복약률과 약별 잔여를 보여 주고, 같은 내용을 PDF 한 장으로 낸다.
-/// 무엇을 적을지는 `ReportComposer` 가 정한다 — 화면과 PDF 가 다른 말을 하지 않도록.
+/// 지난 진료 이후(진료 기록이 없으면 4주)의 복약률과 약별 잔여를 보여 주고,
+/// 같은 내용을 PDF 한 장으로 낸다. 무엇을 적을지는 `ReportComposer` 가 정한다 —
+/// 화면과 PDF 가 다른 말을 하지 않도록.
 struct ReportView: View {
 
     @Query private var medicationRecords: [MedicationRecord]
@@ -15,6 +16,7 @@ struct ReportView: View {
     @Query private var checkInRecords: [CheckInRecord]
     @Query private var symptomRecords: [SymptomEntryRecord]
     @Query(sort: \MedicationNoteRecord.createdAt) private var noteRecords: [MedicationNoteRecord]
+    @Query private var doseChangeRecords: [DoseChangeRecord]
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
@@ -80,10 +82,25 @@ struct ReportView: View {
             .min()
     }
 
+    /// 가장 최근에 다녀온 진료. 요약 기간의 시작점이 된다 — 의사가 궁금한 것은
+    /// 지난 4주가 아니라 마지막으로 본 뒤의 일이다(강점 결정서 1위).
+    private var lastVisit: Date? {
+        prescriptionRecords
+            .map(\.core.visitDate)
+            .filter { $0 <= today }
+            .max()
+    }
+
+    /// 화면과 PDF 가 같은 창을 본다. 계산은 ReportComposer 한 곳이 한다.
+    private var reportWindow: (start: Date, anchoredToVisit: Bool) {
+        ReportComposer.window(endingAt: today, lastVisit: lastVisit)
+    }
+
     private var overallAdherence: Decimal? {
         InventoryCalculator.adherenceRate(
             doseEvents: doses,
-            last28DaysEndingAt: today
+            from: reportWindow.start,
+            to: today
         )
     }
 
@@ -96,7 +113,7 @@ struct ReportView: View {
     private var adherenceCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text("지난 4주")
+                Text(reportWindow.anchoredToVisit ? "지난 진료 이후" : "지난 4주")
                     .janjanBody(13, weight: .medium)
                     .foregroundStyle(Color.muted)
 
@@ -179,7 +196,8 @@ struct ReportView: View {
         }
     }
 
-    /// 내보내기는 Pro. 무료 사용자가 누르면 페이월이 올라온다(유도 세 곳 중 하나).
+    /// 내보내기는 무료다 (2026-09-10, 강점 결정서 반영). 진료실 준비 노트가 이 앱의
+    /// 자리인데 그 한 장을 잠그면 자리 자체를 잠그는 셈이다.
     private var exportCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
@@ -193,7 +211,6 @@ struct ReportView: View {
                 .overlay(
                     Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
                 )
-                .proGated(.reports)
                 .disabled(isExporting)
 
                 Text("만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.")
@@ -257,6 +274,8 @@ struct ReportView: View {
             checkIns: checkIns,
             medicationNotes: medicationNotes,
             symptomEntries: symptomEntries,
+            doseChanges: doseChangeRecords.map(\.core),
+            lastVisit: lastVisit,
             nextVisit: nextVisit,
             questionsKo: questions
         )
