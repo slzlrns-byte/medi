@@ -6,9 +6,9 @@
 # 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
 #
 # 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
-# 마지막 실행: 2026-09-11(2차) 워치 필요시 기록 + 영어 확인
-#   볼 것 - 11-워치-홈의 필요시 줄(로라제팜·오늘 14:19), 17-오늘-영어의 영어 오늘
-#   화면, 18-워치-홈-영어. 두 워치 크기에서 필요시 줄이 잘리지 않는지.
+# 마지막 실행: 2026-09-11(3차) 17-오늘-영어 다시 - CloudKit 플래그 누락으로
+#   앱이 죽어 홈 화면이 찍혔다(런 26). 환경변수·생존 확인·재시도를 붙였다.
+#   볼 것 - 17-오늘-영어 한 장. 나머지는 런 26 과 같다.
 
 name: Screenshots
 
@@ -172,14 +172,25 @@ jobs:
           UDID="${{ steps.simulator.outputs.wide_udid }}"
           BUNDLE="com.thejanjan.app"
           xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
-          if xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -janjan.language en; then
-            sleep 8
-            mkdir -p build/named
-            xcrun simctl io "$UDID" screenshot "build/named/17-오늘-영어.png" \
-              || echo "::warning::영어 화면을 찍지 못했습니다."
-          else
-            echo "::warning::영어 인자로 앱을 띄우지 못했습니다."
-          fi
+          # UI 테스트와 같은 이유로 CloudKit 을 꺼야 한다 - 시뮬레이터에는 iCloud
+          # 계정이 없어 그 경로로 들어가면 앱이 죽고 홈 화면이 찍힌다(런 26).
+          # simctl 은 SIMCTL_CHILD_ 접두사가 붙은 변수를 앱에 넘겨 준다.
+          for attempt in 1 2; do
+            if ! SIMCTL_CHILD_JANJAN_DISABLE_CLOUDKIT=1 \
+                xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -janjan.language en; then
+              echo "::warning::영어 인자로 앱을 띄우지 못했습니다(시도 $attempt)."
+              continue
+            fi
+            sleep 12
+            # 찍기 전에 앱이 아직 살아 있는지 본다. 죽었으면 홈 화면을 찍게 된다.
+            if xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "thejanjan.app"; then
+              mkdir -p build/named
+              xcrun simctl io "$UDID" screenshot "build/named/17-오늘-영어.png" && break
+              echo "::warning::영어 화면을 찍지 못했습니다(시도 $attempt)."
+            else
+              echo "::warning::앱이 뜬 뒤에 사라졌습니다(시도 $attempt)."
+            fi
+          done
 
       - name: 첨부에서 PNG 꺼내기
         # 테스트가 걸려 죽어도 이미 찍힌 것은 꺼낸다. 지난번에 이게 없어서
