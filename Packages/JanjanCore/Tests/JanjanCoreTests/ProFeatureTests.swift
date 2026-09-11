@@ -8,7 +8,7 @@ final class ProFeatureTests: XCTestCase {
     func testLaunchHighlightsAreWhatTheAppActuallyLocks() {
         XCTAssertEqual(
             ProFeature.launchHighlights,
-            [.pharmacyScan, .runOutForecast, .watchApp]
+            [.pharmacyScan, .runOutForecast, .hideNames, .watchApp]
         )
         XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "약봉투 스캔")
     }

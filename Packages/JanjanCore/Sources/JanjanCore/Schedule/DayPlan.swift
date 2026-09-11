@@ -308,7 +308,8 @@ public enum DayPlan {
         generatedAt: Date = Date(),
         isPro: Bool = true,
         themeRaw: String = JanjanTheme.standard.rawValue,
-        language: JanjanLanguage = .standard
+        language: JanjanLanguage = .standard,
+        maskNames: Bool = false
     ) -> WatchSnapshot {
 
         // 구독하지 않았으면 오늘 일정을 담지 않는다. 워치 앱 전체가 Pro 이므로
@@ -342,9 +343,14 @@ public enum DayPlan {
                     }
                     .sorted { $0.effectiveDate < $1.effectiveDate }
                 let today = taken.filter { calendar.isDate($0.effectiveDate, inSameDayAs: day) }
+                // 이름을 가리면 용도 한 줄("불안이 몰려올 때")로 부른다 - 무엇에
+                // 쓰는 약인지는 보이되 이름은 곁의 시선에 남지 않는다.
+                let maskedTitle = medication.purposeLine.isEmpty
+                    ? (language == .english ? "As-needed med" : "필요시 약")
+                    : medication.purposeLine
                 return WatchSnapshot.AsNeededLine(
                     medicationID: medication.id,
-                    title: medication.displayTitle,
+                    title: maskNames ? maskedTitle : medication.displayTitle,
                     quantity: taken.last?.quantity ?? 1,
                     takenTodayTexts: today.map { clockText(for: $0.effectiveDate, calendar: calendar) }
                 )
@@ -361,7 +367,9 @@ public enum DayPlan {
                     labelKo: line.slot.label(language),
                     // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 워치가 안 그린다.
                     timeText: line.slot.isCustom ? "" : line.time.description,
-                    medicationNames: line.medicationNames,
+                    // 이름을 가리면 비워 보낸다 - 워치는 이름이 없으면 "2종" 으로
+                    // 부르는 기존 규칙(summary)을 그대로 탄다.
+                    medicationNames: maskNames ? [] : line.medicationNames,
                     medicationIDs: line.entries.map(\.medicationID),
                     isCompleted: line.isCompleted
                 )

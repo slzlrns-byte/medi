@@ -10,6 +10,7 @@ import Foundation
 public enum ProFeature: String, CaseIterable, Sendable {
     case pharmacyScan
     case runOutForecast
+    case hideNames
     case detailedMoodDiary
     case watchApp
     case reports
@@ -20,6 +21,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         switch self {
         case .pharmacyScan: return "약봉투 스캔"
         case .runOutForecast: return "소진 예측과 부족 알림"
+        case .hideNames: return "약 이름 가리기"
         case .detailedMoodDiary: return "자세한 기분일기"
         case .watchApp: return "Apple Watch 앱"
         case .reports: return "진료용 리포트"
@@ -32,6 +34,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         switch self {
         case .pharmacyScan: return "Pharmacy bag scan"
         case .runOutForecast: return "Run-out forecast and alerts"
+        case .hideNames: return "Hide medication names"
         case .detailedMoodDiary: return "Detailed mood journal"
         case .watchApp: return "Apple Watch app"
         case .reports: return "Visit report"
@@ -61,6 +64,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     public static let launchHighlights: [ProFeature] = [
         .pharmacyScan,
         .runOutForecast,
+        .hideNames,
         .watchApp
     ]
 }

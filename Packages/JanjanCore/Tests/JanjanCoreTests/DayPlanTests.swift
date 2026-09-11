@@ -620,4 +620,34 @@ final class DayPlanTests: XCTestCase {
         let restored = WatchMessage(payload: message.payload)
         XCTAssertEqual(restored, message)
     }
+
+    func testMaskedSnapshotHidesNamesButKeepsTheRhythm() {
+        // 이름을 가려도 시간대·개수·기록 가능성은 그대로다. 필요시 줄은
+        // 용도 한 줄로 불린다 - 무엇에 쓰는지는 보이되 이름은 남지 않는다.
+        let lorazepam = Medication(
+            id: Fixed.medB, name: "로라제팜", strengthText: "0.5mg",
+            kind: .asNeeded, purposeLine: "불안이 몰려올 때"
+        )
+        let snapshot = DayPlan.watchSnapshot(
+            on: monday,
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [medications[0], lorazepam],
+            doseEvents: [],
+            calendar: Fixed.calendar,
+            generatedAt: monday,
+            maskNames: true
+        )
+        XCTAssertEqual(snapshot.slots[0].medicationNames, [])
+        XCTAssertEqual(snapshot.slots[0].summaryKo, "1종")
+        XCTAssertEqual(snapshot.slots[0].medicationIDs, [Fixed.medA])  // 기록은 여전히 보낼 수 있다
+        XCTAssertEqual(snapshot.asNeeded[0].title, "불안이 몰려올 때")
+
+        // 용도를 적지 않은 약은 중립적인 이름으로.
+        let unnamed = Medication(id: Fixed.medB, name: "로라제팜", kind: .asNeeded)
+        let fallback = DayPlan.watchSnapshot(
+            on: monday, schedules: [], medications: [unnamed], doseEvents: [],
+            calendar: Fixed.calendar, generatedAt: monday, maskNames: true
+        )
+        XCTAssertEqual(fallback.asNeeded[0].title, "필요시 약")
+    }
 }
