@@ -138,6 +138,47 @@ final class ScreenshotTests: XCTestCase {
             _ = tryDismissSheet()
         }
 
+        // 기록 없이 지나간 시간대를 하나씩 답하는 시트. 데모 데이터가 어제·그제
+        // 아침을 비워 두므로 "이틀 연속" 이 두 줄로 따로 보이는지 여기서 확인한다.
+        if isTabBarReachable {
+            tap(tab: "오늘")
+            scrollToTop()
+            let review = app.buttons["살펴보기"].firstMatch
+            if review.waitForExistence(timeout: 5) {
+                review.tap()
+                settle()
+                capture("15-지나간-시간대")
+                _ = tryDismissSheet()
+            }
+        }
+
+        // 약 상세의 "다시 세기". 센 개수까지 적어야 비교 문장과 미기록 목록이
+        // 같이 나온다 - 데모 데이터 기준으로 기록상 잔여와 같은 17을 적는다.
+        if isTabBarReachable {
+            tap(tab: "약")
+            let row = app.buttons.matching(identifier: "medicationRow").firstMatch
+            if row.waitForExistence(timeout: 10) {
+                row.tap()
+                settle()
+                let recount = app.buttons["다시 세기"].firstMatch
+                if recount.waitForExistence(timeout: 5) {
+                    recount.tap()
+                    settle()
+                    let field = app.textFields.firstMatch
+                    if field.waitForExistence(timeout: 5) {
+                        field.tap()
+                        field.typeText("17")
+                        settle()
+                        // 숫자패드가 미기록 목록을 가리므로 한 번 밀어 올려 둔다.
+                        app.swipeUp()
+                        settle()
+                    }
+                    capture("16-다시-세기")
+                    _ = tryDismissSheet()
+                }
+            }
+        }
+
         // 오늘의 시간대 타일 본문을 누르면 그 시간대의 약 목록 시트가 열린다.
         // 이것도 시트라 맨 뒤에 있다.
         if isTabBarReachable {

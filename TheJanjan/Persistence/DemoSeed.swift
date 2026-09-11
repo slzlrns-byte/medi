@@ -32,6 +32,9 @@ enum DemoSeed {
             context.insert(StockEventRecord.make(from: event))
         }
         for event in SampleData.doseEvents(referenceDate: now) {
+            // 어제·그제 아침은 기록 없이 지나간 것으로 남긴다 — "이틀 연속 빠트림" 을
+            // 화면(지나간 시간대 안내·다시 세기 대조)이 어떻게 다루는지 찍기 위해서다.
+            if isRecentMorningGap(event, now: now) { continue }
             context.insert(DoseEventRecord.make(from: event))
         }
         context.insert(PrescriptionRecord.make(from: SampleData.prescription(referenceDate: now)))
@@ -40,8 +43,46 @@ enum DemoSeed {
         seedSymptoms(context: context, now: now)
         seedNotes(context: context, now: now)
         seedDoseChanges(context: context, now: now)
+        seedAsNeededDoses(context: context, now: now)
 
         try? context.save()
+    }
+
+    /// 어제(1)·그제(2)의 에스시탈로프람 아침 기록인가.
+    private static func isRecentMorningGap(_ event: DoseEvent, now: Date) -> Bool {
+        guard event.medicationID == SampleData.escitalopram.id,
+              event.slotKey == DoseSlot.morning.storageKey else { return false }
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: event.scheduledAt),
+            to: calendar.startOfDay(for: now)
+        ).day ?? 0
+        return days == 1 || days == 2
+    }
+
+    /// 필요시(로라제팜) 복용 예시: 오늘 한 번, 사흘 전 두 번.
+    /// 오늘 화면의 필요시 카드 이력과 리포트의 "필요시 복용" 구역이 이걸로 보인다.
+    private static func seedAsNeededDoses(context: ModelContext, now: Date) {
+        let calendar = Calendar.current
+        var moments: [Date] = [now.addingTimeInterval(-60)]
+        if let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: now) {
+            let day = calendar.startOfDay(for: threeDaysAgo)
+            moments.append(day.addingTimeInterval(15 * 3600))
+            moments.append(day.addingTimeInterval(20 * 3600 + 1800))
+        }
+        for at in moments {
+            let event = DoseEvent(
+                medicationID: SampleData.lorazepam.id,
+                scheduledAt: at,
+                actualAt: at,
+                status: .taken,
+                quantity: 1,
+                kind: .asNeeded,
+                slotKey: nil
+            )
+            context.insert(DoseEventRecord.make(from: event))
+        }
     }
 
     /// 지난 2주의 기분. 오르내림이 있어야 "지난 기록" 이 한 줄짜리로 보이지 않는다.
