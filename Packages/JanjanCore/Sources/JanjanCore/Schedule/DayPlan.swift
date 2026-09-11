@@ -330,6 +330,26 @@ public enum DayPlan {
             calendar: calendar
         )
 
+        // 필요시 약. 워치는 이 줄을 눌러 그 순간의 복용을 보낸다 - 개수는
+        // 지난번에 먹은 개수를 따르고(없으면 1), 오늘 이력은 시각으로만 보인다.
+        let asNeededLines = medications
+            .filter { $0.status == .active && $0.kind == .asNeeded }
+            .map { medication -> WatchSnapshot.AsNeededLine in
+                let taken = doseEvents
+                    .filter {
+                        $0.medicationID == medication.id
+                            && $0.kind == .asNeeded && $0.status == .taken
+                    }
+                    .sorted { $0.effectiveDate < $1.effectiveDate }
+                let today = taken.filter { calendar.isDate($0.effectiveDate, inSameDayAs: day) }
+                return WatchSnapshot.AsNeededLine(
+                    medicationID: medication.id,
+                    title: medication.displayTitle,
+                    quantity: taken.last?.quantity ?? 1,
+                    takenTodayTexts: today.map { clockText(for: $0.effectiveDate, calendar: calendar) }
+                )
+            }
+
         return WatchSnapshot(
             generatedAt: generatedAt,
             dateText: shortDateText(for: day, language: language),
@@ -346,10 +366,17 @@ public enum DayPlan {
                     isCompleted: line.isCompleted
                 )
             },
+            asNeeded: asNeededLines,
             remainingCountToday: pendingCount(in: lines),
             themeRaw: themeRaw,
             languageRaw: language.rawValue
         )
+    }
+
+    /// "14:19". 필요시 이력의 시각 - 두 언어에서 같은 24시간 표기를 쓴다.
+    static func clockText(for date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     }
 
     /// "8/17". 워치 화면 맨 위 한 줄.

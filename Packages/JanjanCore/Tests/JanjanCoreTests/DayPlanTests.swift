@@ -543,6 +543,7 @@ final class DayPlanTests: XCTestCase {
         )
 
         XCTAssertFalse(snapshot.isPro)
+        XCTAssertTrue(snapshot.asNeeded.isEmpty)
         XCTAssertTrue(snapshot.slots.isEmpty)
         XCTAssertEqual(snapshot.remainingCountToday, 0)
     }
@@ -572,5 +573,51 @@ final class DayPlanTests: XCTestCase {
         XCTAssertNotNil(data)
         let restored = data.flatMap { try? JSONDecoder().decode(WatchSnapshot.self, from: $0) }
         XCTAssertEqual(restored, snapshot)
+    }
+
+    func testWatchSnapshotCarriesAsNeededMedications() {
+        // 필요시 약은 시간대 줄이 아니라 자기 목록으로 실린다. 개수는 지난번에
+        // 먹은 개수를 따르고, 오늘 이력은 시각으로만 담긴다.
+        let lorazepam = Medication(
+            id: Fixed.medB, name: "로라제팜", strengthText: "0.5mg", kind: .asNeeded
+        )
+        let yesterday = Fixed.date(2026, 8, 16, 21, 0)
+        let todayNoon = Fixed.date(2026, 8, 17, 12, 30)
+        let doses = [
+            DoseEvent(
+                medicationID: Fixed.medB, scheduledAt: yesterday, actualAt: yesterday,
+                status: .taken, quantity: Fixed.decimal("0.5"), kind: .asNeeded, slotKey: nil
+            ),
+            DoseEvent(
+                medicationID: Fixed.medB, scheduledAt: todayNoon, actualAt: todayNoon,
+                status: .taken, quantity: 1, kind: .asNeeded, slotKey: nil
+            )
+        ]
+        let snapshot = DayPlan.watchSnapshot(
+            on: monday,
+            // 필요시 약에는 스케줄이 없다 - 정기 약의 스케줄만 넘긴다.
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [medications[0], lorazepam],
+            doseEvents: doses,
+            calendar: Fixed.calendar,
+            generatedAt: monday
+        )
+        XCTAssertEqual(snapshot.asNeeded.count, 1)
+        let line = snapshot.asNeeded[0]
+        XCTAssertEqual(line.title, "로라제팜 0.5mg")
+        XCTAssertEqual(line.quantity, 1)  // 가장 최근(오늘 낮)의 개수
+        XCTAssertEqual(line.takenTodayTexts, ["12:30"])  // 어제 것은 오늘 이력이 아니다
+
+        // 시간대 줄에는 섞이지 않는다.
+        XCTAssertFalse(snapshot.slots.contains { $0.medicationNames.contains("로라제팜") })
+    }
+
+    func testAsNeededMessageSurvivesTheDictionaryRoundTrip() {
+        let at = Fixed.date(2026, 8, 17, 14, 19)
+        let message = WatchMessage.asNeededTaken(
+            medicationID: Fixed.medB, quantity: Fixed.decimal("0.5"), at: at
+        )
+        let restored = WatchMessage(payload: message.payload)
+        XCTAssertEqual(restored, message)
     }
 }

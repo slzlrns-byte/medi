@@ -65,10 +65,31 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         }
     }
 
+    /// 필요할 때 먹는 약 한 줄. 워치는 이걸 눌러 그 순간의 복용을 폰으로 보낸다.
+    public struct AsNeededLine: Codable, Hashable, Sendable, Identifiable {
+        public var id: UUID { medicationID }
+        public let medicationID: UUID
+        /// "로라제팜 0.5mg" - 폰이 구워 보낸 표시용 이름.
+        public let title: String
+        /// 누르면 기록될 개수. 폰에서 지난번에 먹은 개수를 따른다(없으면 1).
+        public let quantity: Decimal
+        /// 오늘 이미 기록된 시각들("14:19"). 사실만 보여 주고 세지 않는다.
+        public let takenTodayTexts: [String]
+
+        public init(medicationID: UUID, title: String, quantity: Decimal, takenTodayTexts: [String] = []) {
+            self.medicationID = medicationID
+            self.title = title
+            self.quantity = quantity
+            self.takenTodayTexts = takenTodayTexts
+        }
+    }
+
     public let generatedAt: Date
     /// "8/17"
     public let dateText: String
     public let slots: [SlotLine]
+    /// 필요시(응급) 약들. 이 키가 없던 시절의 스냅샷은 빈 목록으로 되살아난다.
+    public let asNeeded: [AsNeededLine]
     /// 오늘 아직 기록하지 않은 약 개수. 컴플리케이션에 그대로 쓴다.
     public let remainingCountToday: Int
     /// 워치 앱은 Pro 기능이다(무료/Pro 경계 결정). **판단은 폰이 한다.**
@@ -92,6 +113,7 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         generatedAt: Date = Date(),
         dateText: String,
         slots: [SlotLine],
+        asNeeded: [AsNeededLine] = [],
         remainingCountToday: Int,
         isPro: Bool = true,
         themeRaw: String = JanjanTheme.standard.rawValue,
@@ -100,6 +122,7 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         self.generatedAt = generatedAt
         self.dateText = dateText
         self.slots = slots
+        self.asNeeded = asNeeded
         self.remainingCountToday = remainingCountToday
         self.isPro = isPro
         self.themeRaw = themeRaw
@@ -107,7 +130,7 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case generatedAt, dateText, slots, remainingCountToday, isPro, themeRaw, languageRaw
+        case generatedAt, dateText, slots, asNeeded, remainingCountToday, isPro, themeRaw, languageRaw
     }
 
     /// 키가 없던 시절의 스냅샷이 남아 있어도 되살아나게 한다.
@@ -117,6 +140,7 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
         generatedAt = try container.decode(Date.self, forKey: .generatedAt)
         dateText = try container.decode(String.self, forKey: .dateText)
         slots = try container.decode([SlotLine].self, forKey: .slots)
+        asNeeded = try container.decodeIfPresent([AsNeededLine].self, forKey: .asNeeded) ?? []
         remainingCountToday = try container.decode(Int.self, forKey: .remainingCountToday)
         isPro = try container.decodeIfPresent(Bool.self, forKey: .isPro) ?? true
         themeRaw = try container.decodeIfPresent(String.self, forKey: .themeRaw)
@@ -161,6 +185,8 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
 public enum WatchMessage: Hashable, Sendable {
 
     case doseAction(medicationIDs: [UUID], slotKey: String, action: DoseAction)
+    /// 필요시(응급) 복용 한 번. 시간대가 없으므로 슬롯 없이 약과 시각만 말한다.
+    case asNeededTaken(medicationID: UUID, quantity: Decimal, at: Date)
     case symptom(symptomID: String, severity: Int, at: Date)
     case mood(score: Int, at: Date)
     case requestSnapshot
@@ -178,6 +204,8 @@ public enum WatchMessage: Hashable, Sendable {
         public static let medicationIDs = "medicationIDs"
         public static let slotKey = "slotKey"
         public static let action = "action"
+        public static let medicationID = "medicationID"
+        public static let quantity = "quantity"
         public static let symptomID = "symptomID"
         public static let severity = "severity"
         public static let score = "score"
@@ -187,6 +215,7 @@ public enum WatchMessage: Hashable, Sendable {
 
     private enum Kind: String {
         case doseAction
+        case asNeededTaken
         case symptom
         case mood
         case requestSnapshot
@@ -203,6 +232,14 @@ public enum WatchMessage: Hashable, Sendable {
                 Key.slotKey: slotKey,
                 Key.action: action.rawValue,
                 Key.timestamp: Date().timeIntervalSince1970
+            ]
+        case .asNeededTaken(let medicationID, let quantity, let date):
+            return [
+                Key.type: Kind.asNeededTaken.rawValue,
+                Key.medicationID: medicationID.uuidString,
+                // Decimal 은 문자열로 굽는다 - Double 을 거치면 0.1 같은 값이 흔들린다.
+                Key.quantity: NSDecimalNumber(decimal: quantity).stringValue,
+                Key.timestamp: date.timeIntervalSince1970
             ]
         case .symptom(let symptomID, let severity, let date):
             return [
@@ -246,6 +283,13 @@ public enum WatchMessage: Hashable, Sendable {
                 slotKey: slotKey,
                 action: action
             )
+        case .asNeededTaken:
+            guard let rawID = payload[Key.medicationID] as? String,
+                  let medicationID = UUID(uuidString: rawID),
+                  let rawQuantity = payload[Key.quantity] as? String,
+                  let quantity = Decimal(string: rawQuantity)
+            else { return nil }
+            self = .asNeededTaken(medicationID: medicationID, quantity: quantity, at: date)
         case .symptom:
             guard let symptomID = payload[Key.symptomID] as? String,
                   let severity = payload[Key.severity] as? Int
