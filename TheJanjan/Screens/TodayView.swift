@@ -26,6 +26,14 @@ struct TodayView: View {
 
     @State private var openSlot: SlotSelection?
     @State private var safetyReason: SafetyReason?
+    @State private var isShowingUnrecordedSheet = false
+    /// 약별로 고른 필요시 개수. 고르지 않은 약은 `asNeededQuantity(for:)` 가
+    /// 가장 최근 기록에서 기본값을 찾는다.
+    @State private var asNeededQuantities: [UUID: Decimal] = [:]
+
+    /// 개수 선택지. 0.25 단위까지 허용하는 저장 규칙과 달리 화면에서 고르는 값은
+    /// 이 넷으로 좁힌다 - 필요시 약에서 실제로 쓰이는 값이 대체로 이 안에 있다.
+    private let asNeededQuantityOptions: [Decimal] = [0.5, 1, 1.5, 2]
 
     /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
     private struct SafetyReason: Identifiable {
@@ -67,15 +75,63 @@ struct TodayView: View {
 
     private var hasAnyMedication: Bool { !medicationRecords.isEmpty }
 
+    /// 지금 복용 중인 필요시 약. 카드는 이게 하나라도 있을 때만 보인다.
+    private var activeAsNeededMedications: [Medication] {
+        medications.filter { $0.status == .active && $0.kind == .asNeeded }
+    }
+
+    /// 오늘 기록된 필요시 사건. 시각순으로 보여 준다.
+    private var todaysAsNeededEvents: [DoseEventRecord] {
+        let calendar = Calendar.current
+        return doseRecords
+            .filter {
+                $0.kindRaw == DoseEvent.Kind.asNeeded.rawValue
+                    && calendar.isDate($0.scheduledAt, inSameDayAs: today)
+            }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
+    /// 오늘을 뺀 지난 7일에서 기록 없이 지나간 시간대.
+    ///
+    /// 오늘 지나간 시간대는 슬롯 타일에 이미 보이므로 여기서는 중복해 세지 않는다 -
+    /// `until` 을 오늘 0시로 주면 어제까지만 찾는다.
+    private var unrecordedLines: [UnrecordedSlots.Line] {
+        let calendar = Calendar.current
+        guard let from = calendar.date(byAdding: .day, value: -7, to: today) else { return [] }
+        return UnrecordedSlots.find(
+            from: from,
+            until: calendar.startOfDay(for: today),
+            schedules: schedules,
+            medications: medications,
+            doseEvents: doseEvents,
+            calendar: calendar
+        )
+    }
+
+    private var unrecordedSlotsMessage: String {
+        let count = unrecordedLines.count
+        let noun = count == 1 ? "slot" : "slots"
+        return t(
+            "기록 없이 지나간 시간대가 \(count)개 있어요.",
+            "\(count) time \(noun) went by without a record."
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     hero
+                    if !unrecordedLines.isEmpty {
+                        unrecordedSlotsCard
+                    }
                     if hasAnyMedication {
                         slotSection
                     } else {
                         emptyCard
+                    }
+                    if !activeAsNeededMedications.isEmpty {
+                        asNeededCard
                     }
                     checkInCard
                     glanceCard
@@ -112,6 +168,13 @@ struct TodayView: View {
                     // 시트를 열어 둔 사이에 그 시간대가 사라질 수 있다(다른 기기에서
                     // 약을 중단하거나 지웠을 때). 빈 시트를 남기지 않고 이유를 말한다.
                     SlotGoneSheet()
+                }
+            }
+            .sheet(isPresented: $isShowingUnrecordedSheet) {
+                // 목록은 값이 아니라 매번 다시 계산해 넘긴다 - 답을 하나 남기면
+                // 시트가 열려 있는 채로 그 줄이 목록에서 빠진다.
+                UnrecordedSlotsSheet(lines: unrecordedLines, language: lang) { line, entry, status in
+                    recordUnrecorded(entry, in: line, as: status)
                 }
             }
         }
@@ -269,6 +332,153 @@ struct TodayView: View {
         }
     }
 
+    // MARK: - 기록 없이 지나간 시간대
+
+    /// 재촉이 아니라 안내다 - 사실만 짧게 말하고 살펴볼지는 사용자가 고른다.
+    private var unrecordedSlotsCard: some View {
+        JanjanCard {
+            HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(unrecordedSlotsMessage)
+                    .janjanBody(14)
+                    .foregroundStyle(Color.ink2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                WhitePillButton(title: t("살펴보기", "Take a look")) {
+                    isShowingUnrecordedSheet = true
+                }
+            }
+        }
+    }
+
+    // MARK: - 필요시
+
+    private var asNeededCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(t("필요시", "As needed"))
+                    .janjanDisplay(20)
+                    .foregroundStyle(Color.ink)
+                Text(t(
+                    "드신 그 순간에 눌러 주세요. 몇 번이든 각각 기록됩니다.",
+                    "Tap when you take it. Each time is recorded on its own."
+                ))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.muted)
+
+                VStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    ForEach(activeAsNeededMedications) { medication in
+                        asNeededRow(medication)
+                    }
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
+
+                if !todaysAsNeededEvents.isEmpty {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        ForEach(todaysAsNeededEvents) { event in
+                            asNeededHistoryRow(event)
+                        }
+                    }
+                    .padding(.top, CGFloat(JanjanSpacing.xs))
+                }
+            }
+        }
+    }
+
+    private func asNeededRow(_ medication: Medication) -> some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(medication.displayTitle)
+                .janjanBody(15, weight: .medium)
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+
+            Spacer(minLength: CGFloat(JanjanSpacing.xs))
+
+            Menu {
+                ForEach(asNeededQuantityOptions, id: \.self) { option in
+                    Button {
+                        asNeededQuantities[medication.id] = option
+                    } label: {
+                        Text(t(
+                            "\(DecimalQuantity.display(option))정",
+                            "\(DecimalQuantity.display(option)) pills"
+                        ))
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(asNeededQuantityLabel(for: medication.id))
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10))
+                }
+                .janjanBody(13, weight: .medium)
+                .foregroundStyle(Color.ink2)
+                .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 2)
+                .background(Capsule(style: .continuous).fill(Color.janjan(.surface2)))
+            }
+
+            WhitePillButton(title: t("먹었어요", "Took it")) {
+                recordAsNeeded(medicationID: medication.id, quantity: asNeededQuantity(for: medication.id))
+            }
+        }
+    }
+
+    private func asNeededHistoryRow(_ event: DoseEventRecord) -> some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(asNeededHistoryText(event))
+                .janjanBody(13)
+                .foregroundStyle(Color.ink2)
+            Spacer(minLength: 0)
+            Button {
+                deleteAsNeededEvent(event)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.muted)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(t("이 기록 지우기", "Delete this entry")))
+        }
+    }
+
+    private func asNeededHistoryText(_ event: DoseEventRecord) -> String {
+        let time = asNeededTimeFormatter.string(from: event.scheduledAt)
+        let name = medications.first(where: { $0.id == event.medicationID })?.displayTitle ?? ""
+        let quantityText = t(
+            "\(DecimalQuantity.display(event.quantity))정",
+            "\(DecimalQuantity.display(event.quantity)) pills"
+        )
+        return "\(time) · \(name) \(quantityText)"
+    }
+
+    private var asNeededTimeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+
+    /// 고른 값이 있으면 그것, 없으면 그 약의 가장 최근 필요시 기록의 개수, 그것도
+    /// 없으면 1정.
+    private func asNeededQuantity(for medicationID: UUID) -> Decimal {
+        asNeededQuantities[medicationID] ?? defaultAsNeededQuantity(for: medicationID)
+    }
+
+    private func asNeededQuantityLabel(for medicationID: UUID) -> String {
+        let quantity = asNeededQuantity(for: medicationID)
+        return t(
+            "\(DecimalQuantity.display(quantity))정",
+            "\(DecimalQuantity.display(quantity)) pills"
+        )
+    }
+
+    private func defaultAsNeededQuantity(for medicationID: UUID) -> Decimal {
+        doseRecords
+            .filter { $0.medicationID == medicationID && $0.kindRaw == DoseEvent.Kind.asNeeded.rawValue }
+            .max { $0.scheduledAt < $1.scheduledAt }?
+            .quantity ?? 1
+    }
+
     // MARK: - 체크인
 
     private var checkInCard: some View {
@@ -356,6 +566,39 @@ struct TodayView: View {
             source: .phone,
             on: today,
             quantity: entry.dose,
+            in: context
+        )
+        save()
+    }
+
+    private func recordAsNeeded(medicationID: UUID, quantity: Decimal) {
+        DoseRecorder.recordAsNeeded(
+            medicationID: medicationID,
+            quantity: quantity,
+            source: .phone,
+            in: context
+        )
+        save()
+    }
+
+    private func deleteAsNeededEvent(_ event: DoseEventRecord) {
+        context.delete(event)
+        save()
+    }
+
+    /// 지나간 시간대 시트의 세 답 중 하나를 그 줄의 약마다 남긴다.
+    private func recordUnrecorded(
+        _ entry: DayPlan.Entry,
+        in line: UnrecordedSlots.Line,
+        as status: DoseEvent.Status
+    ) {
+        DoseRecorder.record(
+            medicationID: entry.medicationID,
+            slotKey: line.slot.storageKey,
+            status: status,
+            source: .phone,
+            on: line.day,
+            at: line.plannedAt,
             in: context
         )
         save()
@@ -478,6 +721,84 @@ private struct SlotRecordSheet: View {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     WhitePillButton(title: t("복용함", "Taken")) { onRecord(entry, .taken) }
                     WhitePillButton(title: t("건너뜀", "Skipped")) { onRecord(entry, .skipped) }
+                }
+            }
+        }
+    }
+}
+
+/// 기록 없이 지나간 시간대를 하나씩 물어보는 시트.
+///
+/// 어느 날 무슨 일이 있었는지는 사용자만 안다. 그래서 판단하지 않고 세 가지
+/// 답만 내놓는다 - 먹었다, 건너뛰었다, 기억나지 않는다. 셋 다 똑같이 유효한 답이다.
+private struct UnrecordedSlotsSheet: View {
+
+    let lines: [UnrecordedSlots.Line]
+    let language: JanjanLanguage
+    let onAnswer: (UnrecordedSlots.Line, DayPlan.Entry, DoseEvent.Status) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                    Text(t(
+                        "어느 날을 어떻게 하셨는지는 본인만 알 수 있어요. 기억나는 대로 답해 주시고, 기억나지 않으면 그대로 적어 두면 됩니다.",
+                        "Only you can know what happened on each day. Answer what you remember — and if you don't remember, that's a fine answer too."
+                    ))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+
+                    if lines.isEmpty {
+                        Text(t("모두 답했어요.", "All answered."))
+                            .janjanBody(15, weight: .medium)
+                            .foregroundStyle(Color.ink)
+                            .padding(.top, CGFloat(JanjanSpacing.l))
+                    } else {
+                        ForEach(lines) { line in
+                            lineCard(line)
+                        }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("기록 없이 지나간 시간대", "Unrecorded time slots"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func lineCard(_ line: UnrecordedSlots.Line) -> some View {
+        JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(UnrecordedSlots.title(for: line, language: language))
+                    .janjanBody(16, weight: .medium)
+                    .foregroundStyle(Color.ink)
+                Text(line.entries.map(\.medicationName).joined(separator: " · "))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.ink2)
+
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    WhitePillButton(title: t("먹었어요", "Took it")) {
+                        for entry in line.entries { onAnswer(line, entry, .taken) }
+                    }
+                    WhitePillButton(title: t("건너뛰었어요", "Skipped it")) {
+                        for entry in line.entries { onAnswer(line, entry, .skipped) }
+                    }
+                }
+                WhitePillButton(title: t("기억나지 않아요", "I don't remember")) {
+                    for entry in line.entries { onAnswer(line, entry, .unrecorded) }
                 }
             }
         }
