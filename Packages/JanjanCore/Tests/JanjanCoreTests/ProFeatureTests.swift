@@ -35,7 +35,7 @@ final class ProFeatureTests: XCTestCase {
     }
 
     func testEveryFeatureHasKoreanTitle() {
-        XCTAssertEqual(ProFeature.allCases.count, 7)
+        XCTAssertEqual(ProFeature.allCases.count, 8)
         for feature in ProFeature.allCases {
             XCTAssertFalse(feature.titleKo.isEmpty, "\(feature) 문구가 비어 있다")
             XCTAssertFalse(feature.rawValue.isEmpty)

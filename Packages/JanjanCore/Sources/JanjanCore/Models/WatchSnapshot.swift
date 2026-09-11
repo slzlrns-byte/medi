@@ -53,15 +53,21 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
             isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
         }
 
+        /// 이름이 비어 있어도 ID 가 있으면 약은 있는 것이다 - 이름 가리기가 이름만
+        /// 비워 보내므로, 개수까지 "없음" 으로 말하면 가림이 거짓말이 된다.
+        private var medicationCount: Int {
+            medicationNames.isEmpty ? medicationIDs.count : medicationNames.count
+        }
+
         public var summaryKo: String {
-            if medicationNames.isEmpty { return "예정된 약 없음" }
-            return "\(medicationNames.count)종"
+            guard medicationCount > 0 else { return "예정된 약 없음" }
+            return "\(medicationCount)종"
         }
 
         public func summary(_ language: JanjanLanguage) -> String {
             guard language == .english else { return summaryKo }
-            if medicationNames.isEmpty { return "Nothing scheduled" }
-            return medicationNames.count == 1 ? "1 med" : "\(medicationNames.count) meds"
+            guard medicationCount > 0 else { return "Nothing scheduled" }
+            return medicationCount == 1 ? "1 med" : "\(medicationCount) meds"
         }
     }
 
