@@ -122,6 +122,14 @@ public enum ReportComposer {
             language: language,
             calendar: calendar
         ))
+        lines.append(contentsOf: asNeededLines(
+            medications: medications,
+            doseEvents: doseEvents,
+            from: start,
+            to: end,
+            language: language,
+            calendar: calendar
+        ))
         lines.append(contentsOf: moodLines(
             checkIns: checkIns,
             from: start,
@@ -310,6 +318,64 @@ public enum ReportComposer {
             if let note = change.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
                 lines.append(.init(style: .caption, text: note))
             }
+        }
+        return lines
+    }
+
+    /// 필요시(응급) 복용. 언제 · 몇 번 썼는지만 센다 — 응급약 사용 빈도는 의사가
+    /// 실제로 묻는 것이지만, "자주" 같은 해석은 붙이지 않는다. 기록 없으면 구역도 없다.
+    private static func asNeededLines(
+        medications: [Medication],
+        doseEvents: [DoseEvent],
+        from start: Date,
+        to end: Date,
+        language: JanjanLanguage,
+        calendar: Calendar
+    ) -> [ReportContent.Line] {
+
+        let en = language == .english
+        var lines: [ReportContent.Line] = []
+
+        for medication in medications {
+            let taken = doseEvents
+                .filter {
+                    $0.medicationID == medication.id
+                        && $0.kind == .asNeeded
+                        && $0.status == .taken
+                        && $0.effectiveDate >= start && $0.effectiveDate <= end
+                }
+                .sorted { $0.effectiveDate < $1.effectiveDate }
+            guard !taken.isEmpty else { continue }
+
+            // 날짜별로 묶는다: "9/3 · 9/7 2회 · 9/9".
+            var dayCounts: [(day: Date, count: Int)] = []
+            for event in taken {
+                let day = calendar.startOfDay(for: event.effectiveDate)
+                if let last = dayCounts.last, last.day == day {
+                    dayCounts[dayCounts.count - 1].count += 1
+                } else {
+                    dayCounts.append((day: day, count: 1))
+                }
+            }
+
+            if lines.isEmpty {
+                lines.append(.init(style: .heading, text: en ? "As-needed doses" : "필요시 복용"))
+            }
+            let total = taken.count
+            lines.append(.init(
+                style: .body,
+                text: en
+                    ? "\(medication.displayTitle) · \(total == 1 ? "once" : "\(total) times")"
+                    : "\(medication.displayTitle) · \(total)회"
+            ))
+            lines.append(.init(
+                style: .caption,
+                text: dayCounts.map { entry in
+                    let day = monthDayText(entry.day, language: language, calendar: calendar)
+                    guard entry.count > 1 else { return day }
+                    return en ? "\(day) ×\(entry.count)" : "\(day) \(entry.count)회"
+                }.joined(separator: " · ")
+            ))
         }
         return lines
     }

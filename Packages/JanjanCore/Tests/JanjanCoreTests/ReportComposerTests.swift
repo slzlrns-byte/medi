@@ -397,4 +397,56 @@ final class ReportComposerTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - 필요시 복용
+
+    private func prnTaken(_ medicationID: UUID, at: Date) -> DoseEvent {
+        DoseEvent(
+            medicationID: medicationID,
+            scheduledAt: at, actualAt: at,
+            status: .taken, quantity: 1,
+            kind: .asNeeded, slotKey: nil
+        )
+    }
+
+    func testAsNeededSectionCountsDayByDayWithoutJudging() {
+        var doses = Fixed.workedExampleDoses() // medA 의 정기 복용 - 이 구역에 섞이면 안 된다
+        doses.append(prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 10, 15, 0)))
+        doses.append(prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 12, 11, 0)))
+        doses.append(prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 12, 23, 0)))
+
+        let lines = texts(content(doses: doses))
+        XCTAssertTrue(lines.contains("필요시 복용"))
+        XCTAssertTrue(lines.contains("쿠에티아핀 25mg · 3회"))
+        XCTAssertTrue(lines.contains("8월 10일 · 8월 12일 2회"))
+        // 정기 약(에스시탈로프람)은 필요시 구역에 나오지 않는다.
+        XCTAssertFalse(lines.contains { $0.hasPrefix("에스시탈로프람") && $0.hasSuffix("회") })
+        // "자주" 같은 해석은 없다.
+        XCTAssertFalse(lines.contains { $0.contains("자주") || $0.contains("많") })
+    }
+
+    func testAsNeededSectionIsAbsentWithoutRecords() {
+        XCTAssertFalse(texts(content(doses: Fixed.workedExampleDoses())).contains("필요시 복용"))
+    }
+
+    func testAsNeededSectionInEnglish() {
+        let report = ReportComposer.make(
+            endingAt: end,
+            medications: medications,
+            schedules: schedules,
+            doseEvents: [
+                prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 10, 15, 0)),
+                prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 12, 11, 0)),
+                prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 12, 23, 0))
+            ],
+            stockEvents: [],
+            checkIns: [],
+            language: .english,
+            calendar: Fixed.calendar
+        )
+        let lines = texts(report)
+        XCTAssertTrue(lines.contains("As-needed doses"))
+        XCTAssertTrue(lines.contains("쿠에티아핀 25mg · 3 times"))
+        XCTAssertTrue(lines.contains("Aug 10 · Aug 12 ×2"))
+    }
 }
