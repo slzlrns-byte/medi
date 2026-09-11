@@ -35,6 +35,15 @@ enum WatchDemoSeed {
         return screen
     }
 
+    /// `-JanjanLanguage en` 처럼 받는다. 없으면 한국어(기본).
+    static var requestedLanguage: JanjanLanguage {
+        guard let index = arguments.firstIndex(of: "-JanjanLanguage"),
+              arguments.indices.contains(index + 1),
+              let language = JanjanLanguage(rawValue: arguments[index + 1])
+        else { return .standard }
+        return language
+    }
+
     /// 폰이 없어도 화면이 채워지도록 예시 스냅샷을 넣는다.
     ///
     /// 시뮬레이터에는 짝지어진 아이폰이 없어서 그냥 두면 placeholder 만 보인다.
@@ -42,7 +51,53 @@ enum WatchDemoSeed {
     @MainActor
     static func applyIfRequested(to session: WatchSessionManager) {
         guard isRequested else { return }
-        session.applyDemoSnapshot(SampleData.watchSnapshot())
+        session.applyDemoSnapshot(demoSnapshot(language: requestedLanguage))
+    }
+
+    /// `SampleData.watchSnapshot()` 과 같은 예시 약을 쓰되, 슬롯 라벨을 요청한
+    /// 언어로 굽고 필요시 줄 하나(로라제팜)를 더한다 - 홈 화면 찍기에 보이도록.
+    private static func demoSnapshot(language: JanjanLanguage) -> WatchSnapshot {
+        let referenceDate = Date()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: language.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+
+        let slots: [WatchSnapshot.SlotLine] = [
+            WatchSnapshot.SlotLine(
+                slotKey: DoseSlot.morning.storageKey,
+                labelKo: DoseSlot.morning.label(language),
+                timeText: TimeOfDay(hour: 8, minute: 0).description,
+                medicationNames: [SampleData.escitalopram.name],
+                medicationIDs: [SampleData.escitalopram.id],
+                isCompleted: true
+            ),
+            WatchSnapshot.SlotLine(
+                slotKey: DoseSlot.bedtime.storageKey,
+                labelKo: DoseSlot.bedtime.label(language),
+                timeText: TimeOfDay(hour: 22, minute: 30).description,
+                medicationNames: [SampleData.lamotrigine.name, SampleData.quetiapine.name],
+                medicationIDs: [SampleData.lamotrigine.id, SampleData.quetiapine.id],
+                isCompleted: false
+            )
+        ]
+
+        let asNeeded: [WatchSnapshot.AsNeededLine] = [
+            WatchSnapshot.AsNeededLine(
+                medicationID: SampleData.lorazepam.id,
+                title: "\(SampleData.lorazepam.name) \(SampleData.lorazepam.strengthText)",
+                quantity: 1,
+                takenTodayTexts: ["14:19"]
+            )
+        ]
+
+        return WatchSnapshot(
+            generatedAt: referenceDate,
+            dateText: formatter.string(from: referenceDate),
+            slots: slots,
+            asNeeded: asNeeded,
+            remainingCountToday: 2,
+            languageRaw: language.rawValue
+        )
     }
 }
 #endif

@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import SwiftData
 import WatchConnectivity
 import JanjanCore
 
@@ -64,6 +65,21 @@ final class PhoneSessionManager: NSObject {
                 source: .watch,
                 at: Date()
             )
+        case .asNeededTaken(let medicationID, let quantity, let at):
+            guard let context = AppServices.shared.container?.mainContext else { return }
+            DoseRecorder.recordAsNeeded(
+                medicationID: medicationID,
+                quantity: quantity,
+                source: .watch,
+                at: at,
+                in: context
+            )
+            do {
+                try context.save()
+            } catch {
+                logger.error("필요시 복용 기록 저장 실패: \(error.localizedDescription, privacy: .public)")
+            }
+            AppServices.shared.pushWatchSnapshot()
         case .symptom(let symptomID, let severity, let date):
             doseLogger?.logSymptom(
                 symptomID: symptomID,

@@ -115,6 +115,44 @@ final class WatchSessionManager: NSObject, ObservableObject {
         }
     }
 
+    /// 필요시 약 한 번 복용을 보내고, 화면에 먼저 반영한다(낙관적 갱신).
+    ///
+    /// `markSlotCompleted` 와 같은 이유다 - 폰의 새 스냅샷이 오기 전까지 방금 누른
+    /// 사실이 화면에 없으면 같은 약을 두 번 누르게 된다. 진짜 스냅샷이 오면 덮인다.
+    func recordAsNeeded(_ line: WatchSnapshot.AsNeededLine) {
+        let now = Date()
+        send(.asNeededTaken(medicationID: line.medicationID, quantity: line.quantity, at: now))
+
+        onMain { manager in
+            let old = manager.snapshot
+            let calendar = Calendar.current
+            let timeText = String(
+                format: "%02d:%02d",
+                calendar.component(.hour, from: now),
+                calendar.component(.minute, from: now)
+            )
+            let asNeeded = old.asNeeded.map { existing -> WatchSnapshot.AsNeededLine in
+                guard existing.medicationID == line.medicationID else { return existing }
+                return WatchSnapshot.AsNeededLine(
+                    medicationID: existing.medicationID,
+                    title: existing.title,
+                    quantity: existing.quantity,
+                    takenTodayTexts: existing.takenTodayTexts + [timeText]
+                )
+            }
+            manager.snapshot = WatchSnapshot(
+                generatedAt: old.generatedAt,
+                dateText: old.dateText,
+                slots: old.slots,
+                asNeeded: asNeeded,
+                remainingCountToday: old.remainingCountToday,
+                isPro: old.isPro,
+                themeRaw: old.themeRaw,
+                languageRaw: old.languageRaw
+            )
+        }
+    }
+
     private func queue(_ payload: [String: Any], isRecord: Bool) {
         guard WCSession.isSupported() else { return }
         if isRecord { setQueuedFlag(true) }

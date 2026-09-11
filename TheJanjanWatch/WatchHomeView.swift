@@ -42,6 +42,12 @@ struct WatchHomeView: View {
                     }
                 }
 
+                if session.snapshot.isPro && !session.snapshot.asNeeded.isEmpty {
+                    ForEach(session.snapshot.asNeeded) { line in
+                        asNeededRow(line)
+                    }
+                }
+
                 if session.snapshot.isPro {
                     Button(t("증상 기록", "Log symptom")) { isShowingSymptom = true }
                     Button(t("기분", "Mood")) { isShowingMood = true }
@@ -152,6 +158,37 @@ struct WatchHomeView: View {
                 .lineLimit(2)
         }
         .padding(.vertical, 2)
+    }
+
+    /// 필요시 약은 시간대가 없어 항상 눌린다 - 개수를 고르지 않고 바로 기록한다.
+    /// (작은 화면에서 결정을 받지 않는다는 원칙, 설계 10절.)
+    private func asNeededRow(_ line: WatchSnapshot.AsNeededLine) -> some View {
+        Button {
+            session.recordAsNeeded(line)
+        } label: {
+            asNeededRowBody(line)
+        }
+    }
+
+    private func asNeededRowBody(_ line: WatchSnapshot.AsNeededLine) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(line.title)
+                .font(.headline)
+            Text(asNeededSubtitleText(line))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// 오늘 이미 기록이 있으면 마지막 시각, 없으면 누르면 기록될 개수.
+    private func asNeededSubtitleText(_ line: WatchSnapshot.AsNeededLine) -> String {
+        if let last = line.takenTodayTexts.last {
+            return t("오늘 \(last)", "Today \(last)")
+        }
+        let displayText = DecimalQuantity.display(line.quantity)
+        let englishText = displayText == "1" ? "1 pill" : "\(displayText) pills"
+        return t("\(displayText)정", englishText)
     }
 }
 

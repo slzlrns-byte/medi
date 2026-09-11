@@ -6,9 +6,9 @@
 # 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
 #
 # 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
-# 마지막 실행: 2026-09-11 필요시 복용·빠트림 확인
-#   볼 것 - 오늘 필요시 카드와 지나간 시간대 안내(01·01b), 15-지나간-시간대 시트의
-#   이틀 연속 두 줄, 16-다시-세기의 비교 문장과 미기록 목록, 리포트의 필요시 구역(06).
+# 마지막 실행: 2026-09-11(2차) 워치 필요시 기록 + 영어 확인
+#   볼 것 - 11-워치-홈의 필요시 줄(로라제팜·오늘 14:19), 17-오늘-영어의 영어 오늘
+#   화면, 18-워치-홈-영어. 두 워치 크기에서 필요시 줄이 잘리지 않는지.
 
 name: Screenshots
 
@@ -160,6 +160,26 @@ jobs:
             -maximum-test-execution-time-allowance 480 \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+      - name: 영어 화면 한 장 (넓은 기기)
+        # UI 테스트는 한국어 라벨로 이동하므로 영어로는 못 걸어 다닌다. 대신
+        # 테스트가 설치해 둔 앱을 영어 인자로 다시 띄워 첫 화면만 찍는다 -
+        # `-janjan.language en` 은 UserDefaults 인자 도메인으로 들어가
+        # 설정에서 English 를 고른 것과 같은 상태가 된다.
+        if: always()
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.simulator.outputs.wide_udid }}"
+          BUNDLE="com.thejanjan.app"
+          xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+          if xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -janjan.language en; then
+            sleep 8
+            mkdir -p build/named
+            xcrun simctl io "$UDID" screenshot "build/named/17-오늘-영어.png" \
+              || echo "::warning::영어 화면을 찍지 못했습니다."
+          else
+            echo "::warning::영어 인자로 앱을 띄우지 못했습니다."
+          fi
 
       - name: 첨부에서 PNG 꺼내기
         # 테스트가 걸려 죽어도 이미 찍힌 것은 꺼낸다. 지난번에 이게 없어서
@@ -334,9 +354,9 @@ jobs:
           # 한 화면이 실패해도 나머지는 찍는다. 여기서 죽으면 나머지를 다 잃는데,
           # 워치 사진은 한 번 찍는 데 macOS 러너 몇 분이 든다.
           capture () {
-            udid="$1"; name="$2"; screen="$3"
+            udid="$1"; name="$2"; screen="$3"; extra="${4:-}"
             xcrun simctl terminate "$udid" "$BUNDLE" >/dev/null 2>&1 || true
-            if ! xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen"; then
+            if ! xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen" $extra; then
               echo "::warning::${name} 을 띄우지 못했습니다. 다음 화면으로 넘어갑니다."
               return 0
             fi
@@ -363,6 +383,8 @@ jobs:
             capture "$udid" "12-워치-기분${suffix}" mood
             capture "$udid" "13-워치-증상${suffix}" symptom
             capture "$udid" "14-워치-복약${suffix}" dose
+            # 영어 확인용 한 장. 데모 시드가 이 인자를 보고 영어 스냅샷을 만든다.
+            capture "$udid" "18-워치-홈-영어${suffix}" home "-JanjanLanguage en"
 
             xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
           }
