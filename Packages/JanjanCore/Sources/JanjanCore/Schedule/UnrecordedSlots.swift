@@ -53,19 +53,41 @@ public enum UnrecordedSlots {
         let floor = calendar.date(byAdding: .day, value: -(maxLookbackDays - 1), to: endDay) ?? endDay
         var day = max(calendar.startOfDay(for: from), floor)
 
+        var medicationsByID: [UUID: Medication] = [:]
+        for medication in medications { medicationsByID[medication.id] = medication }
+
         var lines: [Line] = []
         while day <= endDay {
+            // 중단한 약도 **중단하기 전의 날** 에는 복용 중이었다. DayPlan 은 지금
+            // 상태만 보므로, 그 날 아직 중단 전이었던 약을 그 날에 한해 살려서 넘긴다.
+            // 중단 시각을 모르는 옛 기록(stoppedAt == nil)은 예전처럼 빠진다.
+            let dayMedications = medications.map { medication -> Medication in
+                guard medication.status == .stopped,
+                      let stoppedAt = medication.stoppedAt,
+                      stoppedAt > day else { return medication }
+                var revived = medication
+                revived.status = .active
+                return revived
+            }
             let slots = DayPlan.slots(
                 on: day,
                 schedules: schedules,
-                medications: medications,
+                medications: dayMedications,
                 doseEvents: doseEvents,
                 calendar: calendar
             )
             for line in slots {
                 let plannedAt = line.time.date(on: day, calendar: calendar)
                 guard plannedAt <= now else { continue }
-                let unrecorded = line.entries.filter { $0.status == nil }
+                let unrecorded = line.entries.filter { entry in
+                    guard entry.status == nil else { return false }
+                    guard let medication = medicationsByID[entry.medicationID] else { return false }
+                    // 중단한 시각보다 뒤의 시간대는 빠트린 것이 아니다.
+                    if medication.status == .stopped {
+                        guard let stoppedAt = medication.stoppedAt, stoppedAt > plannedAt else { return false }
+                    }
+                    return true
+                }
                 guard !unrecorded.isEmpty else { continue }
                 lines.append(Line(day: day, slot: line.slot, plannedAt: plannedAt, entries: unrecorded))
             }

@@ -117,6 +117,11 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
     public var catalogID: String?
     /// "잠들기 쉽게" 같은 한 줄 용도 메모. 진단명이 아니라 사용자 자신의 말.
     public var purposeLine: String
+    /// 복용을 중단한 시각. 다시 복용 중으로 바꾸면 nil 로 돌아간다.
+    ///
+    /// "기록 없이 지나간 시간대" 가 이걸 본다 - 중단하기 **전**의 빈 시간대는
+    /// 여전히 사실이므로 계속 들되, 중단한 뒤의 침묵은 빠트림이 아니다.
+    public var stoppedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -127,7 +132,8 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         status: Status = .active,
         note: String = "",
         catalogID: String? = nil,
-        purposeLine: String = ""
+        purposeLine: String = "",
+        stoppedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -138,6 +144,7 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         self.note = note
         self.catalogID = catalogID
         self.purposeLine = purposeLine
+        self.stoppedAt = stoppedAt
     }
 
     /// "쿠에티아핀 25mg" 처럼 한 줄로 합친 표시용 문자열.

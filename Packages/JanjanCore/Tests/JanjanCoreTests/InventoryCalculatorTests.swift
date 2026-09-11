@@ -282,4 +282,36 @@ final class InventoryCalculatorTests: XCTestCase {
         )
         XCTAssertEqual(remaining, 14, "8/1 28정 → 8/17 까지 14회 복용 → 14정 남음")
     }
+
+    func testAdherenceIgnoresAsNeededDoses() {
+        // 정기 2건(복용 1·건너뜀 1) 사이에 필요시 복용이 아무리 섞여도
+        // 복약률은 정기만 본다: 1/2 = 50%.
+        let day1 = Fixed.date(2026, 8, 10, 8, 0)
+        let day2 = Fixed.date(2026, 8, 11, 8, 0)
+        var events = [
+            DoseEvent(
+                medicationID: Fixed.medA, scheduledAt: day1, actualAt: day1,
+                status: .taken, quantity: 1, slotKey: DoseSlot.morning.storageKey
+            ),
+            DoseEvent(
+                medicationID: Fixed.medA, scheduledAt: day2, actualAt: nil,
+                status: .skipped, quantity: 1, slotKey: DoseSlot.morning.storageKey
+            )
+        ]
+        for hour in [10, 15, 21] {
+            let at = Fixed.date(2026, 8, 10, hour, 0)
+            events.append(DoseEvent(
+                medicationID: Fixed.medA, scheduledAt: at, actualAt: at,
+                status: .taken, quantity: 1, kind: .asNeeded, slotKey: nil
+            ))
+        }
+        let rate = InventoryCalculator.adherenceRate(
+            doseEvents: events,
+            medicationID: Fixed.medA,
+            from: Fixed.date(2026, 8, 9),
+            to: Fixed.date(2026, 8, 12),
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(rate, Decimal(string: "0.5"))
+    }
 }

@@ -123,4 +123,55 @@ final class UnrecordedSlotsTests: XCTestCase {
         XCTAssertEqual(UnrecordedSlots.title(for: line, language: .korean, calendar: Fixed.calendar), "8월 17일 월요일 · 아침")
         XCTAssertEqual(UnrecordedSlots.title(for: line, language: .english, calendar: Fixed.calendar), "Mon, Aug 17 · Morning")
     }
+
+    func testStoppedMedicationKeepsItsPreStopGapsOnly() {
+        // 월요일 아침을 비운 채, 화요일 오전 10시에 에스시탈로프람을 중단했다.
+        // 중단 전(월 아침·화 아침 8시)은 여전히 들고, 중단 뒤는 빠트림이 아니다.
+        let stoppedAt = Fixed.date(2026, 8, 18, 10, 0)
+        let stopped = Medication(
+            id: Fixed.medA, name: "에스시탈로프람", strengthText: "10mg",
+            status: .stopped, stoppedAt: stoppedAt
+        )
+        let lines = UnrecordedSlots.find(
+            from: monday,
+            until: Fixed.date(2026, 8, 19, 12, 0),  // 수요일 정오
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [stopped],
+            doseEvents: [],
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(
+            lines.map { Fixed.calendar.component(.day, from: $0.day) },
+            [17, 18],
+            "중단 전의 빈 아침 둘만 남아야 합니다 - 수요일은 빠트림이 아닙니다"
+        )
+    }
+
+    func testStoppedWithoutTimestampStaysQuiet() {
+        // 이 필드가 없던 판에서 중단한 약: 언제 중단했는지 모르므로 아예 들지 않는다.
+        let stopped = Medication(
+            id: Fixed.medA, name: "에스시탈로프람", strengthText: "10mg", status: .stopped
+        )
+        let lines = UnrecordedSlots.find(
+            from: monday, until: tuesdayNoon,
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [stopped], doseEvents: [], calendar: Fixed.calendar
+        )
+        XCTAssertTrue(lines.isEmpty)
+    }
+
+    func testEndedScheduleStopsProducingGaps() {
+        // 월요일까지인 스케줄: 화요일 아침은 예정이 아니었으므로 빠트림도 아니다.
+        let ended = Schedule(
+            medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1,
+            endDate: monday
+        )
+        let lines = UnrecordedSlots.find(
+            from: monday, until: tuesdayNoon,
+            schedules: [ended], medications: medications, doseEvents: [],
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertEqual(lines.first.map { Fixed.calendar.component(.day, from: $0.day) }, Optional(17))
+    }
 }

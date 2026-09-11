@@ -78,6 +78,8 @@ enum MedicationStore {
     static func setStatus(_ status: Medication.Status, for medicationID: UUID, in context: ModelContext) {
         guard let record = medicationRecord(medicationID, in: context) else { return }
         record.statusRaw = status.rawValue
+        // 중단 시각을 남긴다 - "기록 없이 지나간 시간대" 가 중단 전과 후를 가른다.
+        record.stoppedAt = status == .stopped ? Date() : nil
         save("복용 상태 변경", in: context)
     }
 

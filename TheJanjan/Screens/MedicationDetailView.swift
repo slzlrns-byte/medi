@@ -810,13 +810,17 @@ private struct StockRecountSheet: View {
         }
     }
 
-    /// 이 약의 마지막 재고 사건(보충 또는 정정) 시각. 한 번도 없으면 7일 전부터 본다.
+    /// 이 약의 마지막 **직접 정정** 시각. 한 번도 없으면 7일 전부터 본다.
+    ///
+    /// 보충(refill)은 기준점을 세우지 않는다 - remaining() 은 마지막 정정부터의
+    /// 소비를 전부 세므로, 그 사이에 보충이 있었어도 미기록 시간대는 정정
+    /// 이후 전체에서 찾아야 차이의 원인 후보를 놓치지 않는다.
     private var unrecordedFrom: Date {
-        let lastStockEvent = stockEvents
-            .filter { $0.medicationID == medicationID }
+        let lastCorrection = stockEvents
+            .filter { $0.medicationID == medicationID && $0.isCorrection }
             .map(\.occurredAt)
             .max()
-        return lastStockEvent ?? (Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now)
+        return lastCorrection ?? (Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now)
     }
 
     /// 이 약만 걸러 낸, 기록 없이 지나간 시간대.
