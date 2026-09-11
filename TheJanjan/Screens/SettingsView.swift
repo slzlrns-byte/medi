@@ -20,6 +20,7 @@ struct SettingsView: View {
     @EnvironmentObject private var pro: ProStore
 
     @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
+    @AppStorage(JanjanPrivacy.hideNamesKey) private var hidesMedicationNamesOnScreen = false
     @AppStorage(ReminderPlanner.appointmentLeadDaysKey)
     private var appointmentLeadDays = AppointmentReminder.defaultLeadDays
 
@@ -317,6 +318,14 @@ struct SettingsView: View {
 
     private var privacySection: some View {
         Section {
+            Toggle(ProFeature.hideNames.title(.current), isOn: $hidesMedicationNamesOnScreen)
+                .onChange(of: hidesMedicationNamesOnScreen) { _, newValue in
+                    // 위젯도 같은 값을 읽도록 앱 그룹에도 쓰고, 워치 화면도 새로 밀어 준다.
+                    JanjanPrivacy.store(newValue)
+                    AppServices.shared.pushWatchSnapshot()
+                }
+                .proGated(.hideNames)
+
             LabeledContent(t("저장 위치", "Storage")) {
                 Text(JanjanModelContainer.activeStorage.label)
                     .foregroundStyle(Color.muted)
@@ -330,11 +339,20 @@ struct SettingsView: View {
         } header: {
             Text(t("개인정보", "Privacy"))
         } footer: {
-            Text(t(
-                "로그인도 서버도 없습니다. 기록은 이 기기와 사용자의 iCloud에만 있습니다.",
-                "There is no sign-in and no server. Your records live only on this device and in your own iCloud."
-            ))
+            Text(privacyFooterKo)
         }
+    }
+
+    private var privacyFooterKo: String {
+        let hideNamesCaption = t(
+            "켜면 화면의 약 이름이 가려지고, 가려진 자리를 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실립니다 - 의사에게 보여 주는 종이라서요.",
+            "When this is on, medication names on screen are hidden, and tapping a hidden name shows it only in that spot. Names still print in full on the visit PDF, since that page is meant to be shown to your doctor."
+        )
+        let storageCaption = t(
+            "로그인도 서버도 없습니다. 기록은 이 기기와 사용자의 iCloud에만 있습니다.",
+            "There is no sign-in and no server. Your records live only on this device and in your own iCloud."
+        )
+        return "\(hideNamesCaption)\n\n\(storageCaption)"
     }
 
     // MARK: - 위기 상담

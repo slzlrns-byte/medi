@@ -14,6 +14,7 @@ struct PrescriptionFormView: View {
     let onSaved: () -> Void
 
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var pro: ProStore
 
     @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
@@ -44,6 +45,9 @@ struct PrescriptionFormView: View {
     }
 
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+
+    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
 
     var body: some View {
         ScrollView {
@@ -159,12 +163,7 @@ struct PrescriptionFormView: View {
     private func medicationRow(_ medication: Medication) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                TogglePill(
-                    text: medication.displayTitle,
-                    isOn: refills[medication.id] != nil
-                ) {
-                    toggle(medication)
-                }
+                togglePill(for: medication)
                 Spacer(minLength: 0)
             }
 
@@ -179,6 +178,32 @@ struct PrescriptionFormView: View {
             }
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
+    }
+
+    /// 이 알약은 눌러서 이번 처방에 포함시키는 손잡이다 - 이름 자리에 따로 탭을
+    /// 두면 손잡이 전체의 탭(선택 · 해제)과 겹친다. 그래서 `MaskedNameText` 대신
+    /// 가려졌을 때는 점 표기만 보여 주고, 다시 눌러 보이게 하는 동작은 두지 않는다
+    /// (약 목록 행과 같은 판단 - `MedicationsView.medicationNameText` 참고).
+    @ViewBuilder
+    private func togglePill(for medication: Medication) -> some View {
+        if masksNames {
+            // 여러 약이 전부 점이면 어느 것을 고르는지 알 수 없다. 목록 행과 같은
+            // 규칙으로 용도 한 줄이 있으면 그것으로 부른다.
+            TogglePill(
+                text: medication.purposeLine.isEmpty ? MaskedNameText.maskGlyph : medication.purposeLine,
+                isOn: refills[medication.id] != nil
+            ) {
+                toggle(medication)
+            }
+            .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+        } else {
+            TogglePill(
+                text: medication.displayTitle,
+                isOn: refills[medication.id] != nil
+            ) {
+                toggle(medication)
+            }
+        }
     }
 
     private var noteCard: some View {
@@ -304,5 +329,6 @@ struct PrescriptionFormView: View {
     NavigationStack {
         PrescriptionFormView {}
     }
+    .environmentObject(ProStore())
     .modelContainer(for: JanjanSchema.allModels, inMemory: true)
 }

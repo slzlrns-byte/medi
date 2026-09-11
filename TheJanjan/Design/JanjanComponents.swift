@@ -316,3 +316,53 @@ struct CountStepper: View {
         .accessibilityLabel(Text(label))
     }
 }
+
+/// 가려진 약 이름. Pro 의 "약 이름 가리기"가 켜졌을 때 이름 대신 놓는다.
+///
+/// 누르면 그 자리에서만 원래 글자가 보이고, 다시 누르면 도로 가려진다. 이 뷰
+/// 자신은 화면 전환을 기억하지 않는다 — 시트를 닫거나 다른 화면으로 갔다 오면
+/// 뷰가 새로 만들어지며 `isRevealed` 도 처음(false)으로 돌아가, 굳이 다시
+/// 가리는 코드 없이도 자연히 다시 가려진다.
+///
+/// 글자 수 자체가 힌트가 되지 않도록 이름 길이·개수와 무관하게 점 셋로 고정한다
+/// (`maskGlyph`). 색만으로 가림·펼침을 말하지 않고 글자(점 또는 이름)로 말한다.
+///
+/// 폰트·색은 이 뷰가 정하지 않는다 — 두 상태(점 · 이름) 모두 평범한 `Text` 라서
+/// 바깥에서 `.janjanBody(...)`, `.foregroundStyle(...)` 를 그대로 얹으면
+/// 환경값으로 내려가 그대로 먹는다. 자리마다 글꼴·색이 다른 다섯 화면에서
+/// 매번 같은 파라미터를 받게 만드는 대신, 쓰는 자리의 기존 수식어를 그대로
+/// 재사용할 수 있게 한 것 - 사용처마다 새 스타일 인자를 늘리지 않는다.
+///
+/// 이미 다른 손짓(행 전체 내비게이션 등)이 같은 자리를 차지한 곳에는 이 뷰를
+/// 그대로 쓰지 않는다 — 각 화면의 판단은 그 화면의 편집 기록에 남겨 둔다.
+struct MaskedNameText: View {
+
+    let name: String
+    var isMasked: Bool
+
+    @State private var isRevealed = false
+
+    /// 가려졌을 때 보이는 점 표기. 글자 수를 흘리지 않도록 이름과 무관하게 늘 셋이다.
+    /// `TogglePill` 처럼 이 뷰를 그대로 못 쓰는 자리(누르면 다른 동작이 일어나는 자리)에서
+    /// 같은 표기를 쓰려고 밖에서도 볼 수 있게 둔다.
+    static let maskGlyph = "● ● ●"
+
+    var body: some View {
+        if !isMasked {
+            Text(name)
+        } else if isRevealed {
+            Text(name)
+                .contentShape(Rectangle())
+                .onTapGesture { isRevealed = false }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(Text(t("누르면 가려요", "Tap to hide")))
+        } else {
+            Text(Self.maskGlyph)
+                .contentShape(Rectangle())
+                .onTapGesture { isRevealed = true }
+                .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+                .accessibilityHint(Text(t("누르면 보여요", "Tap to show")))
+                .accessibilityAddTraits(.isButton)
+        }
+    }
+}

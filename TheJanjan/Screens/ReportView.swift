@@ -38,6 +38,10 @@ struct ReportView: View {
 
     private var today: Date { Date() }
 
+    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// PDF 내보내기 내용에는 적용하지 않는다 — 진료실에서 보여 줄 종이라서 이름이 그대로 실린다.
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -186,7 +190,7 @@ struct ReportView: View {
         )
 
         return HStack {
-            Text(medication.displayTitle)
+            MaskedNameText(name: medication.displayTitle, isMasked: masksNames)
                 .janjanBody(15)
                 .foregroundStyle(Color.ink2)
             Spacer()

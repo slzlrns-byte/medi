@@ -11,6 +11,7 @@ struct MedicationDetailView: View {
     let medicationID: UUID
 
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var pro: ProStore
 
     @Query private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
@@ -30,6 +31,9 @@ struct MedicationDetailView: View {
 
     private var today: Date { Date() }
     private var lang: JanjanLanguage { .current }
+
+    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
 
     private var record: MedicationRecord? {
         medicationRecords.first { $0.id == medicationID }
@@ -75,7 +79,7 @@ struct MedicationDetailView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle(medication?.name ?? t("약", "Medication"))
+        .navigationTitle(masksNames ? t("약", "Medication") : (medication?.name ?? t("약", "Medication")))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $composing) { kind in
             MedicationNoteComposer(kind: kind) { text, symptomID in
@@ -112,7 +116,7 @@ struct MedicationDetailView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    Text(medication.name)
+                    MaskedNameText(name: medication.name, isMasked: masksNames)
                         .janjanDisplay(24)
                         .foregroundStyle(Color.ink)
                     if !medication.strengthText.isEmpty {
@@ -970,5 +974,6 @@ private struct StockRecountSheet: View {
     NavigationStack {
         MedicationDetailView(medicationID: UUID())
     }
+    .environmentObject(ProStore())
     .modelContainer(for: JanjanSchema.allModels, inMemory: true)
 }

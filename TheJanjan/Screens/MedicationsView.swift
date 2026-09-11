@@ -25,6 +25,9 @@ struct MedicationsView: View {
     private var today: Date { Date() }
     private var lang: JanjanLanguage { .current }
 
+    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -245,12 +248,32 @@ struct MedicationsView: View {
             .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
     }
 
+    /// 목록 행 안의 약 이름.
+    ///
+    /// 이 줄은 `MaskedNameText` 를 그대로 쓰지 않는다 — 행 전체가 `NavigationLink` 라
+    /// 이름 자리에 따로 탭 손짓을 얹으면 행 탭(상세로 이동)과 겹친다. 그래서 여기서는
+    /// 가려졌을 때 점 표기만 보이고, 다시 누르면 보이는 동작은 두지 않는다. 이름을
+    /// 보려면 상세로 들어가면 된다 - 거기서는 `MaskedNameText` 가 제대로 동작한다.
+    private func medicationNameText(_ medication: Medication) -> some View {
+        Group {
+            if masksNames {
+                // 목록의 약이 전부 점이면 서로 구분이 안 된다. 워치와 같은 규칙으로
+                // 용도 한 줄("잠들기 쉽게")이 있으면 그것으로 부른다 - 무엇에 쓰는지는
+                // 보이되 이름은 곁의 시선에 남지 않고, 용도를 적을지는 사용자가 정한다.
+                Text(medication.purposeLine.isEmpty ? MaskedNameText.maskGlyph : medication.purposeLine)
+                    .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+            } else {
+                Text(medication.name)
+            }
+        }
+    }
+
     private func medicationRow(_ row: Row) -> some View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.s)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                     HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                        Text(row.medication.name)
+                        medicationNameText(row.medication)
                             .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                         if !row.medication.strengthText.isEmpty {

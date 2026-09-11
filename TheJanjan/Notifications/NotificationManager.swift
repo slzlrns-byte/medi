@@ -189,8 +189,11 @@ final class NotificationManager: NSObject {
     }
 
     /// "쿠에티아핀 · 라모트리진" 또는 이름을 숨겼을 때 "2종"/"2 meds".
+    ///
+    /// `JanjanPrivacy.hidesNames`(Pro "약 이름 가리기")도 함께 본다 — 앱 안에서
+    /// 가린 이름이 잠금화면 알림으로 새면 그 기능이 뚫린 것과 같다.
     private func bodyText(for reminder: SlotReminder) -> String {
-        guard showsMedicationNames, !reminder.medicationNames.isEmpty else {
+        guard showsMedicationNames, !JanjanPrivacy.hidesNames, !reminder.medicationNames.isEmpty else {
             let count = reminder.medicationIDs.count
             return t("\(count)종", count == 1 ? "1 med" : "\(count) meds")
         }

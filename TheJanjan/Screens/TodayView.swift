@@ -48,6 +48,9 @@ struct TodayView: View {
     private var today: Date { Date() }
     private var lang: JanjanLanguage { .current }
 
+    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+
     // MARK: - 저장소에서 읽어 온 것
 
     private var medications: [Medication] { medicationRecords.map(\.core) }
@@ -271,7 +274,7 @@ struct TodayView: View {
                                     .foregroundStyle(Color.ink2)
                             }
                         }
-                        Text(line.medicationNames.joined(separator: " · "))
+                        slotNamesText(line)
                             .janjanBody(14)
                             .foregroundStyle(Color.ink2)
                             .lineLimit(2)
@@ -315,6 +318,23 @@ struct TodayView: View {
                     )))
                     .accessibilityHint(Text(t("한 번에 기록합니다", "Records all of them at once")))
                 }
+            }
+        }
+    }
+
+    /// 시간대 타일의 이름 줄.
+    ///
+    /// 이 타일 전체가 그 시간대를 여는 버튼이라, 이름 자리에 따로 탭을 두면 타일 탭
+    /// (시트 열기)과 겹친다. 그래서 `MaskedNameText` 대신 가려졌을 때는 점 표기만
+    /// 보여 주고, 다시 눌러 보이게 하는 동작은 두지 않는다 - 시트를 열면 약마다
+    /// `SlotRecordSheet` 의 `MaskedNameText` 로 따로 확인할 수 있다(약 목록 행과 같은 판단).
+    private func slotNamesText(_ line: DayPlan.SlotLine) -> some View {
+        Group {
+            if masksNames {
+                Text(MaskedNameText.maskGlyph)
+                    .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+            } else {
+                Text(line.medicationNames.joined(separator: " · "))
             }
         }
     }
@@ -385,7 +405,7 @@ struct TodayView: View {
 
     private func asNeededRow(_ medication: Medication) -> some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(medication.displayTitle)
+            MaskedNameText(name: medication.displayTitle, isMasked: masksNames)
                 .janjanBody(15, weight: .medium)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
@@ -421,7 +441,8 @@ struct TodayView: View {
 
     private func asNeededHistoryRow(_ event: DoseEventRecord) -> some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(asNeededHistoryText(event))
+            // 시각·이름·개수가 한 문장이라, 가릴 때는 줄 전체를 하나로 가린다.
+            MaskedNameText(name: asNeededHistoryText(event), isMasked: masksNames)
                 .janjanBody(13)
                 .foregroundStyle(Color.ink2)
             Spacer(minLength: 0)
@@ -650,8 +671,10 @@ private struct SlotRecordSheet: View {
     let onRecord: (DayPlan.Entry, DoseEvent.Status) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var pro: ProStore
 
     private var lang: JanjanLanguage { .current }
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
 
     var body: some View {
         NavigationStack {
@@ -695,7 +718,7 @@ private struct SlotRecordSheet: View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    Text(entry.medicationName)
+                    MaskedNameText(name: entry.medicationName, isMasked: masksNames)
                         .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
                     PillChip(text: t("\(DecimalQuantity.display(entry.dose))정", "\(DecimalQuantity.display(entry.dose)) pills"))
@@ -729,6 +752,9 @@ private struct UnrecordedSlotsSheet: View {
     let onAnswer: (UnrecordedSlots.Line, DayPlan.Entry, DoseEvent.Status) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var pro: ProStore
+
+    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
 
     var body: some View {
         NavigationStack {
@@ -776,7 +802,10 @@ private struct UnrecordedSlotsSheet: View {
                 Text(UnrecordedSlots.title(for: line, language: language))
                     .janjanBody(16, weight: .medium)
                     .foregroundStyle(Color.ink)
-                Text(line.entries.map(\.medicationName).joined(separator: " · "))
+                MaskedNameText(
+                    name: line.entries.map(\.medicationName).joined(separator: " · "),
+                    isMasked: masksNames
+                )
                     .janjanBody(13)
                     .foregroundStyle(Color.ink2)
 

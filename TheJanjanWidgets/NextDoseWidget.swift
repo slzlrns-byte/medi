@@ -91,13 +91,17 @@ struct NextDoseProvider: TimelineProvider {
             )
         }
 
+        // 위젯은 구독 여부를 물을 수 없어 저장된 값만 본다. 구독이 끝난 뒤에도
+        // 가려진 채로 남는 것은 프라이버시 쪽으로 안전한 실패라 그대로 둔다.
+        let names = JanjanPrivacy.hidesNames ? [] : line.medicationNames
+
         return DoseEntry(
             date: now,
             slotKey: line.slotKey,
             slotLabelKo: line.slot.label(JanjanLanguage.current),
             // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 아래에서 안 그린다.
             timeText: line.slot.isCustom ? "" : line.time.description,
-            medicationNames: line.medicationNames,
+            medicationNames: names,
             pendingCount: line.pendingCount,
             hasAnyMedication: true
         )
