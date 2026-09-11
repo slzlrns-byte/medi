@@ -25,6 +25,8 @@ struct MedicationDetailView: View {
     @State private var composing: MedicationNote.Kind?
     @State private var isShowingDoseChangeSheet = false
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
+    @State private var selectedAsNeededQuantity: Decimal?
+    @State private var isShowingRecountSheet = false
 
     private var today: Date { Date() }
     private var lang: JanjanLanguage { .current }
@@ -45,6 +47,9 @@ struct MedicationDetailView: View {
                 if let medication {
                     headerCard(medication)
                     stockCard(medication)
+                    if medication.kind == .asNeeded {
+                        asNeededCard(medication)
+                    }
                     doseChangeCard
                     scheduleCard
                     noteCard(.heardFromDoctor)
@@ -82,6 +87,9 @@ struct MedicationDetailView: View {
                     saveDoseChange(changedAt: changedAt, fromText: fromText, toText: toText, note: note)
                 }
             }
+        }
+        .sheet(isPresented: $isShowingRecountSheet) {
+            StockRecountSheet(medicationID: medicationID)
         }
         .confirmationDialog(
             t("이 용량 변경 기록을 지울까요?", "Delete this dose change record?"),
@@ -158,8 +166,119 @@ struct MedicationDetailView: View {
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 }
+
+                WhitePillButton(title: t("다시 세기", "Count again"), systemImage: "number") {
+                    isShowingRecountSheet = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
         }
+    }
+
+    // MARK: - 필요시 복용
+
+    /// 필요할 때 먹는 약 하나를 그 자리에서 기록하는 줄.
+    ///
+    /// 정기 약과 달리 시간대가 없어 늘 새 사건으로 쌓인다(DoseRecorder 주석 그대로).
+    /// 기본 개수는 이 약을 마지막으로 필요시 먹었을 때의 개수를 따른다 — 없으면 1정.
+    private func asNeededCard(_ medication: Medication) -> some View {
+        let quantityOptions: [Decimal] = [0.5, 1, 1.5, 2]
+        let quantity = selectedAsNeededQuantity ?? defaultAsNeededQuantity
+
+        return JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(t("필요할 때 복용", "As-needed dose"))
+                    .janjanBody(15, weight: .medium)
+                    .foregroundStyle(Color.ink)
+
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Menu {
+                        ForEach(quantityOptions, id: \.self) { option in
+                            Button(asNeededQuantityText(option)) {
+                                selectedAsNeededQuantity = option
+                            }
+                        }
+                    } label: {
+                        PillChip(text: asNeededQuantityText(quantity))
+                    }
+
+                    WhitePillButton(title: t("지금 먹었어요", "Took it just now"), systemImage: "checkmark") {
+                        recordAsNeededNow(quantity: quantity)
+                    }
+                }
+
+                if !recentAsNeededRecords.isEmpty {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                        Text(t("최근 7일", "Last 7 days"))
+                            .janjanBody(12, weight: .medium)
+                            .foregroundStyle(Color.muted)
+                            .padding(.top, CGFloat(JanjanSpacing.xxs))
+
+                        ForEach(recentAsNeededRecords) { record in
+                            asNeededRow(record)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func asNeededRow(_ record: DoseEventRecord) -> some View {
+        HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
+            Text("\(asNeededTimeText(record.core.effectiveDate)) · \(asNeededQuantityText(record.quantity))")
+                .janjanBody(15)
+                .foregroundStyle(Color.ink2)
+                .monospacedDigit()
+            Spacer(minLength: 0)
+            Button {
+                context.delete(record)
+                try? context.save()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.muted)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(t("이 기록 지우기", "Delete this record")))
+        }
+    }
+
+    private var asNeededRecords: [DoseEventRecord] {
+        doseRecords.filter {
+            $0.medicationID == medicationID && $0.kindRaw == DoseEvent.Kind.asNeeded.rawValue
+        }
+    }
+
+    /// 이 약을 마지막으로 필요시 먹었을 때의 개수. 한 번도 없으면 nil.
+    private var defaultAsNeededQuantity: Decimal {
+        asNeededRecords
+            .map(\.core)
+            .max { $0.effectiveDate < $1.effectiveDate }?
+            .quantity ?? 1
+    }
+
+    private var recentAsNeededRecords: [DoseEventRecord] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: today) ?? today
+        return asNeededRecords
+            .filter { $0.core.effectiveDate >= cutoff }
+            .sorted { $0.core.effectiveDate > $1.core.effectiveDate }
+    }
+
+    private func asNeededQuantityText(_ quantity: Decimal) -> String {
+        t("\(DecimalQuantity.display(quantity))정", "\(DecimalQuantity.display(quantity)) pills")
+    }
+
+    private func asNeededTimeText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: lang.localeIdentifier)
+        formatter.dateFormat = lang == .english ? "MMM d, HH:mm" : "M월 d일 HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func recordAsNeededNow(quantity: Decimal) {
+        DoseRecorder.recordAsNeeded(medicationID: medicationID, quantity: quantity, source: .phone, in: context)
+        try? context.save()
     }
 
     /// 용량이 바뀐 순간들. **입력만 받는다** — 강점 결정서 D12 그대로,
@@ -621,6 +740,234 @@ private struct DoseChangeSheet: View {
 
     private var isSavable: Bool {
         !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// 재고를 다시 세어 기록과 맞춰 보는 시트.
+///
+/// 여기서 만드는 사건은 언제나 **정정(correction)** 이다 — 재고 계산 원칙(설계 05절)대로
+/// 이 시점이 새 기준점이 되고 그 이전 사건은 계산에서 빠진다. 판단은 하지 않는다:
+/// 실제 개수와 기록상 잔여를 나란히 보여 주고 차이만 말한다.
+private struct StockRecountSheet: View {
+
+    let medicationID: UUID
+
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+    @Query private var stockRecords: [StockEventRecord]
+    @Query private var medicationRecords: [MedicationRecord]
+
+    @State private var countedText = ""
+
+    private var lang: JanjanLanguage { .current }
+    private var now: Date { Date() }
+
+    private var stockEvents: [StockEvent] { stockRecords.map(\.core) }
+    private var doseEvents: [DoseEvent] { doseRecords.map(\.core) }
+    private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+    private var medications: [Medication] { medicationRecords.map(\.core) }
+
+    /// 기록상 잔여. 이 화면의 재고 카드와 같은 계산기를 쓴다.
+    private var remaining: Decimal {
+        InventoryCalculator.remaining(
+            for: medicationID,
+            stockEvents: stockEvents,
+            doseEvents: doseEvents,
+            asOf: now
+        )
+    }
+
+    /// "1.5", "1,5" 둘 다 받는다. 숫자가 아니면 아직 세지 않은 것으로 본다.
+    private var countedQuantity: Decimal? {
+        let trimmed = countedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard !trimmed.isEmpty, let value = Decimal(string: trimmed), value >= 0 else { return nil }
+        return DecimalQuantity.snapToQuarter(value)
+    }
+
+    /// 계산만 한다 — "빠트렸다" 고 말하지 않는다.
+    private var comparisonText: String? {
+        guard let counted = countedQuantity else { return nil }
+        let diff = DecimalQuantity.round(counted - remaining, scale: 2)
+        if diff == 0 {
+            return t("기록과 맞아요.", "Matches the record.")
+        } else if diff > 0 {
+            return t(
+                "기록보다 \(DecimalQuantity.display(diff))정 많아요. 보충을 적지 않았거나, 기록만 하고 드시지 않은 날이 있을 수 있어요.",
+                "It's \(DecimalQuantity.display(diff)) pills more than the record. A refill may not have been logged, or there may be a day it was recorded as taken but wasn't."
+            )
+        } else {
+            let shortfall = DecimalQuantity.round(remaining - counted, scale: 2)
+            return t(
+                "기록보다 \(DecimalQuantity.display(shortfall))정 적어요. 기록 없이 드신 날이 있을 수 있어요.",
+                "It's \(DecimalQuantity.display(shortfall)) pills less than the record. There may be a day it was taken without being recorded."
+            )
+        }
+    }
+
+    /// 이 약의 마지막 재고 사건(보충 또는 정정) 시각. 한 번도 없으면 7일 전부터 본다.
+    private var unrecordedFrom: Date {
+        let lastStockEvent = stockEvents
+            .filter { $0.medicationID == medicationID }
+            .map(\.occurredAt)
+            .max()
+        return lastStockEvent ?? (Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now)
+    }
+
+    /// 이 약만 걸러 낸, 기록 없이 지나간 시간대.
+    private var unrecordedLines: [UnrecordedSlots.Line] {
+        UnrecordedSlots.find(
+            from: unrecordedFrom,
+            until: now,
+            schedules: schedules,
+            medications: medications,
+            doseEvents: doseEvents
+        )
+        .compactMap { line in
+            let mine = line.entries.filter { $0.medicationID == medicationID }
+            guard !mine.isEmpty else { return nil }
+            return UnrecordedSlots.Line(day: line.day, slot: line.slot, plannedAt: line.plannedAt, entries: mine)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                            Text(t("기록상 잔여", "On record"))
+                                .janjanBody(12, weight: .medium)
+                                .foregroundStyle(Color.muted)
+                            Text(t(
+                                "기록상 \(DecimalQuantity.display(remaining))정",
+                                "On record: \(DecimalQuantity.display(remaining)) pills"
+                            ))
+                                .janjanDisplay(24)
+                                .foregroundStyle(Color.ink)
+                                .monospacedDigit()
+                        }
+                    }
+
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                            JanjanField(
+                                label: t("실제로 센 개수", "Count you actually have"),
+                                placeholder: t("예: 20", "e.g. 20"),
+                                keyboard: .decimalPad,
+                                text: $countedText
+                            )
+                            if let comparisonText {
+                                Text(comparisonText)
+                                    .janjanBody(13)
+                                    .foregroundStyle(Color.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    if !unrecordedLines.isEmpty {
+                        JanjanCard {
+                            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                                Text(t("기록 없이 지나간 시간대", "Slots that passed unrecorded"))
+                                    .janjanBody(15, weight: .medium)
+                                    .foregroundStyle(Color.ink)
+                                Text(t(
+                                    "어느 날인지 기억나면 골라 주세요. 기억나지 않아도 괜찮아요 — 방금 센 개수가 새 기준이 됩니다.",
+                                    "Pick the day if you remember. If not, that's okay — the count you just made becomes the new baseline."
+                                ))
+                                    .janjanBody(12)
+                                    .foregroundStyle(Color.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                ForEach(unrecordedLines) { line in
+                                    unrecordedRow(line)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("다시 세기", "Count again"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("이 개수로 맞추기", "Set to this count")) {
+                        save()
+                    }
+                    .foregroundStyle(countedQuantity != nil ? Color.ink : Color.muted)
+                    .disabled(countedQuantity == nil)
+                }
+            }
+        }
+    }
+
+    private func unrecordedRow(_ line: UnrecordedSlots.Line) -> some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(UnrecordedSlots.title(for: line, language: lang))
+                .janjanBody(15)
+                .foregroundStyle(Color.ink2)
+
+            FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
+                Button {
+                    respond(to: line, status: .taken)
+                } label: {
+                    PillChip(text: t("먹었어요", "Took it"))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    respond(to: line, status: .skipped)
+                } label: {
+                    PillChip(text: t("건너뛰었어요", "Skipped it"))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    respond(to: line, status: .unrecorded)
+                } label: {
+                    PillChip(text: t("기억나지 않아요", "I don't remember"))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, CGFloat(JanjanSpacing.xxs))
+    }
+
+    /// 여기서 답하면 그 시간대의 기록이 생겨 기록상 잔여가 바로 바뀐다 —
+    /// 위 비교 문장도 같은 화면에서 다시 계산된다.
+    private func respond(to line: UnrecordedSlots.Line, status: DoseEvent.Status) {
+        DoseRecorder.record(
+            medicationID: medicationID,
+            slotKey: line.slot.storageKey,
+            status: status,
+            source: .phone,
+            on: line.day,
+            at: line.plannedAt,
+            in: context
+        )
+        try? context.save()
+    }
+
+    private func save() {
+        guard let counted = countedQuantity else { return }
+        let event = StockEvent.correction(medicationID: medicationID, setTo: counted, at: Date(), note: nil)
+        context.insert(StockEventRecord.make(from: event))
+        try? context.save()
+        dismiss()
     }
 }
 
