@@ -397,10 +397,7 @@ struct TodayView: View {
                     Button {
                         asNeededQuantities[medication.id] = option
                     } label: {
-                        Text(t(
-                            "\(DecimalQuantity.display(option))정",
-                            "\(DecimalQuantity.display(option)) pills"
-                        ))
+                        Text(t("\(DecimalQuantity.display(option))정", pillsEn(option)))
                     }
                 }
             } label: {
@@ -445,10 +442,7 @@ struct TodayView: View {
     private func asNeededHistoryText(_ event: DoseEventRecord) -> String {
         let time = asNeededTimeFormatter.string(from: event.scheduledAt)
         let name = medications.first(where: { $0.id == event.medicationID })?.displayTitle ?? ""
-        let quantityText = t(
-            "\(DecimalQuantity.display(event.quantity))정",
-            "\(DecimalQuantity.display(event.quantity)) pills"
-        )
+        let quantityText = t("\(DecimalQuantity.display(event.quantity))정", pillsEn(event.quantity))
         return "\(time) · \(name) \(quantityText)"
     }
 
@@ -466,10 +460,7 @@ struct TodayView: View {
 
     private func asNeededQuantityLabel(for medicationID: UUID) -> String {
         let quantity = asNeededQuantity(for: medicationID)
-        return t(
-            "\(DecimalQuantity.display(quantity))정",
-            "\(DecimalQuantity.display(quantity)) pills"
-        )
+        return t("\(DecimalQuantity.display(quantity))정", pillsEn(quantity))
     }
 
     private func defaultAsNeededQuantity(for medicationID: UUID) -> Decimal {

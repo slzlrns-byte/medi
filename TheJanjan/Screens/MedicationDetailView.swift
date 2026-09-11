@@ -267,7 +267,7 @@ struct MedicationDetailView: View {
     }
 
     private func asNeededQuantityText(_ quantity: Decimal) -> String {
-        t("\(DecimalQuantity.display(quantity))정", "\(DecimalQuantity.display(quantity)) pills")
+        t("\(DecimalQuantity.display(quantity))정", pillsEn(quantity))
     }
 
     private func asNeededTimeText(_ date: Date) -> String {
@@ -799,13 +799,13 @@ private struct StockRecountSheet: View {
         } else if diff > 0 {
             return t(
                 "기록보다 \(DecimalQuantity.display(diff))정 많아요. 보충을 적지 않았거나, 기록만 하고 드시지 않은 날이 있을 수 있어요.",
-                "It's \(DecimalQuantity.display(diff)) pills more than the record. A refill may not have been logged, or there may be a day it was recorded as taken but wasn't."
+                "It's \(pillsEn(diff)) more than the record. A refill may not have been logged, or there may be a day it was recorded as taken but wasn't."
             )
         } else {
             let shortfall = DecimalQuantity.round(remaining - counted, scale: 2)
             return t(
                 "기록보다 \(DecimalQuantity.display(shortfall))정 적어요. 기록 없이 드신 날이 있을 수 있어요.",
-                "It's \(DecimalQuantity.display(shortfall)) pills less than the record. There may be a day it was taken without being recorded."
+                "It's \(pillsEn(shortfall)) less than the record. There may be a day it was taken without being recorded."
             )
         }
     }
@@ -850,7 +850,7 @@ private struct StockRecountSheet: View {
                                 .foregroundStyle(Color.muted)
                             Text(t(
                                 "기록상 \(DecimalQuantity.display(remaining))정",
-                                "On record: \(DecimalQuantity.display(remaining)) pills"
+                                "On record: \(pillsEn(remaining))"
                             ))
                                 .janjanDisplay(24)
                                 .foregroundStyle(Color.ink)

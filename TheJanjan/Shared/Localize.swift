@@ -35,3 +35,8 @@ extension JanjanLanguage {
 func t(_ ko: String, _ en: String) -> String {
     JanjanLanguage.current == .english ? en : ko
 }
+
+/// 영어의 알 개수: "1 pill" / "0.5 pills". 한국어 "정" 은 셈이 없어 짝이 필요 없다.
+func pillsEn(_ quantity: Decimal) -> String {
+    "\(DecimalQuantity.display(quantity)) \(quantity == 1 ? "pill" : "pills")"
+}
