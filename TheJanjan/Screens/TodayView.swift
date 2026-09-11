@@ -434,7 +434,7 @@ struct TodayView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .regular))
                     .foregroundStyle(Color.muted)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

@@ -47,7 +47,8 @@ struct MedicationDetailView: View {
                 if let medication {
                     headerCard(medication)
                     stockCard(medication)
-                    if medication.kind == .asNeeded {
+                    // 중단한 약은 "지금 먹었어요" 를 내밀지 않는다 - 오늘 화면과 같은 규칙.
+                    if medication.kind == .asNeeded && medication.status == .active {
                         asNeededCard(medication)
                     }
                     doseChangeCard
@@ -921,27 +922,17 @@ private struct StockRecountSheet: View {
                 .janjanBody(15)
                 .foregroundStyle(Color.ink2)
 
+            // 오늘 화면의 같은 세 답과 같은 크기(44pt 터치 타깃)를 쓴다.
             FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
-                Button {
+                WhitePillButton(title: t("먹었어요", "Took it")) {
                     respond(to: line, status: .taken)
-                } label: {
-                    PillChip(text: t("먹었어요", "Took it"))
                 }
-                .buttonStyle(.plain)
-
-                Button {
+                WhitePillButton(title: t("건너뛰었어요", "Skipped it")) {
                     respond(to: line, status: .skipped)
-                } label: {
-                    PillChip(text: t("건너뛰었어요", "Skipped it"))
                 }
-                .buttonStyle(.plain)
-
-                Button {
+                WhitePillButton(title: t("기억나지 않아요", "I don't remember")) {
                     respond(to: line, status: .unrecorded)
-                } label: {
-                    PillChip(text: t("기억나지 않아요", "I don't remember"))
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
