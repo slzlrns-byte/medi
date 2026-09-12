@@ -14,7 +14,7 @@ enum ReminderPlanner {
     /// 통째로 다시 까는 이유: 무엇이 지워졌는지 따라다니며 하나씩 취소하려면
     /// 앱과 알림센터 두 곳에 같은 목록을 유지해야 하고, 그 둘은 반드시 어긋난다.
     static func reschedule(using context: ModelContext) async {
-        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map(\.core) ?? []
+        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map { $0.core.displayReady } ?? []
         let schedules = (try? context.fetch(FetchDescriptor<ScheduleRecord>()))?.map(\.core) ?? []
 
         let reminders = DayPlan.weeklyReminders(schedules: schedules, medications: medications)

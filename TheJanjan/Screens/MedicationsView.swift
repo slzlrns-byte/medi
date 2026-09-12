@@ -130,7 +130,7 @@ struct MedicationsView: View {
         let rows: [Row]
     }
 
-    private var medications: [Medication] { medicationRecords.map(\.core) }
+    private var medications: [Medication] { medicationRecords.map { $0.core.displayReady } }
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
     private var doseEvents: [DoseEvent] { doseRecords.map(\.core) }
     private var stockEvents: [StockEvent] { stockRecords.map(\.core) }

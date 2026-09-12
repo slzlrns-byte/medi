@@ -16,7 +16,7 @@ enum WatchSnapshotBuilder {
         calendar: Calendar = .current
     ) -> WatchSnapshot {
 
-        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map(\.core) ?? []
+        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map { $0.core.displayReady } ?? []
         let schedules = (try? context.fetch(FetchDescriptor<ScheduleRecord>()))?.map(\.core) ?? []
 
         return DayPlan.watchSnapshot(

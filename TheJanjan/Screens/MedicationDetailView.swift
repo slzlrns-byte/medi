@@ -39,7 +39,7 @@ struct MedicationDetailView: View {
         medicationRecords.first { $0.id == medicationID }
     }
 
-    private var medication: Medication? { record?.core }
+    private var medication: Medication? { record?.core.displayReady }
 
     private var myNotes: [MedicationNoteRecord] {
         noteRecords.filter { $0.medicationID == medicationID }
@@ -773,7 +773,7 @@ private struct StockRecountSheet: View {
     private var stockEvents: [StockEvent] { stockRecords.map(\.core) }
     private var doseEvents: [DoseEvent] { doseRecords.map(\.core) }
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
-    private var medications: [Medication] { medicationRecords.map(\.core) }
+    private var medications: [Medication] { medicationRecords.map { $0.core.displayReady } }
 
     /// 기록상 잔여. 이 화면의 재고 카드와 같은 계산기를 쓴다.
     private var remaining: Decimal {

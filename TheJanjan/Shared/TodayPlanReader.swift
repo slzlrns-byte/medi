@@ -13,7 +13,7 @@ enum TodayPlanReader {
 
     /// 그 날의 시간대별 계획. 화면이 부르는 것과 같은 함수를 지난다.
     static func slots(on day: Date, in context: ModelContext) -> [DayPlan.SlotLine] {
-        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map(\.core) ?? []
+        let medications = (try? context.fetch(FetchDescriptor<MedicationRecord>()))?.map { $0.core.displayReady } ?? []
         let schedules = (try? context.fetch(FetchDescriptor<ScheduleRecord>()))?.map(\.core) ?? []
         let doseEvents = (try? context.fetch(FetchDescriptor<DoseEventRecord>()))?.map(\.core) ?? []
 

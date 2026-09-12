@@ -41,7 +41,7 @@ struct PrescriptionFormView: View {
     }
 
     private var activeMedications: [Medication] {
-        medicationRecords.map(\.core).filter { $0.status == .active }
+        medicationRecords.map { $0.core.displayReady }.filter { $0.status == .active }
     }
 
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }

@@ -73,7 +73,7 @@ struct ReportView: View {
 
     // MARK: - 데이터
 
-    private var medications: [Medication] { medicationRecords.map(\.core) }
+    private var medications: [Medication] { medicationRecords.map { $0.core.displayReady } }
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
     private var doses: [DoseEvent] { doseRecords.map(\.core) }
     private var stock: [StockEvent] { stockRecords.map(\.core) }

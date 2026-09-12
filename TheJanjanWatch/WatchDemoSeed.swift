@@ -67,7 +67,7 @@ enum WatchDemoSeed {
                 slotKey: DoseSlot.morning.storageKey,
                 labelKo: DoseSlot.morning.label(language),
                 timeText: TimeOfDay(hour: 8, minute: 0).description,
-                medicationNames: [SampleData.escitalopram.name],
+                medicationNames: [DrugNames.display(SampleData.escitalopram.name, in: language)],
                 medicationIDs: [SampleData.escitalopram.id],
                 isCompleted: true
             ),
@@ -75,7 +75,10 @@ enum WatchDemoSeed {
                 slotKey: DoseSlot.bedtime.storageKey,
                 labelKo: DoseSlot.bedtime.label(language),
                 timeText: TimeOfDay(hour: 22, minute: 30).description,
-                medicationNames: [SampleData.lamotrigine.name, SampleData.quetiapine.name],
+                medicationNames: [
+                    DrugNames.display(SampleData.lamotrigine.name, in: language),
+                    DrugNames.display(SampleData.quetiapine.name, in: language)
+                ],
                 medicationIDs: [SampleData.lamotrigine.id, SampleData.quetiapine.id],
                 isCompleted: false
             )
@@ -84,7 +87,7 @@ enum WatchDemoSeed {
         let asNeeded: [WatchSnapshot.AsNeededLine] = [
             WatchSnapshot.AsNeededLine(
                 medicationID: SampleData.lorazepam.id,
-                title: "\(SampleData.lorazepam.name) \(SampleData.lorazepam.strengthText)",
+                title: "\(DrugNames.display(SampleData.lorazepam.name, in: language)) \(SampleData.lorazepam.strengthText)",
                 quantity: 1,
                 takenTodayTexts: ["14:19"]
             )
