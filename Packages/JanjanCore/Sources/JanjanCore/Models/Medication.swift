@@ -117,11 +117,17 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
     public var catalogID: String?
     /// "잠들기 쉽게" 같은 한 줄 용도 메모. 진단명이 아니라 사용자 자신의 말.
     public var purposeLine: String
-    /// 복용을 중단한 시각. 다시 복용 중으로 바꾸면 nil 로 돌아간다.
+    /// 가장 최근 중단 구간이 시작한 시각. 다시 복용으로 바꿔도 지우지 않는다 -
+    /// `resumedAt` 과 짝을 이뤄 "그동안 쉬었다" 는 사실을 남긴다.
     ///
     /// "기록 없이 지나간 시간대" 가 이걸 본다 - 중단하기 **전**의 빈 시간대는
     /// 여전히 사실이므로 계속 들되, 중단한 뒤의 침묵은 빠트림이 아니다.
     public var stoppedAt: Date?
+    /// 가장 최근 중단 구간이 끝난(다시 복용을 시작한) 시각.
+    /// `[stoppedAt, resumedAt)` 사이의 빈 시간대는 빠트림이 아니다.
+    /// 여러 번 중단·재개하면 마지막 구간만 남는다 - 그 전 구간까지 완벽히
+    /// 되짚는 것은 이 도구의 몫(어제오늘 빠트렸나)을 넘는다.
+    public var resumedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -133,7 +139,8 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         note: String = "",
         catalogID: String? = nil,
         purposeLine: String = "",
-        stoppedAt: Date? = nil
+        stoppedAt: Date? = nil,
+        resumedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -145,6 +152,7 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         self.catalogID = catalogID
         self.purposeLine = purposeLine
         self.stoppedAt = stoppedAt
+        self.resumedAt = resumedAt
     }
 
     /// "쿠에티아핀 25mg" 처럼 한 줄로 합친 표시용 문자열.

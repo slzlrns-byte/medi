@@ -51,7 +51,7 @@ struct PasscodeField: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("네 자리 중 \(digits.count)자리 입력됨"))
+        .accessibilityLabel(Text(t("네 자리 중 \(digits.count)자리 입력됨", "\(digits.count) of 4 digits entered")))
     }
 
     // MARK: - 숫자판
@@ -100,7 +100,7 @@ struct PasscodeField: View {
                     .frame(width: 72, height: 72)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("지우기"))
+            .accessibilityLabel(Text(t("지우기", "Delete")))
             .opacity(digits.isEmpty ? 0.3 : 1)
             .disabled(digits.isEmpty)
         }

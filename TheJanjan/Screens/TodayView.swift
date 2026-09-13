@@ -577,7 +577,10 @@ struct TodayView: View {
         }
 
         guard !short.isEmpty else { return t("부족한 약 없음", "Nothing running low") }
-        if short.count == 1 { return t("\(short[0].name) 모자람", "\(short[0].name) running low") }
+        // 이름을 가려 둔 동안은 여기서도 부르지 않는다 - 개수로만 말한다.
+        if short.count == 1 && !masksNames {
+            return t("\(short[0].name) 모자람", "\(short[0].name) running low")
+        }
         return t("모자라는 약 \(short.count)개", "\(short.count) meds running low")
     }
 
@@ -734,7 +737,7 @@ private struct SlotRecordSheet: View {
                     MaskedNameText(name: entry.medicationName, isMasked: masksNames)
                         .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
-                    PillChip(text: t("\(DecimalQuantity.display(entry.dose))정", "\(DecimalQuantity.display(entry.dose)) pills"))
+                    PillChip(text: t("\(DecimalQuantity.display(entry.dose))정", pillsEn(entry.dose)))
                     Spacer(minLength: 0)
                     if let status = entry.status, status != .unrecorded {
                         PillChip(

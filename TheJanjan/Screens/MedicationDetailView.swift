@@ -164,12 +164,12 @@ struct MedicationDetailView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                 if hasStock {
-                    Text(t("\(DecimalQuantity.display(snapshot.remaining))정", "\(DecimalQuantity.display(snapshot.remaining)) pills"))
+                    Text(t("\(DecimalQuantity.display(snapshot.remaining))정", pillsEn(snapshot.remaining)))
                         .janjanDisplay(28)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
                     if let refill = StockEvent.lastRefillQuantity(of: medication.id, in: stock) {
-                        Text(t("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(DecimalQuantity.display(refill)) pills last time"))
+                        Text(t("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill)) last time"))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                             .monospacedDigit()
@@ -388,7 +388,7 @@ struct MedicationDetailView: View {
                              : "\(schedule.slot.label(lang)) \(schedule.timeOfDay.description)")
                             .janjanBody(15)
                             .foregroundStyle(Color.ink2)
-                        PillChip(text: t("\(DecimalQuantity.display(schedule.dosePerIntake))정", "\(DecimalQuantity.display(schedule.dosePerIntake)) pills"))
+                        PillChip(text: t("\(DecimalQuantity.display(schedule.dosePerIntake))정", pillsEn(schedule.dosePerIntake)))
                         Spacer(minLength: 0)
                     }
                 }

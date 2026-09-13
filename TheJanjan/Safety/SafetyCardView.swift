@@ -16,14 +16,15 @@ struct SafetyCardView: View {
     @Environment(\.openURL) private var openURL
 
     private let contacts = Janjan.crisisContactsForCurrentRegion
+    private var lang: JanjanLanguage { .current }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     Text(contacts.isEmpty
-                         ? Janjan.safetyCardWithoutContactsKo
-                         : Janjan.safetyCardMessageKo)
+                         ? Janjan.safetyCardWithoutContacts(lang)
+                         : Janjan.safetyCardMessage(lang))
                         .janjanDisplay(22)
                         .foregroundStyle(Color.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -32,7 +33,7 @@ struct SafetyCardView: View {
                         contactCard(contact)
                     }
 
-                    Text("응급 상황은 112 · 119.")
+                    Text(t("응급 상황은 112 · 119.", "In an emergency, call 112 or 119."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
 
@@ -49,7 +50,7 @@ struct SafetyCardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
             }
@@ -65,10 +66,10 @@ struct SafetyCardView: View {
                 HStack(spacing: CGFloat(JanjanSpacing.s)) {
                     CircleGlyph(systemImage: "phone", background: .sage, foreground: .sageInk)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(contact.titleKo)
+                        Text(contact.title(lang))
                             .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
-                        Text(contact.subtitleKo)
+                        Text(contact.subtitle(lang))
                             .janjanBody(12)
                             .foregroundStyle(Color.muted)
                     }
@@ -81,7 +82,10 @@ struct SafetyCardView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text("\(contact.titleKo) \(contact.number) 에 전화하기"))
+        .accessibilityLabel(Text(t(
+            "\(contact.title(lang)) \(contact.number) 에 전화하기",
+            "Call \(contact.title(lang)) at \(contact.number)"
+        )))
     }
 
     private func call(_ contact: Janjan.CrisisContact) {

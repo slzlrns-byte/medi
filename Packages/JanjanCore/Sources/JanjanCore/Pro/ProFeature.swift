@@ -21,7 +21,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     public var titleKo: String {
         switch self {
         case .pharmacyScan: return "약봉투 스캔"
-        case .runOutForecast: return "소진 예측과 부족 알림"
+        case .runOutForecast: return "소진 예측"
         case .hideNames: return "약 이름 가리기"
         case .doseChangeCompare: return "용량 변경 전후 비교"
         case .detailedMoodDiary: return "자세한 기분일기"
@@ -35,7 +35,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     public var titleEn: String {
         switch self {
         case .pharmacyScan: return "Pharmacy bag scan"
-        case .runOutForecast: return "Run-out forecast and alerts"
+        case .runOutForecast: return "Run-out forecast"
         case .hideNames: return "Hide medication names"
         case .doseChangeCompare: return "Dose change comparison"
         case .detailedMoodDiary: return "Detailed mood journal"

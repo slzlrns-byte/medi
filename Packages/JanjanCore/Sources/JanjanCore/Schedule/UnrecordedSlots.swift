@@ -86,6 +86,12 @@ public enum UnrecordedSlots {
                     if medication.status == .stopped {
                         guard let stoppedAt = medication.stoppedAt, stoppedAt > plannedAt else { return false }
                     }
+                    // 중단했다가 다시 복용하는 약은 쉬었던 구간 `[stoppedAt, resumedAt)`
+                    // 의 침묵도 빠트림이 아니다. 재개 시각을 모르는 옛 기록은 예전처럼 든다.
+                    if medication.status == .active,
+                       let stoppedAt = medication.stoppedAt,
+                       let resumedAt = medication.resumedAt,
+                       stoppedAt <= plannedAt, plannedAt < resumedAt { return false }
                     return true
                 }
                 guard !unrecorded.isEmpty else { continue }

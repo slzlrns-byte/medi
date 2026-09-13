@@ -105,10 +105,18 @@ struct MedicationsView: View {
                 Button(t("삭제", "Delete"), role: .destructive) { delete(row) }
                 Button(t("취소", "Cancel"), role: .cancel) { pendingDeletion = nil }
             } message: { row in
-                Text(t(
-                    "\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
-                    "This removes \(row.medication.name)'s dose and stock records together. This can't be undone."
-                ))
+                // 목록에서 가려 둔 이름이 확인 창에서 새면 안 된다 - 가린 동안은 부르지 않는다.
+                if masksNames {
+                    Text(t(
+                        "복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
+                        "This removes its dose and stock records together. This can't be undone."
+                    ))
+                } else {
+                    Text(t(
+                        "\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
+                        "This removes \(row.medication.name)'s dose and stock records together. This can't be undone."
+                    ))
+                }
             }
         }
     }
@@ -291,13 +299,13 @@ struct MedicationsView: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
-                        Text(t("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정", "\(DecimalQuantity.display(max(row.snapshot.remaining, 0))) pills"))
+                        Text(t("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정", pillsEn(max(row.snapshot.remaining, 0))))
                             .janjanDisplay(20)
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
                         // 남은 숫자만으로는 많은지 적은지 모른다. 받아 온 개수가 눈금이 된다.
                         if let refill = row.lastRefill {
-                            Text(t("받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(DecimalQuantity.display(refill)) pills"))
+                            Text(t("받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill))"))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                                 .monospacedDigit()

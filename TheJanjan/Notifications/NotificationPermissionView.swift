@@ -23,18 +23,21 @@ struct NotificationPermissionView: View {
             CircleGlyph(systemImage: "bell", background: .butter, foreground: .butterInk, diameter: 72)
 
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
-                Text("약 시간에 알려드릴까요?")
+                Text(t("약 시간에 알려드릴까요?", "Want a reminder at med time?"))
                     .janjanDisplay(26)
                     .foregroundStyle(Color.ink)
                     .multilineTextAlignment(.center)
 
-                Text("알림에서 바로 복용함·건너뜀을 누를 수 있어요. 앱을 열지 않아도 기록됩니다.")
+                Text(t(
+                    "알림에서 바로 복용함·건너뜀을 누를 수 있어요. 앱을 열지 않아도 기록됩니다.",
+                    "You can tap Taken or Skipped right on the notification. It records without opening the app."
+                ))
                     .janjanBody(15)
                     .foregroundStyle(Color.ink2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("나중에 설정에서 켜고 끌 수 있어요.")
+                Text(t("나중에 설정에서 켜고 끌 수 있어요.", "You can turn this on or off in Settings later."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -44,11 +47,11 @@ struct NotificationPermissionView: View {
             Spacer()
 
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
-                BlackPillButton(title: "알림 받기", isBusy: isAsking) {
+                BlackPillButton(title: t("알림 받기", "Get reminders"), isBusy: isAsking) {
                     ask()
                 }
 
-                Button("지금은 괜찮아요") {
+                Button(t("지금은 괜찮아요", "Not right now")) {
                     finish()
                 }
                 .janjanBody(15)

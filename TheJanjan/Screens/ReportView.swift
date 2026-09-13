@@ -196,7 +196,7 @@ struct ReportView: View {
             Spacer()
             // 한 번도 세지 않았으면 0정이라고 말하지 않는다.
             Text(counted
-                ? t("\(DecimalQuantity.display(remaining))정", "\(DecimalQuantity.display(remaining)) pills")
+                ? t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining))
                 : t("재고 미기록", "Stock not tracked"))
                 .janjanBody(15, weight: counted ? .medium : .light)
                 .foregroundStyle(counted ? Color.ink : Color.muted)

@@ -67,6 +67,15 @@ final class PhoneSessionManager: NSObject {
             )
         case .asNeededTaken(let medicationID, let quantity, let at):
             guard let context = AppServices.shared.container?.mainContext else { return }
+            // 폰에서 약을 지운 직후, 옛 스냅샷을 쥔 워치가 누른 것일 수 있다.
+            // 주인 없는 기록은 이름 없는 이력 줄로 남고 복약률에 조용히 섞이므로
+            // (MedicationStore.delete 주석과 같은 위험) 여기서 거르고,
+            // 워치에는 새 스냅샷을 보내 옛 줄을 걷어 낸다.
+            guard Self.medicationExists(medicationID, in: context) else {
+                logger.error("지워진 약의 필요시 기록이 워치에서 왔습니다. 무시합니다.")
+                AppServices.shared.pushWatchSnapshot()
+                return
+            }
             DoseRecorder.recordAsNeeded(
                 medicationID: medicationID,
                 quantity: quantity,
@@ -94,6 +103,12 @@ final class PhoneSessionManager: NSObject {
                 pushSnapshot(snapshot)
             }
         }
+    }
+
+    /// 이 약이 아직 저장소에 있는가. 워치에서 온 ID 는 이미 지워진 약일 수 있다.
+    private static func medicationExists(_ id: UUID, in context: ModelContext) -> Bool {
+        let descriptor = FetchDescriptor<MedicationRecord>(predicate: #Predicate { $0.id == id })
+        return ((try? context.fetchCount(descriptor)) ?? 0) > 0
     }
 }
 

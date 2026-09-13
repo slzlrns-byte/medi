@@ -79,7 +79,15 @@ enum MedicationStore {
         guard let record = medicationRecord(medicationID, in: context) else { return }
         record.statusRaw = status.rawValue
         // 중단 시각을 남긴다 - "기록 없이 지나간 시간대" 가 중단 전과 후를 가른다.
-        record.stoppedAt = status == .stopped ? Date() : nil
+        // 다시 복용으로 돌아와도 stoppedAt 은 지우지 않는다. resumedAt 과 짝을 이뤄
+        // 쉬었던 구간 [stoppedAt, resumedAt) 을 남겨야, 그 사이의 침묵을
+        // 빠트림으로 다시 묻지 않는다.
+        if status == .stopped {
+            record.stoppedAt = Date()
+            record.resumedAt = nil
+        } else if record.stoppedAt != nil {
+            record.resumedAt = Date()
+        }
         save("복용 상태 변경", in: context)
     }
 

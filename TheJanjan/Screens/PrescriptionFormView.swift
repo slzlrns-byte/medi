@@ -168,10 +168,15 @@ struct PrescriptionFormView: View {
             }
 
             if let quantity = refills[medication.id] {
+                // VoiceOver 가 가린 이름을 소리 내어 읽으면 가림이 뚫린다 -
+                // 눈에 보이는 손잡이(togglePill)와 같은 규칙으로 용도줄로 부른다.
+                let spokenName = masksNames
+                    ? (medication.purposeLine.isEmpty ? t("가려진 약", "hidden medication") : medication.purposeLine)
+                    : medication.name
                 CountStepper(
-                    text: t("\(DecimalQuantity.display(quantity))정", "\(DecimalQuantity.display(quantity)) pills"),
-                    decreaseLabelKo: t("\(medication.name) 개수 줄이기", "Decrease \(medication.name) count"),
-                    increaseLabelKo: t("\(medication.name) 개수 늘리기", "Increase \(medication.name) count"),
+                    text: t("\(DecimalQuantity.display(quantity))정", pillsEn(quantity)),
+                    decreaseLabelKo: t("\(spokenName) 개수 줄이기", "Decrease \(spokenName) count"),
+                    increaseLabelKo: t("\(spokenName) 개수 늘리기", "Increase \(spokenName) count"),
                     onDecrease: { adjust(medication, by: -1) },
                     onIncrease: { adjust(medication, by: 1) }
                 )

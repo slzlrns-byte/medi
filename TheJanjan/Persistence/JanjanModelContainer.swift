@@ -35,9 +35,15 @@ enum JanjanModelContainer {
     /// 어떤 저장소로 열렸는지. 설정 화면에서 그대로 보여 준다.
     private(set) static var activeStorage: Storage = .cloudKit
 
-    /// iCloud 동기화를 끄고 싶을 때(테스트 러너, 추후 설정 토글) 쓰는 스위치.
+    /// iCloud 동기화를 끄고 싶을 때(테스트 러너, 화면 캡처) 쓰는 스위치.
+    /// 다른 디버그 스위치들과 같은 규칙 - 제출 빌드에는 이 뒷문이 컴파일되지 않는다.
+    /// 사용자용 동기화 끄기 토글을 만들게 되면 환경변수가 아니라 설정 저장소로 한다.
     static var isCloudKitDisabledByEnvironment: Bool {
+        #if DEBUG
         ProcessInfo.processInfo.environment["JANJAN_DISABLE_CLOUDKIT"] == "1"
+        #else
+        false
+        #endif
     }
 
     /// 앱과 위젯이 같은 파일을 보게 하는 그룹을 실제로 열 수 있는가.

@@ -233,7 +233,7 @@ struct MedicationFormView: View {
 
     private func doseStepper(_ draft: Binding<SlotDraft>) -> some View {
         CountStepper(
-            text: t("1회 \(DecimalQuantity.display(draft.wrappedValue.dose))정", "\(DecimalQuantity.display(draft.wrappedValue.dose)) pills per dose"),
+            text: t("1회 \(DecimalQuantity.display(draft.wrappedValue.dose))정", "\(pillsEn(draft.wrappedValue.dose)) per dose"),
             decreaseLabelKo: t("개수 줄이기", "Decrease count"),
             increaseLabelKo: t("개수 늘리기", "Increase count"),
             onDecrease: { adjust(draft, by: -doseStep) },

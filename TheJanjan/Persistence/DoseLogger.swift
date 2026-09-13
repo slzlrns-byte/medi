@@ -58,9 +58,25 @@ final class SwiftDataDoseLogger: DoseLogging {
 
         let status: DoseEvent.Status = (action == .taken) ? .taken : .skipped
 
+        // 이미 지워진 약의 ID 가 섞여 올 수 있다 - 옛 스냅샷을 쥔 워치, 걷히기 전의
+        // 잠금화면 알림. 주인 없는 기록은 복약률에 조용히 섞이므로 여기서 거른다.
+        let knownIDs = medicationIDs.filter { medicationID in
+            let descriptor = FetchDescriptor<MedicationRecord>(
+                predicate: #Predicate { $0.id == medicationID }
+            )
+            return ((try? context.fetchCount(descriptor)) ?? 0) > 0
+        }
+        if knownIDs.count != medicationIDs.count {
+            logger.error("지워진 약 \(medicationIDs.count - knownIDs.count)개의 복용 기록을 무시했습니다.")
+        }
+        guard !knownIDs.isEmpty else {
+            AppServices.shared.pushWatchSnapshot()
+            return
+        }
+
         // 저장 규칙은 DoseRecorder 한 곳에만 있다. 같은 시간대의 기록은 덮어쓴다 —
         // 알림에서 복용함을 누른 뒤 앱에서 건너뜀으로 고쳐도 재고가 두 번 깎이지 않는다.
-        for medicationID in medicationIDs {
+        for medicationID in knownIDs {
             DoseRecorder.record(
                 medicationID: medicationID,
                 slotKey: slotKey,

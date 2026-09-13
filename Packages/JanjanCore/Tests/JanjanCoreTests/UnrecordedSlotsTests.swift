@@ -147,6 +147,46 @@ final class UnrecordedSlotsTests: XCTestCase {
         )
     }
 
+    func testResumedMedicationDoesNotRelitigateTheStoppedInterval() {
+        // 월요일 아침 10시에 중단했다가 수요일 아침 7시에 다시 복용을 시작했다.
+        // 쉬었던 월요일 취침 ~ 화요일(구간 안)은 빠트림이 아니고,
+        // 중단 전(월요일 아침 8시은 이미 지나 있었고 기록 없음)과
+        // 재개 뒤(수요일 아침 8시)는 여전히 든다.
+        let resumed = Medication(
+            id: Fixed.medA, name: "에스시탈로프람", strengthText: "10mg",
+            status: .active,
+            stoppedAt: Fixed.date(2026, 8, 17, 10, 0),
+            resumedAt: Fixed.date(2026, 8, 19, 7, 0)
+        )
+        let lines = UnrecordedSlots.find(
+            from: monday,
+            until: Fixed.date(2026, 8, 19, 12, 0),  // 수요일 정오
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [resumed],
+            doseEvents: [],
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(
+            lines.map { Fixed.calendar.component(.day, from: $0.day) },
+            [17, 19],
+            "쉬었던 화요일 아침은 다시 묻지 않아야 합니다"
+        )
+    }
+
+    func testResumedWithoutIntervalBehavesAsBefore() {
+        // 옛 판에서 재개해 stoppedAt 이 지워진 약(둘 다 nil): 구간을 모르므로
+        // 예전과 같이 전부 든다 - 거짓으로 조용해지는 것보다 묻는 쪽이 낫다.
+        let resumed = Medication(
+            id: Fixed.medA, name: "에스시탈로프람", strengthText: "10mg", status: .active
+        )
+        let lines = UnrecordedSlots.find(
+            from: monday, until: tuesdayNoon,
+            schedules: [Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1)],
+            medications: [resumed], doseEvents: [], calendar: Fixed.calendar
+        )
+        XCTAssertEqual(lines.count, 2)
+    }
+
     func testStoppedWithoutTimestampStaysQuiet() {
         // 이 필드가 없던 판에서 중단한 약: 언제 중단했는지 모르므로 아예 들지 않는다.
         let stopped = Medication(

@@ -29,6 +29,8 @@ final class MedicationRecord {
     // CloudKit 호환을 위해 선택적 필드로 더한다. 이 필드가 없던 판이 저장한
     // 레코드는 nil 로 읽힌다 - 그런 "옛 중단" 은 중단 시점을 모르는 것으로 다룬다.
     var stoppedAt: Date?
+    // 마지막 중단 구간이 끝난 시각. stoppedAt 과 짝이다 (Medication.resumedAt 참고).
+    var resumedAt: Date?
 
     init(
         id: UUID = UUID(),
@@ -41,7 +43,8 @@ final class MedicationRecord {
         catalogID: String? = nil,
         purposeLine: String = "",
         createdAt: Date = Date(),
-        stoppedAt: Date? = nil
+        stoppedAt: Date? = nil,
+        resumedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -54,6 +57,7 @@ final class MedicationRecord {
         self.purposeLine = purposeLine
         self.createdAt = createdAt
         self.stoppedAt = stoppedAt
+        self.resumedAt = resumedAt
     }
 
     static func make(from core: Medication) -> MedicationRecord {
@@ -67,7 +71,8 @@ final class MedicationRecord {
             note: core.note,
             catalogID: core.catalogID,
             purposeLine: core.purposeLine,
-            stoppedAt: core.stoppedAt
+            stoppedAt: core.stoppedAt,
+            resumedAt: core.resumedAt
         )
     }
 
@@ -82,7 +87,8 @@ final class MedicationRecord {
             note: note,
             catalogID: catalogID,
             purposeLine: purposeLine,
-            stoppedAt: stoppedAt
+            stoppedAt: stoppedAt,
+            resumedAt: resumedAt
         )
     }
 }
