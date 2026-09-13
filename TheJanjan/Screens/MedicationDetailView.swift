@@ -28,6 +28,7 @@ struct MedicationDetailView: View {
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
     @State private var selectedAsNeededQuantity: Decimal?
     @State private var isShowingRecountSheet = false
+    @State private var comparingChange: DoseChangeRecord?
 
     private var today: Date { Date() }
     private var lang: JanjanLanguage { .current }
@@ -95,6 +96,13 @@ struct MedicationDetailView: View {
         }
         .sheet(isPresented: $isShowingRecountSheet) {
             StockRecountSheet(medicationID: medicationID)
+        }
+        .sheet(item: $comparingChange) { entry in
+            DoseChangeCompareSheet(
+                change: entry.core,
+                medicationName: medication?.name ?? "",
+                masksNames: masksNames
+            )
         }
         .confirmationDialog(
             t("이 용량 변경 기록을 지울까요?", "Delete this dose change record?"),
@@ -320,39 +328,39 @@ struct MedicationDetailView: View {
     }
 
     private func doseChangeRow(_ entry: DoseChangeRecord) -> some View {
-        HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(doseChangeDayText(entry.changedAt)) · \(entry.core.arrowTextKo)")
-                    .janjanBody(15)
-                    .foregroundStyle(Color.ink2)
-                    .monospacedDigit()
-                if let note = entry.note, !note.isEmpty {
-                    Text(note)
-                        .janjanBody(12)
-                        .foregroundStyle(Color.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(doseChangeDayText(entry.changedAt)) · \(entry.core.arrowTextKo)")
+                        .janjanBody(15)
+                        .foregroundStyle(Color.ink2)
+                        .monospacedDigit()
+                    if let note = entry.note, !note.isEmpty {
+                        Text(note)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                Spacer(minLength: 0)
+                Button {
+                    // 다른 카드처럼 바로 지우지 않고 확인을 한 번 거친다.
+                    pendingDoseChangeDeletion = entry
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.muted)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
             }
-            Spacer(minLength: 0)
-            Button {
-                // 다른 카드처럼 바로 지우지 않고 확인을 한 번 거친다.
-                pendingDoseChangeDeletion = entry
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Color.muted)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
-        }
-    }
 
-    private func doseChangeDayText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
-        formatter.setLocalizedDateFormatFromTemplate("Md")
-        return formatter.string(from: date)
+            WhitePillButton(title: t("전후 보기", "Compare")) {
+                comparingChange = entry
+            }
+            .proGated(.doseChangeCompare)
+        }
     }
 
     private var scheduleCard: some View {
@@ -544,6 +552,15 @@ struct MedicationDetailView: View {
             record?.strengthText = latest.toText
         }
     }
+}
+
+/// "9월 3일" 처럼 용량 변경 날짜를 짧게 적는 서식. 용량 변경 줄과 전후 비교
+/// 시트 머리글이 같은 서식을 쓰도록 파일 안에서 함께 둔다.
+private func doseChangeDayText(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
+    formatter.setLocalizedDateFormatFromTemplate("Md")
+    return formatter.string(from: date)
 }
 
 /// 메모 한 줄을 받는 시트. 증상 카탈로그와 이어 두는 것은 선택이다.
@@ -745,6 +762,187 @@ private struct DoseChangeSheet: View {
 
     private var isSavable: Bool {
         !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// 용량 변경 하나의 전후 2주를 나란히 놓는 시트 (Pro).
+///
+/// 여기서도 강점 결정서 D12 그대로다 — 숫자와 사실만 나란히 두고, 좋아졌다·
+/// 나빠졌다 같은 말은 붙이지 않는다. 방향은 `DoseChangeComparison.moodText`
+/// 가 주는 부호 글자로만 보이고, 색으로는 말하지 않는다.
+private struct DoseChangeCompareSheet: View {
+
+    let change: DoseChange
+    let medicationName: String
+    let masksNames: Bool
+
+    @Environment(\.dismiss) private var dismiss
+
+    // StockRecountSheet 와 같은 패턴 — 걸러 두지 않고 받아서 코어 계산에 그대로 넘긴다.
+    @Query private var checkInRecords: [CheckInRecord]
+    @Query private var symptomRecords: [SymptomEntryRecord]
+
+    private var lang: JanjanLanguage { .current }
+
+    private var comparison: DoseChangeComparison {
+        DoseChangeComparison.make(
+            change: change,
+            checkIns: checkInRecords.map(\.core),
+            symptomEntries: symptomRecords.map(\.core)
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    JanjanCard {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                            MaskedNameText(name: medicationName, isMasked: masksNames)
+                                .janjanBody(17, weight: .semibold)
+                                .foregroundStyle(Color.ink)
+                            Text("\(doseChangeDayText(change.changedAt)) · \(change.arrowTextKo)")
+                                .janjanBody(13)
+                                .foregroundStyle(Color.muted)
+                                .monospacedDigit()
+                        }
+                    }
+
+                    JanjanCard {
+                        Text(t(
+                            "변경 전 2주와 후 2주의 기록을 그대로 놓았습니다. 해석은 진료에서 함께 하시면 됩니다.",
+                            "The two weeks before and after are laid out as recorded. You can go over what it means together at your visit."
+                        ))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    JanjanCard {
+                        if comparison.hasAnything {
+                            compareTable
+                        } else {
+                            Text(t("이 구간에는 아직 기록이 없습니다.", "There are no records in this period yet."))
+                                .janjanBody(15)
+                                .foregroundStyle(Color.muted)
+                        }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("전후 보기", "Compare"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+    }
+
+    // MARK: - 표
+    //
+    // 좁은 화면(SE, 375pt)에서도 넘치지 않는지: 열 셋 다 숫자·짧은 단어뿐이라
+    // Grid 가 내용에 맞춰 폭을 잡으면 카드 안쪽 폭(대략 310pt)에 넉넉히 들어간다.
+
+    private var compareTable: some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+            Grid(alignment: .leading, horizontalSpacing: CGFloat(JanjanSpacing.s), verticalSpacing: CGFloat(JanjanSpacing.s)) {
+                GridRow {
+                    Text("")
+                    Text(t("변경 전 \(comparison.before.days)일", "Before · \(comparison.before.days) days"))
+                        .janjanBody(12, weight: .medium)
+                        .foregroundStyle(Color.muted)
+                    Text(t("변경 후 \(comparison.after.days)일", "After · \(comparison.after.days) days"))
+                        .janjanBody(12, weight: .medium)
+                        .foregroundStyle(Color.muted)
+                }
+
+                metricRow(
+                    label: t("기분 평균", "Mood average"),
+                    before: moodCell(comparison.before),
+                    after: moodCell(comparison.after)
+                )
+                metricRow(
+                    label: t("수면 평균", "Sleep average"),
+                    before: sleepCell(comparison.before),
+                    after: sleepCell(comparison.after)
+                )
+                metricRow(
+                    label: t("증상 기록", "Symptoms"),
+                    before: symptomCell(comparison.before),
+                    after: symptomCell(comparison.after)
+                )
+                metricRow(
+                    label: t("꿈", "Dreams"),
+                    before: dreamCell(comparison.before),
+                    after: dreamCell(comparison.after)
+                )
+            }
+
+            if comparison.after.days < DoseChangeComparison.windowDays {
+                Text(t(
+                    "후 구간은 아직 \(comparison.after.days)일째입니다.",
+                    "The after period is only \(comparison.after.days) days in so far."
+                ))
+                .janjanBody(12)
+                .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func metricRow<Before: View, After: View>(label: String, before: Before, after: After) -> some View {
+        GridRow {
+            Text(label)
+                .janjanBody(13)
+                .foregroundStyle(Color.ink2)
+            before
+            after
+        }
+    }
+
+    private func moodCell(_ window: DoseChangeComparison.Window) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(DoseChangeComparison.moodText(window.moodAverage) ?? t("기록 없음", "No records"))
+                .janjanBody(15, weight: .medium)
+                .foregroundStyle(Color.ink)
+                .monospacedDigit()
+            Text(t("\(window.moodRecordedDays)일 기록", "\(window.moodRecordedDays) days recorded"))
+                .janjanBody(11)
+                .foregroundStyle(Color.muted)
+                .monospacedDigit()
+        }
+    }
+
+    private func sleepCell(_ window: DoseChangeComparison.Window) -> some View {
+        Text(DoseChangeComparison.sleepText(window.sleepAverageMinutes, language: lang) ?? t("기록 없음", "No records"))
+            .janjanBody(15, weight: .medium)
+            .foregroundStyle(Color.ink)
+            .monospacedDigit()
+    }
+
+    private func symptomCell(_ window: DoseChangeComparison.Window) -> some View {
+        Text(t("\(window.symptomDays)일", "\(window.symptomDays) days"))
+            .janjanBody(15, weight: .medium)
+            .foregroundStyle(Color.ink)
+            .monospacedDigit()
+    }
+
+    private func dreamCell(_ window: DoseChangeComparison.Window) -> some View {
+        Text(t(
+            "\(window.dreamDays)일 · 악몽 \(window.nightmareDays)일",
+            "\(window.dreamDays) days · nightmares \(window.nightmareDays)"
+        ))
+        .janjanBody(15, weight: .medium)
+        .foregroundStyle(Color.ink)
+        .monospacedDigit()
     }
 }
 

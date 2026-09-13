@@ -19,6 +19,9 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments = ["-JanjanSeedDemoData"]
         // 시뮬레이터에는 iCloud 계정도 entitlement 도 없다. 저장소 문제로 흔들리지 않게.
         app.launchEnvironment["JANJAN_DISABLE_CLOUDKIT"] = "1"
+        // Pro 화면(전후 보기 등)도 찍는다. 디버그 백도어라 출시 빌드에는 없는 스위치다.
+        // 스토어 제출용 사진도 어차피 Pro 가 켜진 모습이 맞다.
+        app.launchEnvironment["JANJAN_FORCE_PRO"] = "1"
         app.launch()
     }
 
@@ -174,6 +177,29 @@ final class ScreenshotTests: XCTestCase {
                         settle()
                     }
                     capture("16-다시-세기")
+                    _ = tryDismissSheet()
+                }
+            }
+        }
+
+        // 용량 변경 전후 비교 시트(Pro). 데모 데이터에 9일 전 5mg→10mg 변경이
+        // 있어 전 2주·후 2주가 실데이터로 채워진다.
+        if isTabBarReachable {
+            tap(tab: "약")
+            let row = app.buttons.matching(identifier: "medicationRow").firstMatch
+            if row.waitForExistence(timeout: 10) {
+                row.tap()
+                settle()
+                let compare = app.buttons["전후 보기"].firstMatch
+                if !compare.waitForExistence(timeout: 3) {
+                    // 용량 변경 카드는 화면 아래쪽이다.
+                    app.swipeUp()
+                    settle()
+                }
+                if compare.waitForExistence(timeout: 5) {
+                    compare.tap()
+                    settle()
+                    capture("20-용량변경-전후")
                     _ = tryDismissSheet()
                 }
             }
