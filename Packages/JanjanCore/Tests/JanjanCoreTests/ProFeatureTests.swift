@@ -8,7 +8,7 @@ final class ProFeatureTests: XCTestCase {
     func testLaunchHighlightsAreWhatTheAppActuallyLocks() {
         XCTAssertEqual(
             ProFeature.launchHighlights,
-            [.pharmacyScan, .runOutForecast, .hideNames, .watchApp]
+            [.pharmacyScan, .runOutForecast, .doseChangeCompare, .hideNames, .watchApp]
         )
         XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "약봉투 스캔")
     }
@@ -35,7 +35,7 @@ final class ProFeatureTests: XCTestCase {
     }
 
     func testEveryFeatureHasKoreanTitle() {
-        XCTAssertEqual(ProFeature.allCases.count, 8)
+        XCTAssertEqual(ProFeature.allCases.count, 9)
         for feature in ProFeature.allCases {
             XCTAssertFalse(feature.titleKo.isEmpty, "\(feature) 문구가 비어 있다")
             XCTAssertFalse(feature.rawValue.isEmpty)
