@@ -27,6 +27,12 @@ struct TodayView: View {
     @State private var openSlot: SlotSelection?
     @State private var safetyReason: SafetyReason?
     @State private var isShowingUnrecordedSheet = false
+    #if DEBUG
+    /// 화면 찍기 전용: `-JanjanShowUnrecorded` 인자가 있으면 뜨자마자 살펴보기
+    /// 시트를 연다. simctl 로만 띄우는 영어 캡처가 버튼을 누를 수 없어서다.
+    private let opensUnrecordedOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("-JanjanShowUnrecorded")
+    #endif
     /// 약별로 고른 필요시 개수. 고르지 않은 약은 `asNeededQuantity(for:)` 가
     /// 가장 최근 기록에서 기본값을 찾는다.
     @State private var asNeededQuantities: [UUID: Decimal] = [:]
@@ -180,6 +186,13 @@ struct TodayView: View {
                     recordUnrecorded(entry, in: line, as: status)
                 }
             }
+            #if DEBUG
+            .onAppear {
+                if opensUnrecordedOnLaunch && !unrecordedLines.isEmpty {
+                    isShowingUnrecordedSheet = true
+                }
+            }
+            #endif
         }
     }
 
