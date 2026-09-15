@@ -40,8 +40,8 @@ jobs:
   capture:
     name: 화면 찍기
     runs-on: macos-15
-    # 실제로는 7~9분. 45분으로 두면 매달릴 때 450분이 깎인다.
-    timeout-minutes: 45
+    # 캡처가 늘며 45분을 넘기기 시작했다(런 33: 워치 단계에서 잘림).
+    timeout-minutes: 75
 
     steps:
       - name: 체크아웃
@@ -333,6 +333,37 @@ jobs:
             || { echo "::error::사진을 하나도 꺼내지 못했습니다."; exit 1; }
 
           echo "넓은 기기: ${WIDE_NAME:-?} / 좁은 기기: ${NARROW_NAME:-없음}"
+
+      - name: 아이폰 사진을 먼저 올려 둔다
+        # 런 33의 교훈 - 워치 단계가 늘어져 시간 상한에 잘리면, 이미 찍은
+        # 아이폰 사진까지 러너와 함께 사라진다. 여기서 한 번 올려 두면
+        # 뒤가 어떻게 되든 아이폰 몫은 남는다. 마지막 단계가 전체(워치 포함)로
+        # 다시 덮어쓴다.
+        if: always()
+        continue-on-error: true
+        run: |
+          set -e
+          ls build/named/*.png >/dev/null 2>&1 || { echo "올릴 사진 없음"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          current="$(git rev-parse HEAD)"
+          mkdir -p /tmp/shots-early
+          cp build/named/*.png /tmp/shots-early/
+          git checkout --orphan screenshots-early
+          git rm -rf --cached . > /dev/null
+          rm -rf shots && mkdir -p shots
+          cp /tmp/shots-early/*.png shots/
+          {
+            echo "# 시뮬레이터 화면 (아이폰 몫 중간 업로드)"
+            echo
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo "- 찍은 때: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          } > README.md
+          git add -f shots README.md
+          git commit -q -m "화면(아이폰 먼저) ${GITHUB_SHA:0:7}"
+          git push -f origin HEAD:ci/screenshots
+          git checkout -f "$current"
+          rm -rf shots README.md && git checkout -- README.md 2>/dev/null || true
 
       # ── 워치 ────────────────────────────────────────────────────────────
       # watchOS 는 XCUITest 를 지원하지 않는다. 눌러 가며 찍을 수 없으므로
