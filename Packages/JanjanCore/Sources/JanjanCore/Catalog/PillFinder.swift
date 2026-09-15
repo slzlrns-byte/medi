@@ -237,3 +237,13 @@ public enum PillFinder {
             .joined()
     }
 }
+
+/// 번들에 실린 낱알 데이터. 첫 접근에 한 번만 읽고 캐시한다(Catalogs 와 같은 규칙).
+///
+/// 파일이 없으면 빈 목록이다 - **지어낸 약 데이터를 넣는 것은 금지**라서,
+/// 실데이터 파이프라인(식약처 공공데이터)이 `pill_catalog.json` 을 만들어
+/// 넣기 전까지는 화면이 "아직 실려 있지 않아요" 로 안내한다.
+public enum PillCatalog {
+    public static let pills: [PillFinder.Pill] =
+        (try? CatalogLoader.decode([PillFinder.Pill].self, resource: "pill_catalog")) ?? []
+}

@@ -34,6 +34,17 @@ struct PillFinderView: View {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 filterCard
                 resultsSection
+
+                // 공공누리 제1유형(출처표시) - 데이터를 쓰는 조건이다.
+                if !PillCatalog.pills.isEmpty {
+                    Text(t(
+                        "출처: 식품의약품안전처 의약품 낱알식별 정보",
+                        "Source: MFDS (Korea) pill identification data"
+                    ))
+                    .janjanBody(11)
+                    .foregroundStyle(Color.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .padding(.top, CGFloat(JanjanSpacing.s))
@@ -206,25 +217,6 @@ struct PillFinderView: View {
             parts.append(t("각인 \(imprint)", "Imprint \(imprint)"))
         }
         return parts.joined(separator: " · ")
-    }
-}
-
-/// 번들에 실린 낱알 데이터를 읽는 곳.
-///
-/// 파일이 없으면 빈 목록이다 - 지어낸 약 데이터를 넣는 것은 금지다.
-/// 데이터는 식약처(한국)·NLM(미국) 공공 자료를 빌드 파이프라인이 추려 담는다.
-enum PillCatalog {
-
-    /// 언어와 무관하게 실린 것 전부. 한국 데이터는 한국어 제품명, 미국 데이터는
-    /// 영어 제품명 그대로다 - 약봉투에 적힌 이름과 같아야 알아본다.
-    static let pills: [PillFinder.Pill] = load()
-
-    private static func load() -> [PillFinder.Pill] {
-        guard let url = Bundle.main.url(forResource: "PillCatalog", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let pills = try? JSONDecoder().decode([PillFinder.Pill].self, from: data)
-        else { return [] }
-        return pills
     }
 }
 
