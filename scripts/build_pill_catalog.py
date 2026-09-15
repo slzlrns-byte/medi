@@ -96,13 +96,31 @@ def fetch_page(endpoint, service_key, page):
         "numOfRows": 100,
         "pageNo": page,
     })
-    request = urllib.request.Request(f"{endpoint}?{params}", headers={"Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        raw = response.read().decode("utf-8")
-    if raw.lstrip().startswith("<"):
-        # 인증 실패 등은 XML 오류로 온다. 원문 머리를 그대로 보여 준다.
-        raise RuntimeError(f"JSON 이 아닌 응답: {raw[:300]}")
-    return json.loads(raw)
+    # 해외 러너에서 응답이 매우 느리거나 첫 접속이 끊기는 일이 있어
+    # 넉넉한 시간과 재시도를 준다. 그래도 안 되면 http 로도 두드려 본다.
+    urls = [f"{endpoint}?{params}"]
+    if endpoint.startswith("https://"):
+        urls.append(f"http://{endpoint[len('https://'):]}?{params}")
+    last_error = None
+    for url in urls:
+        for attempt in range(3):
+            try:
+                request = urllib.request.Request(url, headers={
+                    "Accept": "application/json",
+                    "User-Agent": "Mozilla/5.0 (JanjanPillCatalog build script)",
+                })
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    raw = response.read().decode("utf-8")
+                if raw.lstrip().startswith("<"):
+                    # 인증 실패 등은 XML 오류로 온다. 원문 머리를 그대로 보여 준다.
+                    raise RuntimeError(f"JSON 이 아닌 응답: {raw[:300]}")
+                return json.loads(raw)
+            except RuntimeError:
+                raise
+            except Exception as error:  # noqa: BLE001 - 재시도할 가치가 있는 접속 오류
+                last_error = error
+                time.sleep(3 * (attempt + 1))
+    raise RuntimeError(f"접속 실패(재시도 소진): {last_error}")
 
 
 def normalize_keys(item):

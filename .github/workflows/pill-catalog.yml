@@ -15,6 +15,7 @@ on:
   push:
     paths:
       - .github/workflows/pill-catalog.yml
+      - scripts/build_pill_catalog.py
 
 concurrency:
   group: pill-catalog-${{ github.ref }}
