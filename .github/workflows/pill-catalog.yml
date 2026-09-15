@@ -40,12 +40,13 @@ jobs:
 
       - name: 바뀐 것이 있으면 커밋
         run: |
-          if git diff --quiet; then
+          # 먼저 add 해야 한다 - git diff 는 처음 생긴(untracked) 파일을 못 본다.
+          git add Packages/JanjanCore/Sources/JanjanCore/Resources/pill_catalog.json
+          if git diff --cached --quiet; then
             echo "pill_catalog.json 에 변화 없음 - 커밋하지 않는다."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Packages/JanjanCore/Sources/JanjanCore/Resources/pill_catalog.json
           git commit -m "낱알 데이터 갱신 (식약처 의약품 낱알식별 정보, 공공누리 제1유형)"
           git push
