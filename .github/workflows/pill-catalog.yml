@@ -28,7 +28,7 @@ jobs:
   build:
     name: 낱알 데이터 만들기
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: 체크아웃
         uses: actions/checkout@v4

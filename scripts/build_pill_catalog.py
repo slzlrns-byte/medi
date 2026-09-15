@@ -15,6 +15,7 @@
   · 품목명에 앱의 성분명 표(DrugNames.swift)에 있는 성분이 들어 있는 것.
 """
 
+import concurrent.futures
 import json
 import os
 import re
@@ -252,22 +253,35 @@ def main():
 
     pills = {}
     skipped = {}
-    page = 1
     seen = 0
-    while seen < total:
-        payload = first if page == 1 else fetch_page(endpoint, service_key, page)
-        items = items_of(payload)
-        if not items:
-            break
-        for item in items:
+
+    def digest(payload):
+        nonlocal seen
+        for item in items_of(payload):
             seen += 1
             pill, reason = convert(item, generic_names)
             if pill is not None:
                 pills[pill["id"]] = pill
             elif reason != "분류 밖":
                 skipped[reason] = skipped.get(reason, 0) + 1
-        page += 1
-        time.sleep(0.15)  # 공공 API 를 몰아치지 않는다
+
+    digest(first)
+    last_page = (total + 99) // 100
+    # 해외 러너는 페이지당 왕복이 수 초라 순차로는 30분을 넘긴다.
+    # 여덟 갈래면 공공 API 에 무리 없이 5분 안쪽으로 끝난다.
+    # 한 페이지라도 끝내 실패하면 통째로 실패한다 - 조용히 얇아진 카탈로그는
+    # "그 약이 없다" 는 거짓말이 되기 때문이다.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {
+            pool.submit(fetch_page, endpoint, service_key, page): page
+            for page in range(2, last_page + 1)
+        }
+        for future in concurrent.futures.as_completed(futures):
+            page = futures[future]
+            try:
+                digest(future.result())
+            except Exception as error:  # noqa: BLE001
+                sys.exit(f"{page}쪽을 받지 못해 중단합니다: {error}")
 
     result = sorted(pills.values(), key=lambda pill: pill["name"])
     print(f"읽음 {seen} / 담음 {len(result)} / 조건 밖 제외는 정상 동작")
