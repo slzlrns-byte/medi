@@ -284,6 +284,9 @@ struct MedicationsView: View {
                         medicationNameText(row.medication)
                             .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
+                            // 이름이 두 줄이 되면 옆 칩이 줄 사이에 뜬다.
+                            // 목록에서는 한 줄로 자르고, 전체 이름은 상세에서 본다.
+                            .lineLimit(1)
                         if !row.medication.strengthText.isEmpty {
                             PillChip(text: row.medication.strengthText)
                         }

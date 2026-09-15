@@ -737,6 +737,9 @@ private struct SlotRecordSheet: View {
                     MaskedNameText(name: entry.medicationName, isMasked: masksNames)
                         .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
+                        // 필요시 이력 줄(asNeededRow)과 같은 규칙 - 이름이 길면
+                        // 두 줄로 꺾이며 칩 둘이 줄 사이에 뜬다. 한 줄로 자른다.
+                        .lineLimit(1)
                     PillChip(text: t("\(DecimalQuantity.display(entry.dose))정", pillsEn(entry.dose)))
                     Spacer(minLength: 0)
                     if let status = entry.status, status != .unrecorded {

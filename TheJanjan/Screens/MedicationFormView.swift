@@ -203,7 +203,7 @@ struct MedicationFormView: View {
                         Image(systemName: "minus.circle")
                             .font(.system(size: 20, weight: .regular))
                             .foregroundStyle(Color.ink2)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

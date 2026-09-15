@@ -26,6 +26,7 @@ struct MedicationDetailView: View {
     @State private var composing: MedicationNote.Kind?
     @State private var isShowingDoseChangeSheet = false
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
+    @State private var pendingNoteDeletion: MedicationNoteRecord?
     @State private var selectedAsNeededQuantity: Decimal?
     @State private var isShowingRecountSheet = false
     @State private var comparingChange: DoseChangeRecord?
@@ -116,6 +117,18 @@ struct MedicationDetailView: View {
             Button(t("지우기", "Delete"), role: .destructive) { deleteDoseChange(entry) }
             Button(t("취소", "Cancel"), role: .cancel) { pendingDoseChangeDeletion = nil }
         }
+        .confirmationDialog(
+            t("이 메모를 지울까요?", "Delete this note?"),
+            isPresented: Binding(
+                get: { pendingNoteDeletion != nil },
+                set: { if !$0 { pendingNoteDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingNoteDeletion
+        ) { note in
+            Button(t("지우기", "Delete"), role: .destructive) { deleteNote(note) }
+            Button(t("취소", "Cancel"), role: .cancel) { pendingNoteDeletion = nil }
+        }
     }
 
     // MARK: - 카드
@@ -123,7 +136,10 @@ struct MedicationDetailView: View {
     private func headerCard(_ medication: Medication) -> some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                // 이름이 길어 두 줄이 되면 칩이 줄 사이에 어정쩡하게 뜬다.
+                // 여기(상세 머리글)는 이름 전체를 보여 주는 유일한 자리라 자르지 않고,
+                // 칩을 첫 줄 글줄에 붙여 정렬한다.
+                HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
                     MaskedNameText(name: medication.name, isMasked: masksNames)
                         .janjanDisplay(24)
                         .foregroundStyle(Color.ink)
@@ -251,6 +267,8 @@ struct MedicationDetailView: View {
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(Color.muted)
                     .frame(width: 44, height: 44)
+                    // frame 만으로는 투명한 여백이 눌리지 않는다 - 44pt 전체를 판정 영역으로.
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(t("이 기록 지우기", "Delete this record")))
@@ -351,6 +369,7 @@ struct MedicationDetailView: View {
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(Color.muted)
                         .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
@@ -458,13 +477,15 @@ struct MedicationDetailView: View {
             }
             Spacer(minLength: 0)
             Button {
-                context.delete(note)
-                try? context.save()
+                // 메모는 사용자가 직접 쓴 글이라 지우면 되살릴 수 없다.
+                // 용량 변경 기록과 같은 규칙으로 확인을 한 번 거친다.
+                pendingNoteDeletion = note
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(Color.muted)
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(t("이 메모 지우기", "Delete this note")))
@@ -521,6 +542,12 @@ struct MedicationDetailView: View {
         )
         context.insert(DoseChangeRecord.make(from: change))
         refreshStrengthText(including: change)
+        try? context.save()
+    }
+
+    private func deleteNote(_ note: MedicationNoteRecord) {
+        context.delete(note)
+        pendingNoteDeletion = nil
         try? context.save()
     }
 

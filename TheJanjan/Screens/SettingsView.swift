@@ -104,7 +104,8 @@ struct SettingsView: View {
             Button(t("구매 복원", "Restore purchase")) {
                 Task { await pro.restore() }
             }
-            .foregroundStyle(Color.ink)
+            // 복원이 도는 동안은 눌리지 않는다는 것을 색으로도 보인다.
+            .foregroundStyle(pro.isLoading ? Color.muted : Color.ink)
             .disabled(pro.isLoading)
 
             if pro.isPro, let url = URL(string: ProProduct.manageSubscriptionsURLString) {

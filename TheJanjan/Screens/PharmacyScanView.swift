@@ -149,6 +149,9 @@ struct PharmacyScanView: View {
                     Text(candidate.name)
                         .janjanBody(16, weight: .medium)
                         .foregroundStyle(Color.ink)
+                        // OCR 이름은 유난히 길다. 원문은 아래 sourceLine 에서 다 보이니
+                        // 여기서는 한 줄로 잘라 칩이 줄 사이에 뜨지 않게 한다.
+                        .lineLimit(1)
                     if !candidate.strengthText.isEmpty {
                         PillChip(text: candidate.strengthText)
                     }

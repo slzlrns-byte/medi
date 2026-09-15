@@ -219,6 +219,8 @@ struct ReportView: View {
                 .overlay(
                     Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
                 )
+                // 만드는 동안은 눌리지 않는다는 것이 눈에도 보여야 한다.
+                .opacity(isExporting ? 0.4 : 1)
                 .disabled(isExporting)
 
                 Text(t(

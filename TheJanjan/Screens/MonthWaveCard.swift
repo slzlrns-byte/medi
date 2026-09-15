@@ -74,7 +74,8 @@ struct MonthWaveCard: View {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.ink2)
-                .frame(width: 32, height: 32)
+                // 아이콘은 작아도 누르는 자리는 44pt 를 지킨다.
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -86,6 +87,8 @@ struct MonthWaveCard: View {
             Text(t("기록한 색만 남아요.\n해석은 하지 않아요.", "Only the colors you chose remain.\nNo interpretation is added."))
                 .janjanBody(12)
                 .foregroundStyle(Color.muted)
+                // HStack 에서 버튼과 폭을 다툴 때 세로로 눌려 잘리지 않게 한다.
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: CGFloat(JanjanSpacing.s))
             WhitePillButton(title: t("그림으로 저장", "Save as image"), systemImage: "square.and.arrow.down") {
                 export()

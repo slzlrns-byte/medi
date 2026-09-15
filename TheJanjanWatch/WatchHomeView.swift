@@ -152,7 +152,9 @@ struct WatchHomeView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Text(slot.medicationNames.isEmpty ? slot.summary(session.snapshot.language) : slot.medicationNames.joined(separator: " · "))
+            // 이름 앞의 공백을 붙임표(NBSP)로 두면 줄이 꺾일 때 "·" 가
+            // 다음 줄 첫머리에 홀로 남지 않고 앞 이름 끝에 붙는다.
+            Text(slot.medicationNames.isEmpty ? slot.summary(session.snapshot.language) : slot.medicationNames.joined(separator: "\u{00A0}· "))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -174,6 +176,8 @@ struct WatchHomeView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(line.title)
                 .font(.headline)
+                // 긴 약 이름이 행을 끝없이 키우지 않게 - 시간대 줄과 같은 규칙.
+                .lineLimit(2)
             Text(asNeededSubtitleText(line))
                 .font(.caption)
                 .foregroundStyle(.secondary)

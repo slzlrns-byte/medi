@@ -124,6 +124,9 @@ struct WhitePillButton: View {
                 }
                 Text(title)
                     .janjanBody(15, weight: .medium)
+                    // 큰 글자 설정에서 폭이 모자라면 알약 안에서 두 줄로 꺾여
+                    // 캡슐이 찌부러진다. 모양을 지키고 대신 말줄임한다.
+                    .lineLimit(1)
             }
             .foregroundStyle(Color.ink)
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
@@ -258,6 +261,8 @@ struct TogglePill: View {
         Button(action: action) {
             Text(text)
                 .janjanBody(14, weight: .medium)
+                // 알약 안에서 줄바꿈되면 캡슐이 찌부러진다. 모양을 지키고 말줄임한다.
+                .lineLimit(1)
                 .foregroundStyle(Color.janjan(isOn ? .surface : .ink2))
                 .frame(minWidth: minWidth)
                 .padding(.horizontal, CGFloat(fillsRow ? JanjanSpacing.xs : JanjanSpacing.s))
@@ -267,6 +272,10 @@ struct TogglePill: View {
                     Capsule(style: .continuous)
                         .fill(Color.janjan(isOn ? .ink : .surface2))
                 )
+                // 캡슐 자체는 34pt 안팎으로 아담하지만, 누르는 자리는 44pt 를
+                // 지킨다 - 요일처럼 일곱 개가 붙는 줄에서 오탭을 막는 보이지 않는 여유.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
