@@ -19,6 +19,17 @@ struct PillFinderView: View {
     @State private var imprint = ""
     @State private var picked: PharmacyLabelParser.Candidate?
 
+    init(onSaved: @escaping () -> Void) {
+        self.onSaved = onSaved
+        #if DEBUG
+        // 화면 찍기 전용: 탭 없이도 결과가 보이게 조건을 채워서 연다.
+        if ProcessInfo.processInfo.arguments.contains("-JanjanShowPillFinder") {
+            _shape = State(initialValue: .round)
+            _color = State(initialValue: .white)
+        }
+        #endif
+    }
+
     private var lang: JanjanLanguage { .current }
 
     private var query: PillFinder.Query {

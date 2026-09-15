@@ -80,6 +80,15 @@ struct MedicationsView: View {
             .sheet(isPresented: $isShowingAddFlow) {
                 AddMedicationEntryView()
             }
+            #if DEBUG
+            // 화면 찍기 전용: simctl 로만 띄우는 캡처는 탭을 못 누르므로
+            // -JanjanShowPillFinder 로 약 추가 시트를 바로 연다.
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("-JanjanShowPillFinder") {
+                    isShowingAddFlow = true
+                }
+            }
+            #endif
             .sheet(isPresented: $isShowingPrescription) {
                 NavigationStack {
                     PrescriptionFormView { isShowingPrescription = false }
@@ -433,6 +442,13 @@ private struct AddMedicationEntryView: View {
             .navigationDestination(isPresented: $isShowingPillFinder) {
                 PillFinderView { dismiss() }
             }
+            #if DEBUG
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("-JanjanShowPillFinder") {
+                    isShowingPillFinder = true
+                }
+            }
+            #endif
         }
     }
 
