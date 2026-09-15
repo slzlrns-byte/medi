@@ -378,6 +378,7 @@ private struct AddMedicationEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isShowingForm = false
     @State private var isShowingScan = false
+    @State private var isShowingPillFinder = false
 
     var body: some View {
         NavigationStack {
@@ -401,6 +402,15 @@ private struct AddMedicationEntryView: View {
                 }
                 .proGated(.pharmacyScan)
 
+                entryRow(
+                    title: ProFeature.pillFinder.title(.current),
+                    subtitle: t("모양·색·각인으로 어떤 약인지 좁혀 봐요.", "Narrow it down by shape, color, and imprint."),
+                    systemImage: "circle.grid.2x2"
+                ) {
+                    isShowingPillFinder = true
+                }
+                .proGated(.pillFinder)
+
                 Spacer()
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
@@ -419,6 +429,9 @@ private struct AddMedicationEntryView: View {
             }
             .navigationDestination(isPresented: $isShowingScan) {
                 PharmacyScanView { dismiss() }
+            }
+            .navigationDestination(isPresented: $isShowingPillFinder) {
+                PillFinderView { dismiss() }
             }
         }
     }

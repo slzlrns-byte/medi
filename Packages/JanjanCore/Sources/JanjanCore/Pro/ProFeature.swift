@@ -9,6 +9,7 @@ import Foundation
 /// 구독을 사면 열리는 기능들. 화면 문구는 `titleKo` 하나만 쓴다.
 public enum ProFeature: String, CaseIterable, Sendable {
     case pharmacyScan
+    case pillFinder
     case runOutForecast
     case hideNames
     case doseChangeCompare
@@ -21,6 +22,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     public var titleKo: String {
         switch self {
         case .pharmacyScan: return "약봉투 스캔"
+        case .pillFinder: return "약 모양으로 찾기"
         case .runOutForecast: return "소진 예측"
         case .hideNames: return "약 이름 가리기"
         case .doseChangeCompare: return "용량 변경 전후 비교"
@@ -35,6 +37,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     public var titleEn: String {
         switch self {
         case .pharmacyScan: return "Pharmacy bag scan"
+        case .pillFinder: return "Find by pill appearance"
         case .runOutForecast: return "Run-out forecast"
         case .hideNames: return "Hide medication names"
         case .doseChangeCompare: return "Dose change comparison"
@@ -66,6 +69,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// 앱과 스토어가 서로 다른 약속을 하게 된다.
     public static let launchHighlights: [ProFeature] = [
         .pharmacyScan,
+        .pillFinder,
         .runOutForecast,
         .doseChangeCompare,
         .hideNames,
