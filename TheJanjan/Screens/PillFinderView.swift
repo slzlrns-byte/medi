@@ -156,6 +156,14 @@ struct PillFinderView: View {
                 .foregroundStyle(Color.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
+                Text(t(
+                    "낱알 사진은 식약처 서버에서 그때그때 불러오고, 기기에 저장하지 않아요.",
+                    "Pill photos load from the MFDS server on demand and aren't stored on this device."
+                ))
+                .janjanBody(12)
+                .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
                 ForEach(results) { pill in
                     resultCard(pill)
                 }
@@ -183,21 +191,39 @@ struct PillFinderView: View {
             )
         } label: {
             JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
-                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                        Text(pill.name)
-                            .janjanBody(16, weight: .medium)
-                            .foregroundStyle(Color.ink)
-                            .lineLimit(1)
-                        if !pill.strengthText.isEmpty {
-                            PillChip(text: pill.strengthText)
+                HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.s)) {
+                    // 사진은 식약처 서버에서 그때그때 불러온다(핫링크).
+                    // 파일을 받아 앱에 담지 않는다 - 촬영물의 재배포 권리가
+                    // 완전히 정리되지 않은 회색지대라서다(결정 로그 참고).
+                    // 사진이 없거나 아직 안 왔어도 글만으로 성립해야 한다.
+                    if let urlString = pill.imageURLString, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            if case .success(let image) = phase {
+                                image.resizable().scaledToFit()
+                            } else {
+                                Color.janjan(.surface2)
+                            }
                         }
-                        Spacer(minLength: 0)
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .accessibilityHidden(true)
                     }
-                    // 무엇을 보고 추측했는지 함께 보인다 - 그래야 아니라고 판단할 수 있다.
-                    Text(appearanceLine(pill))
-                        .janjanBody(12)
-                        .foregroundStyle(Color.muted)
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                            Text(pill.name)
+                                .janjanBody(16, weight: .medium)
+                                .foregroundStyle(Color.ink)
+                                .lineLimit(1)
+                            if !pill.strengthText.isEmpty {
+                                PillChip(text: pill.strengthText)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        // 무엇을 보고 추측했는지 함께 보인다 - 그래야 아니라고 판단할 수 있다.
+                        Text(appearanceLine(pill))
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                    }
                 }
             }
         }

@@ -105,13 +105,17 @@ def fetch_page(endpoint, service_key, page):
     return json.loads(raw)
 
 
-def pick(item, *keys):
-    """대소문자 표기가 문서마다 달라서 둘 다 받아 준다."""
+def normalize_keys(item):
+    """API 판마다 키 표기가 다르다(ITEM_IMAGE / itemImage / item_image).
+    소문자로 내리고 밑줄을 지워 어느 표기든 같은 키로 읽는다."""
+    return {re.sub(r"[^a-z0-9]", "", key.lower()): value for key, value in item.items()}
+
+
+def pick(norm, *keys):
     for key in keys:
-        for variant in (key, key.lower(), key.upper()):
-            value = item.get(variant)
-            if value not in (None, "", "null"):
-                return str(value).strip()
+        value = norm.get(re.sub(r"[^a-z0-9]", "", key.lower()))
+        if value not in (None, "", "null"):
+            return str(value).strip()
     return ""
 
 
@@ -130,18 +134,19 @@ def class3(class_no):
 
 
 def convert(item, generic_names):
-    name = pick(item, "ITEM_NAME")
-    seq = pick(item, "ITEM_SEQ")
+    norm = normalize_keys(item)
+    name = pick(norm, "ITEM_NAME")
+    seq = pick(norm, "ITEM_SEQ")
     if not name or not seq:
         return None, "이름/번호 없음"
 
-    keep = class3(pick(item, "CLASS_NO")) in KEEP_CLASS3 \
+    keep = class3(pick(norm, "CLASS_NO")) in KEEP_CLASS3 \
         or any(generic in name for generic in generic_names)
     if not keep:
         return None, "분류 밖"
 
-    shape_text = pick(item, "DRUG_SHAPE")
-    form_text = pick(item, "FORM_CODE_NAME")
+    shape_text = pick(norm, "DRUG_SHAPE")
+    form_text = pick(norm, "FORM_CODE_NAME")
     if "캡슐" in form_text or "캡슐" in shape_text:
         shape = "capsule"
     else:
@@ -149,10 +154,10 @@ def convert(item, generic_names):
     if shape is None:
         return None, f"모양 미지원({shape_text})"
 
-    color_front = first_color(pick(item, "COLOR_CLASS1"))
+    color_front = first_color(pick(norm, "COLOR_CLASS1"))
     if color_front is None:
-        return None, f"색 미지원({pick(item, 'COLOR_CLASS1')})"
-    color_back = first_color(pick(item, "COLOR_CLASS2"))
+        return None, f"색 미지원({pick(norm, 'COLOR_CLASS1')})"
+    color_back = first_color(pick(norm, "COLOR_CLASS2"))
 
     pill = {
         "id": seq,
@@ -160,12 +165,15 @@ def convert(item, generic_names):
         "strengthText": "",
         "shape": shape,
         "colorFront": color_front,
-        "imprintFront": pick(item, "PRINT_FRONT"),
-        "imprintBack": pick(item, "PRINT_BACK"),
+        "imprintFront": pick(norm, "PRINT_FRONT"),
+        "imprintBack": pick(norm, "PRINT_BACK"),
     }
     if color_back and color_back != color_front:
         pill["colorBack"] = color_back
-    image = pick(item, "ITEM_IMAGE")
+    # 사진은 식약처 서버 URL 만 담는다. 파일을 받아 번들에 넣지 않는다 -
+    # 실제 촬영 주체(약학정보원)의 권리가 완전히 정리되지 않은 회색지대라서,
+    # 화면은 이 URL 을 그때그때 불러와 보여 주기만 한다.
+    image = pick(norm, "ITEM_IMAGE")
     if image.startswith("http"):
         pill["imageURLString"] = image
     return pill, None
