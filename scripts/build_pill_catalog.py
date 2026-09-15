@@ -90,8 +90,14 @@ def load_generic_names():
 
 
 def fetch_page(endpoint, service_key, page):
-    params = urllib.parse.urlencode({
-        "serviceKey": service_key,
+    # 포털이 주는 키는 두 벌이다(Encoding/Decoding). % 가 들어 있으면 이미
+    # URL 인코딩된 Encoding 키로 보고 그대로 쓰고, 아니면 여기서 인코딩한다 -
+    # 어느 쪽을 시크릿에 넣었든 동작하게.
+    if "%" in service_key:
+        key_part = service_key
+    else:
+        key_part = urllib.parse.quote_plus(service_key)
+    params = "serviceKey=" + key_part + "&" + urllib.parse.urlencode({
         "type": "json",
         "numOfRows": 100,
         "pageNo": page,
