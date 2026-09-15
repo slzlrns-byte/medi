@@ -117,6 +117,16 @@ def fetch_page(endpoint, service_key, page):
                 return json.loads(raw)
             except RuntimeError:
                 raise
+            except urllib.error.HTTPError as error:
+                # 4xx 는 다시 시도해도 같다. 서버가 밝힌 이유를 그대로 보여 준다 -
+                # data.go.kr 는 본문에 SERVICE_KEY_IS_NOT_REGISTERED 같은
+                # 정확한 사유를 담아 준다.
+                body = ""
+                try:
+                    body = error.read().decode("utf-8", errors="replace")[:400]
+                except Exception:  # noqa: BLE001
+                    pass
+                raise RuntimeError(f"HTTP {error.code}: {body}") from error
             except Exception as error:  # noqa: BLE001 - 재시도할 가치가 있는 접속 오류
                 last_error = error
                 time.sleep(3 * (attempt + 1))
