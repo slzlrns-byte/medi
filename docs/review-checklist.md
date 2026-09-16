@@ -112,7 +112,8 @@
 
 ## 8. 제출 직전 — 사람이 하는 체크리스트 (09-16 갱신)
 
-- [ ] GitHub Pages 활성화(Settings → Pages) 후 처리방침·지원 URL 살아 있음 확인 - docs/site/privacy.html·support.html 은 이미 작성돼 있다(낱알 사진 핫링크 고지 포함, 09-16)
+- [x] GitHub Pages 살아 있음 확인(09-16): https://slzlrns-byte.github.io/medi/site/privacy.html · support.html — 지원 URL 은 ASC 입력 완료
+- [ ] main 의 docs/site/privacy.html 이 2주 전 판이라 낱알 사진 핫링크 문단이 빠져 있다 - 심사 전 main 에 최신판 반영 필요(사용자 허락 대기)
 - [ ] App Store Connect: 앱 이름 "더잔잔"으로 통일, 부제 "더 잔잔한 하루를 위해", 카테고리(건강 및 피트니스 / 의료), **연령 등급 재확인**(의료·치료 정보: 자주)
 - [ ] 유료 앱 계약 체결(구독 만들기 전 필수) → 구독 그룹 "The잔잔 Pro" + 상품 2개(pro_yearly ₩19,900/년·7일 체험, pro_monthly ₩2,900/월) 생성, **구독 설명은 여섯 기능 문구**("약봉투 스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치를 열어요."), "제출 준비 완료" + 첫 버전 페이지에 첨부
 - [ ] EULA/약관 링크 기입(docs/site/terms.html 또는 애플 표준 EULA)

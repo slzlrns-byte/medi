@@ -157,6 +157,9 @@ This is the first release of The Janjan.
 - 카테고리: 기본 **건강 및 피트니스**, 보조 **의료**
 - 연령 등급: 의료/치료 정보 "자주" → 12+ 상당. "약물 사용 및 남용" 문항은 처방약 기록이므로 "없음"
 - Privacy Nutrition Label: **데이터를 수집하지 않음**
-- 개인정보처리방침 URL / 지원 URL: GitHub Pages 활성화 후 docs/site/privacy.html · support.html 주소
+- 개인정보처리방침 URL: https://slzlrns-byte.github.io/medi/site/privacy.html
+- 지원 URL: https://slzlrns-byte.github.io/medi/site/support.html (2026-09-16 ASC 입력 완료)
+  - Pages 소스가 main + /docs 라서 심사 때 보이는 건 main 의 파일이다.
+    작업 브랜치에서 처리방침을 고치면 main 의 docs/site/ 에도 반영해야 산다.
 - 저작권: © 2026 (개발자 이름)
 - 구독 설명(구독 그룹 로컬라이즈): "약봉투 스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치를 열어요."
