@@ -18,9 +18,9 @@
 더 잔잔한 하루를 위해
 ```
 
-### 프로모션 텍스트 (170자 제한, 아래 103자. 심사 없이 수시 수정 가능)
+### 프로모션 텍스트 (170자 제한, 아래 97자. 심사 없이 수시 수정 가능)
 ```
-먹었는지 기억이 안 나는 날, 더잔잔을 열어 보세요. 오늘 기록이 그대로 남아 있어요. 진료 전날엔 지난 한 달이 PDF 한 장으로 정리돼요. 기록은 내 기기와 iCloud에만 남아요.
+먹었는지 기억이 안 나는 날, 더잔잔을 열어 보세요. 오늘 기록이 그대로 남아 있어요. 기분도 색 하나로 남겨 두면, 병원 가는 날 지난 한 달을 그대로 들고 갈 수 있어요.
 ```
 
 ### 설명 (4,000자 제한)
@@ -81,9 +81,9 @@ The Janjan
 For calmer days
 ```
 
-### Promotional text (170 제한, 아래 166자)
+### Promotional text (170 제한, 아래 168자)
 ```
-Can't remember whether you took your meds? Open the app - today's record is right there. Before your visit, get the past month on a one-page PDF. No server, no login.
+Can't remember whether you took your meds? Open the app - today's record is right there. Log your mood with a single color, and bring the past month to your next visit.
 ```
 
 ### Description
