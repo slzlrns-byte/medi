@@ -66,9 +66,9 @@
 이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독입니다(월간 또는 연간, 연간은 7일 무료 체험). 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
 ```
 
-### 키워드 (100자 제한, 아래 74자)
+### 키워드 (100자 제한, 아래 85자)
 ```
-복약,약알림,복용알림,약기록,복약체크,정신과,기분일기,감정일기,무드트래커,우울,불안,수면기록,낱알식별,알약검색,진료준비,약봉투
+복약,약알림,복용알림,약기록,복약체크,정신과,기분일기,감정일기,무드트래커,우울,불안,수면기록,낱알식별,알약검색,진료준비,약봉투,정신과약,약먹기,ADHD약
 ```
 - 이름·부제에 이미 있는 단어(더잔잔, 잔잔한, 하루)는 넣지 않는다(검색에 자동 포함).
 - 경쟁 앱 이름 금지(2.3).
@@ -141,7 +141,7 @@ This app is not a medical device and does not provide medical advice; follow you
 
 ### Keywords (100, 아래 97자)
 ```
-medication,reminder,pill,mood,tracker,mental,health,psychiatry,journal,sleep,identifier,adherence
+medication,reminder,pill,mood,tracker,journal,psychiatry,depression,anxiety,adhd,sleep,identifier
 ```
 - 애플이 단어를 조합해 검색어를 만들므로 영어는 낱말 단위가 넓게 걸린다.
 
