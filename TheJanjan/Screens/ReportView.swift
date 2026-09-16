@@ -82,6 +82,11 @@ struct ReportView: View {
     private static let reviewAskedKey = "janjan.review.asked"
 
     private func maybeAskForReview() {
+        #if DEBUG
+        // 화면 찍기가 예시 기록(14일 이상)으로 리포트를 여는 순간 시스템 리뷰
+        // 창이 떠서 탭바를 덮는다(런 35). 예시 기록 실행에서는 청하지 않는다.
+        if ProcessInfo.processInfo.arguments.contains("-JanjanSeedDemoData") { return }
+        #endif
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: Self.reviewAskedKey) else { return }
         let calendar = Calendar.current
