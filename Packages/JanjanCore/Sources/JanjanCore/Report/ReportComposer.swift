@@ -359,7 +359,7 @@ public enum ReportComposer {
             }
 
             if lines.isEmpty {
-                lines.append(.init(style: .heading, text: en ? "As-needed doses" : "필요시 복용"))
+                lines.append(.init(style: .heading, text: en ? "Rescue (as-needed) doses" : "비상약 복용"))
             }
             let total = taken.count
             lines.append(.init(

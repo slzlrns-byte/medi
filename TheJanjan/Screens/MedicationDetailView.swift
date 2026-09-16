@@ -879,15 +879,19 @@ private struct DoseChangeCompareSheet: View {
 
     private var compareTable: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+            // 값 열 둘에 maxWidth 를 줘서 카드 폭 전체에 고르게 편다 - 내용에 맞춰
+            // 움츠러들면 표가 왼쪽에 몰리고 오른쪽이 빈다(사용자 발견 2026-09-16).
             Grid(alignment: .leading, horizontalSpacing: CGFloat(JanjanSpacing.s), verticalSpacing: CGFloat(JanjanSpacing.s)) {
                 GridRow {
                     Text("")
                     Text(t("변경 전 \(comparison.before.days)일", "Before · \(comparison.before.days) days"))
                         .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(t("변경 후 \(comparison.after.days)일", "After · \(comparison.after.days) days"))
                         .janjanBody(12, weight: .medium)
                         .foregroundStyle(Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 metricRow(
@@ -931,7 +935,9 @@ private struct DoseChangeCompareSheet: View {
                 .janjanBody(13)
                 .foregroundStyle(Color.ink2)
             before
+                .frame(maxWidth: .infinity, alignment: .leading)
             after
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

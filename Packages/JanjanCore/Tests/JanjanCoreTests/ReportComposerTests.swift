@@ -416,7 +416,7 @@ final class ReportComposerTests: XCTestCase {
         doses.append(prnTaken(Fixed.medB, at: Fixed.date(2026, 8, 12, 23, 0)))
 
         let lines = texts(content(doses: doses))
-        XCTAssertTrue(lines.contains("필요시 복용"))
+        XCTAssertTrue(lines.contains("비상약 복용"))
         XCTAssertTrue(lines.contains("쿠에티아핀 25mg · 3회"))
         XCTAssertTrue(lines.contains("8월 10일 · 8월 12일 2회"))
         // 정기 약(에스시탈로프람)은 필요시 구역에 나오지 않는다.
@@ -426,7 +426,7 @@ final class ReportComposerTests: XCTestCase {
     }
 
     func testAsNeededSectionIsAbsentWithoutRecords() {
-        XCTAssertFalse(texts(content(doses: Fixed.workedExampleDoses())).contains("필요시 복용"))
+        XCTAssertFalse(texts(content(doses: Fixed.workedExampleDoses())).contains("비상약 복용"))
     }
 
     func testAsNeededSectionInEnglish() {
@@ -445,7 +445,7 @@ final class ReportComposerTests: XCTestCase {
             calendar: Fixed.calendar
         )
         let lines = texts(report)
-        XCTAssertTrue(lines.contains("As-needed doses"))
+        XCTAssertTrue(lines.contains("Rescue (as-needed) doses"))
         XCTAssertTrue(lines.contains("쿠에티아핀 25mg · 3 times"))
         XCTAssertTrue(lines.contains("Aug 10 · Aug 12 ×2"))
     }

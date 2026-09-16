@@ -194,7 +194,7 @@ struct MedicationsView: View {
             RowGroup(title: t("복용 중", "Taking"), rows: all.filter {
                 $0.medication.status == .active && $0.medication.kind == .scheduled
             }),
-            RowGroup(title: t("필요시", "As needed"), rows: all.filter {
+            RowGroup(title: t("비상약", "Rescue meds"), rows: all.filter {
                 $0.medication.status == .active && $0.medication.kind == .asNeeded
             }),
             RowGroup(title: t("중단", "Stopped"), rows: all.filter { $0.medication.status == .stopped })
@@ -207,6 +207,15 @@ struct MedicationsView: View {
     /// 다음 진료와 처방 기록 입구.
     ///
     /// 검은 원 버튼은 화면당 하나(약 추가)라서 여기서는 흰 알약을 쓴다(설계 02절).
+    /// 다음 진료까지 못 버티는 복용 중 약의 개수. 진료일이 없으면 nil(계산 불가).
+    private var shortageCount: Int? {
+        guard nextVisit != nil else { return nil }
+        let count = rows.filter {
+            $0.medication.status == .active && ($0.snapshot.shortfallDays ?? 0) > 0
+        }.count
+        return count
+    }
+
     private var prescriptionCard: some View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
@@ -217,12 +226,29 @@ struct MedicationsView: View {
                     Spacer(minLength: 0)
                 }
 
-                Text(nextVisit == nil
-                     ? t("진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요.", "Add a visit date and how many pills you picked up, and running-low forecasts turn on.")
-                     : t("다음 진료 전에 모자라는 약이 있으면 약 줄에 함께 보여요.", "If anything runs short before the next visit, it'll show right on that medication's row."))
-                    .janjanBody(12)
-                    .foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                // 모자라는 약이 있으면 이 카드가 먼저 말한다(사용자 요청 2026-09-16).
+                // 색만으로 구분하지 않는다 - 아이콘과 문장이 같은 말을 한다.
+                if let shortage = shortageCount, shortage > 0 {
+                    HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.ink)
+                        Text(t(
+                            "다음 진료 전에 모자라는 약이 \(shortage)개 있어요. 아래 약 줄에서 확인해 주세요.",
+                            "\(shortage) medication\(shortage == 1 ? "" : "s") will run short before the next visit. Check the rows below."
+                        ))
+                        .janjanBody(12, weight: .semibold)
+                        .foregroundStyle(Color.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text(nextVisit == nil
+                         ? t("진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요.", "Add a visit date and how many pills you picked up, and running-low forecasts turn on.")
+                         : t("다음 진료 전에 모자라는 약이 없어요.", "No medication runs short before the next visit."))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 WhitePillButton(title: t("처방 기록하기", "Log a prescription"), systemImage: "doc.text") {
                     isShowingPrescription = true
@@ -319,15 +345,18 @@ struct MedicationsView: View {
                     if row.hasStock {
                         // "17/28정" - 남은 숫자만으로는 많은지 적은지 모른다.
                         // 이번 구간의 총량이 눈금이 된다(사용자 결정 2026-09-16).
+                        // 남은 개수는 굵고 크게, 총량은 얇고 작게 - 눈이 먼저 잡을 것은
+                        // 지금 남은 쪽이다(사용자 요청 2026-09-16).
                         let remaining = max(row.snapshot.remaining, 0)
                         if let cycle = row.cycle, cycle.total > 0 {
-                            Text(t(
-                                "\(DecimalQuantity.display(remaining))/\(DecimalQuantity.display(cycle.total))정",
-                                "\(DecimalQuantity.display(remaining))/\(DecimalQuantity.display(cycle.total)) pills"
-                            ))
-                            .janjanDisplay(20)
-                            .foregroundStyle(Color.ink)
-                            .monospacedDigit()
+                            (
+                                Text(DecimalQuantity.display(remaining))
+                                    .font(JanjanFont.displayStrong(20).monospacedDigit())
+                                    .foregroundColor(Color.ink)
+                                + Text(t("/\(DecimalQuantity.display(cycle.total))정", "/\(DecimalQuantity.display(cycle.total)) pills"))
+                                    .font(JanjanFont.display(15).monospacedDigit())
+                                    .foregroundColor(Color.muted)
+                            )
                         } else {
                             Text(t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining)))
                                 .janjanDisplay(20)

@@ -371,17 +371,29 @@ struct TodayView: View {
 
     /// 재촉이 아니라 안내다 - 사실만 짧게 말하고 살펴볼지는 사용자가 고른다.
     private var unrecordedSlotsCard: some View {
+        // 흘려보내기 쉬운 줄이라 아이콘과 굵기, 테두리로 무게를 준다
+        // (사용자 요청 2026-09-16: "좀 더 확실하게 꼭 기록할 수 있도록").
         JanjanCard {
             HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.s)) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.ink)
                 Text(unrecordedSlotsMessage)
-                    .janjanBody(14)
-                    .foregroundStyle(Color.ink2)
+                    .janjanBody(14, weight: .semibold)
+                    .foregroundStyle(Color.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 WhitePillButton(title: t("살펴보기", "Take a look")) {
                     isShowingUnrecordedSheet = true
                 }
+                .overlay(
+                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                )
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.card), style: .continuous)
+                .strokeBorder(Color.janjan(.ink).opacity(0.25), lineWidth: 1.5)
+        )
     }
 
     // MARK: - 필요시
@@ -389,12 +401,12 @@ struct TodayView: View {
     private var asNeededCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("필요시", "As needed"))
+                Text(t("비상약", "Rescue meds"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(t(
-                    "드신 그 순간에 눌러 주세요. 몇 번이든 각각 기록됩니다.",
-                    "Tap when you take it. Each time is recorded on its own."
+                    "비상약을 드셨다면 눌러 주세요.",
+                    "Tap when you take a rescue dose."
                 ))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
@@ -516,7 +528,7 @@ struct TodayView: View {
                     .foregroundStyle(Color.ink)
                 Text(todaysMoodScore == nil
                      ? t("하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요.", "Choosing just one is fine. You can add the rest later.")
-                     : t("언제든 다시 고를 수 있어요.", "You can change it any time."))
+                     : t("오늘 기분을 기록해 보세요.", "Log how today felt."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 

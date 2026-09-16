@@ -48,7 +48,7 @@ struct MonthWaveCard: View {
 
     private var header: some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(t("이번 달의 물결", "This month's ripples"))
+            Text(t("이번 달의 흐름", "This month's flow"))
                 .janjanDisplay(20)
                 .foregroundStyle(Color.ink)
             Spacer(minLength: 0)
@@ -235,7 +235,7 @@ private struct MonthWaveShareView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .lastTextBaseline) {
-                Text(t("이번 달의 물결", "This month's ripples"))
+                Text(t("이번 달의 흐름", "This month's flow"))
                     .janjanDisplay(24)
                     .foregroundStyle(Color.ink)
                 Spacer()

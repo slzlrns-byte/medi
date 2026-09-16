@@ -274,7 +274,7 @@ struct PrescriptionFormView: View {
                     placeholder: t("예: 용량 절반으로", "e.g. Cut the dose in half"),
                     text: $clinicNote
                 )
-                Text(t("들은 말을 그대로 적어 두면 다음 진료에서 되짚기 쉬워요.", "Writing down what you heard, as is, makes it easy to revisit at the next visit."))
+                Text(t("진료 시 들었던 내용을 메모로 남겨요.", "Note down what you heard at the visit."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
             }
