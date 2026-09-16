@@ -186,6 +186,11 @@ targets:
       - path: TheJanjan/Persistence/JanjanModelContainer.swift
       - path: TheJanjan/Persistence/DoseRecorder.swift
       - path: TheJanjan/Shared
+      # 위젯도 Shared(언어·가리기 = UserDefaults)와 SwiftData(파일 API)를 쓰므로
+      # 익스텐션 번들에 개인정보 매니페스트가 따로 있어야 한다. 앱 것을 같이 쓴다 -
+      # 내용(추적 없음·수집 없음·CA92.1·C617.1)이 똑같아서다.
+      - path: TheJanjan/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: JanjanCore
     info:

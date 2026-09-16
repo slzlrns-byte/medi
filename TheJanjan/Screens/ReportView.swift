@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import SwiftData
 import JanjanCore
@@ -10,6 +11,7 @@ import JanjanCore
 struct ReportView: View {
 
     @EnvironmentObject private var pro: ProStore
+    @Environment(\.requestReview) private var requestReview
 
     @Query private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
@@ -68,7 +70,25 @@ struct ReportView: View {
                         ReportPDF.removeExportedFiles()
                     }
             }
+            .onAppear(perform: maybeAskForReview)
         }
+    }
+
+    // MARK: - 리뷰 요청
+
+    /// 평생 한 번, 서로 다른 14일 이상 기록한 사람이 리포트를 열었을 때만
+    /// 시스템 리뷰 창을 청한다(심사 체크리스트 4.9). 시스템이 또 거르므로
+    /// 실제로는 더 드물게 뜬다. 조르지 않는다 - 조건을 못 채우면 영영 안 뜬다.
+    private static let reviewAskedKey = "janjan.review.asked"
+
+    private func maybeAskForReview() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.reviewAskedKey) else { return }
+        let calendar = Calendar.current
+        let recordedDays = Set(doseRecords.map { calendar.startOfDay(for: $0.core.effectiveDate) })
+        guard recordedDays.count >= 14 else { return }
+        defaults.set(true, forKey: Self.reviewAskedKey)
+        requestReview()
     }
 
     // MARK: - 데이터

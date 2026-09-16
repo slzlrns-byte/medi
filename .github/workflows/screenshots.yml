@@ -74,6 +74,11 @@ jobs:
           NARROW = ["iPhone SE (3rd generation)", "iPhone SE (2nd generation)",
                     "iPhone 13 mini", "iPhone 12 mini", "iPhone SE"]
 
+          # 스토어 제출 스크린샷은 6.9"(1320x2868) 또는 6.7"(1290x2796)만 받는다.
+          # "첫 번째 아이폰" 을 그냥 잡으면 16 Pro(1206x2622)가 걸려 규격 밖이 된다.
+          WIDE = ["iPhone 17 Pro Max", "iPhone 16 Pro Max", "iPhone 15 Pro Max",
+                  "iPhone 17 Plus", "iPhone 16 Plus", "iPhone 15 Plus"]
+
           runtimes = json.load(sys.stdin)["devices"]
 
           def version(identifier):
@@ -98,7 +103,7 @@ jobs:
           def find(name):
               return next((d for d in phones if d["name"] == name), None)
 
-          wide = phones[0]
+          wide = next((d for name in WIDE if (d := find(name))), phones[0])
           narrow = next((d for name in NARROW if (d := find(name))), None)
 
           lines = ["wide_udid=" + wide["udid"], "wide_name=" + wide["name"]]

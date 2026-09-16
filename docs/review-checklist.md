@@ -1,6 +1,8 @@
 # 더잔잔 · App Store 심사 리스크 총정리
 
-기준일 2026-08-17. 러비티(loviti) 출시 때 실제로 부딪힌 것에는 **[러비티]** 표시.
+기준일 2026-08-17, **2026-09-16 전면 재검증·개정**(코드 대조 감사 — 그 사이 영어판,
+페이월 여섯 기능, PDF 무료화, 약 모양으로 찾기가 들어왔다).
+러비티(loviti) 출시 때 실제로 부딪힌 것에는 **[러비티]** 표시.
 각 항목: **왜 걸리나 → 이 앱은 어떻게 하나 → 상태** (✅ 설계/코드로 해결 · ☐ 사람이 콘솔에서 할 일 · ⚠ 놓치기 쉬움).
 
 ---
@@ -28,17 +30,18 @@
 | 1.5 | 1.4.1 + 리뷰어 관행 | 정신건강 앱에 위기 대응 리소스 없음 | 안전 카드(109 · 1577-0199 · 112/119), 설정에 상시 노출. **심사 노트에 위치 명시** | ✅ ☐ |
 | 1.6 | 5.1.1(i) | 카메라 권한 목적 불명확 | 약봉투 스캔은 온디바이스 Vision, 사진 저장 안 함. NSCameraUsageDescription에 그대로 씀 | ✅ |
 | 1.7 | 1.4.1 | 스캔 결과가 그대로 알림·재고를 바꿈("부정확한 데이터") | 항상 확인 화면 → 사용자가 저장 | ✅ |
-| 1.8 | 메타데이터 | 스토어 문구에 "치료·개선·완화" | 문구는 "기록·정리·진료 준비"만. 국내 식약처 비의료기기 기준과도 일치 | ☐ |
+| 1.8 | 메타데이터 | 스토어 문구에 "치료·개선·완화" | 문구는 "기록·정리·진료 준비"만. 국내 식약처 비의료기기 기준과도 일치. 앱 소스 전체 grep 으로 효능 표현 0건 확인(09-16) | ☐ |
+| 1.9 | 1.4.1 | **약 모양으로 찾기**(09-15 신설, Pro)가 식별을 단정 | 결과 머리는 늘 "이 약으로 추측됩니다" + "정확한 것은 의사나 약사에게 확인해 주세요". 출처 표기(식약처 낱알식별, 공공누리 1유형) 화면에 상시. 낱알 사진은 식약처 서버 핫링크(https, 앱의 유일한 외부 요청)로 보여 주기만 하고 저장 안 함 - 심사 노트에 명시 | ✅ |
 
 ## 2. 개인정보 (5.1.x)
 
 | # | 규정 | 왜 걸리나 | 대응 | 상태 |
 |---|---|---|---|---|
 | 2.1 | 5.1.1(i) | 개인정보처리방침 URL 없음 | 정적 페이지 1장(GitHub Pages) — App Store Connect **앱 정보의 URL 칸** + 앱 설정 링크 두 곳 모두 | ☐ |
-| 2.2 | 5.1.1 | 권한 문구 누락 → **업로드 자체가 거절** | Info.plist: 카메라, Face ID(앱 잠금), 알림은 문구 불필요, **마이크·음성인식**(받아쓰기 쓰면 `NSMicrophoneUsageDescription` + `NSSpeechRecognitionUsageDescription` 둘 다) | ✅ ⚠ |
-| 2.3 | 5.1.1 | 받아쓰기 음성이 애플 서버로 감 | `SFSpeechRecognizer.requiresOnDeviceRecognition = true`. 문구에 "기기 안에서만 처리" | ✅ |
+| 2.2 | 5.1.1 | 권한 문구 누락 → **업로드 자체가 거절** | Info.plist: 카메라·사진 앨범·Face ID 세 문구 존재(project.yml 확인, 09-16). **받아쓰기 기능은 코드에 없음** → 마이크·음성인식 문구 불필요가 맞음. 나중에 받아쓰기를 넣으면 두 문구 추가 | ✅ |
+| 2.3 | 5.1.1 | 받아쓰기 음성이 애플 서버로 감 | 받아쓰기 기능 자체가 없어 해당 없음(09-16 확인). 넣게 되면 `requiresOnDeviceRecognition = true` | 해당없음 |
 | 2.4 | Privacy Nutrition Label | 실제와 다르게 표기 | 서버 없음 → **"데이터를 수집하지 않음"**. CloudKit 개인 DB·StoreKit은 개발자 수집으로 안 침. 나중에 SDK 하나라도 넣으면 재검토 | ☐ ⚠ |
-| 2.5 | PrivacyInfo.xcprivacy (2024~) | 필수 사유 API 미기재 → 업로드 거절 메일 | `NSPrivacyAccessedAPITypes`: UserDefaults(CA92.1), 파일 타임스탬프(C617.1), 필요 시 디스크 공간(E174.1). 서드파티 SDK 없어서 우리 것만 | ✅ ⚠ |
+| 2.5 | PrivacyInfo.xcprivacy (2024~) | 필수 사유 API 미기재 → 업로드 거절 메일 | `NSPrivacyAccessedAPITypes`: UserDefaults(CA92.1), 파일 타임스탬프(C617.1). **앱과 위젯 익스텐션 둘 다** 번들에 포함(09-16 - 위젯이 Shared 의 UserDefaults 를 쓰므로 추가함). 워치는 UserDefaults·파일 API 직접 사용 없음이라 미포함 | ✅ |
 | 2.6 | 5.1.1(v) | 계정 삭제 | 계정 없음 → 해당 없음. 대신 "모든 데이터 삭제"(로컬+iCloud) 제공 | ✅ |
 | 2.7 | 5.1.2 | 데이터 공유 | PDF·CSV 내보내기는 사용자가 직접 공유 시트로 — 처리방침에 그렇게 설명 | ☐ |
 | 2.8 | 국내 개인정보보호법 | 건강 = 민감정보 | 개발자가 처리하지 않는 구조라 별도 동의 화면 불필요. 향후 서버 붙이면 동의·처리방침 개정 필수 | ✅ |
@@ -51,6 +54,7 @@
 | 3.2 | 3.1.2 | 메타데이터에 약관 링크 없음 | App Store Connect 앱 설명 하단 또는 **EULA 필드**에 이용약관 URL(애플 표준 EULA 링크로 대체 가능) | ☐ ⚠ |
 | 3.3 | 2.1 / 3.1.1 | 리뷰어가 눌렀는데 상품 안 뜸 **[러비티: "스토어에서 상품을 찾을 수 없어요"]** | 상품 2개가 "제출 준비 완료" 상태 + **첫 제출 시 앱 버전 페이지의 "앱 내 구입 및 구독" 섹션에 상품 첨부**(구독은 첫 번째 버전과 함께 제출해야 함) | ☐ ⚠ |
 | 3.4 | 3.1.1 | 상품 ID 불일치 **[러비티]** | 코드 `pro_monthly`/`pro_yearly` ↔ App Store Connect 글자 하나까지 동일. 한 문서(docs/decisions.md)에 적어두고 복붙만 | ☐ |
+| 3.10 | 2.3.1 | 페이월 약속 ↔ 실제 잠금 불일치 | 페이월 여섯 줄(스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치) = 실제 잠금과 일치, 테스트가 감시. **PDF 는 무료**(09-10)라 페이월에 없음. 로컬 storekit 구독 설명도 여섯 기능 문구로 갱신(09-16) - **ASC 구독 설명에 같은 문구 입력** | ✅ ☐ |
 | 3.5 | 계약 | 유료 앱 계약 미체결 → 상품 로드 실패 **[러비티]** | 비즈니스 → 계약: **유료 앱** 계약 체결 + 세금·은행 정보 | ☐ ⚠ |
 | 3.6 | 2.1 | 상품 로드 실패 시 크래시/빈 화면 | StoreKit 2 실패해도 무료 기능 정상, 페이월엔 "지금은 스토어에 연결할 수 없어요" | ✅ |
 | 3.7 | 3.1.1 | 외부 결제 링크·"웹에서 더 싸게" 문구 | 없음. 약학정보원 등 외부 링크는 정부·공익 사이트만(구매 링크 없는 페이지) | ✅ |
@@ -63,13 +67,13 @@
 |---|---|---|---|---|
 | 4.1 | 2.1 | 알림 거부·워치 없음·iCloud 꺼짐에서 기능 깨짐 | 세 경우 모두 전 기능 동작. **리뷰어는 워치를 안 찰 수 있음** → 워치 없이도 폰에서 모든 기록 가능 | ✅ |
 | 4.2 | 2.1 | 빈 화면·placeholder·"준비 중" | 빈 상태(empty state) 화면을 정성껏. 미완성 메뉴는 아예 숨김 | ✅ |
-| 4.3 | 2.3.3 | 스크린샷이 실제 앱과 다름 | 실기기 캡처만. iPhone 6.7"·6.1", **Apple Watch 스크린샷 별도**(워치 앱 포함 시 필수) | ☐ |
+| 4.3 | 2.3.3 | 스크린샷이 실제 앱과 다름 / 규격 밖 | 실캡처만 쓴다(ci/screenshots). ⚠ 이전 세트는 iPhone 16 Pro(1206×2622)라 **제출 규격(6.9" 1320×2868 / 6.7" 1290×2796) 밖** - 09-16에 와이드 기기를 Pro Max 급으로 고정했으니 다음 런 세트로 제출. 워치 스크린샷 별도 필수 | ☐ ⚠ |
 | 4.4 | 2.3 | 메타데이터에 타사 앱명·"베타"·"테스트" | 키워드에 경쟁 앱명 금지, 설명에 beta 금지 | ☐ |
 | 4.5 | 2.4.1 | iPad에서 깨짐 | 프로젝트 `TARGETED_DEVICE_FAMILY = 1`(iPhone 전용) — iPad는 확대 모드로 실행되므로 문제 없음 | ✅ |
 | 4.6 | 4.5.4 | 알림을 강제·마케팅 알림 | 알림은 선택, 마케팅 알림 없음, 재알림 1회 | ✅ |
 | 4.7 | 2.5.x 워치 | 워치 앱이 알림 중계기 수준 | 워치 자체 기능(오늘 약·증상·기분·컴플리케이션) 있음 | ✅ |
 | 4.8 | 2.1 | 심사자가 흐름을 못 찾음 | **심사 노트**: 로그인 없음, 알림 확인 방법, 워치 없이 전 기능 확인 가능, 안전 카드 위치, 약 정보 출처(식약처 공개 데이터 원문, 자체 판단 없음), 구독 상품 ID | ☐ |
-| 4.9 | 5.6 | 리뷰 요청 남발 | `SKStoreReviewController` — 14일 이상 기록 + 리포트 열람 후 1회 | ✅ |
+| 4.9 | 5.6 | 리뷰 요청 남발 | `requestReview`(SwiftUI) - 서로 다른 14일 이상 기록한 사용자가 리포트를 열었을 때 **평생 1회**(ReportView.maybeAskForReview, 09-16 실제 구현) | ✅ |
 
 ## 5. 연령 등급 · 카테고리
 
@@ -91,8 +95,8 @@
 | 6.6 | 비밀값이 git 히스토리에 [러비티: 마스터 비밀번호] | .p8·인증서·API 키는 GitHub Secrets/match 저장소만. `.gitignore`에 `*.p8 *.p12 *.mobileprovision` | ✅ |
 | 6.7 | 재발급 불가 키 분실 [러비티: .p8] | ASC API 키 .p8, match 암호 → 비밀번호 관리자 | ☐ ⚠ |
 | 6.8 | 빌드 번호 중복 → 업로드 거절 | `CURRENT_PROJECT_VERSION = GITHUB_RUN_NUMBER` 자동 | ✅ |
-| 6.9 | 폰트 라이선스 | SUIT·Pretendard OFL — 앱 내 "오픈소스 라이선스" 화면에 OFL 전문 | ✅ |
-| 6.10 | 워치 앱 아이콘 전 사이즈·iOS 1024 아이콘 알파 채널 | 아이콘 PNG 알파 없이, 워치 아이콘 세트 전부 채움 | ☐ |
+| 6.9 | 폰트 라이선스 | SUIT·Pretendard OFL — 앱 내 "오픈소스 라이선스" 화면 | ✅ OFL 1.1 **전문**을 OFL-NOTICE.txt 에 실제 수록(09-16 - 그 전에는 요약+링크뿐이었다) |
+| 6.10 | 워치 앱 아이콘 전 사이즈·iOS 1024 아이콘 알파 채널 | 확인 완료(09-16): iOS·워치 모두 1024×1024 RGB **알파 없음**, 단일 마케팅 아이콘 방식으로 채워짐 | ✅ |
 | 6.11 | 앱 이름 vs 표시명 | 스토어 "더 잔잔"(띄어쓰기) ↔ 앱 아이콘 아래 "더잔잔" 다르면 지적 가능성 → 스토어 이름을 "더잔잔"으로 통일 | ☐ |
 
 ## 7. 한국 규제 · 표현
@@ -106,32 +110,35 @@
 
 ---
 
-## 8. 제출 직전 — 사람이 하는 체크리스트
+## 8. 제출 직전 — 사람이 하는 체크리스트 (09-16 갱신)
 
-- [ ] 개인정보처리방침·지원 페이지 URL 살아 있음 (GitHub Pages)
-- [ ] App Store Connect: 앱 이름 "더잔잔"으로 통일, 부제 "더 잔잔한 하루를 위해", 카테고리, **연령 등급 재확인**
-- [ ] 구독 상품 2개 "제출 준비 완료" + 버전 페이지에 첨부, 유료 앱 계약 체결
-- [ ] EULA/약관 링크 기입
-- [ ] iPhone·Apple Watch 스크린샷 실기기 캡처 업로드
-- [ ] 심사 노트 작성(4.8 내용) — 한국어+영어
-- [ ] Privacy Nutrition Label "수집하지 않음" 저장
-- [ ] TestFlight 빌드에서: 알림 액션 3개, 워치 알림 미러링, 구독 샌드박스 구매·복원, 페이월 문구, 안전 카드, 데이터 삭제 확인
+- [ ] GitHub Pages 활성화(Settings → Pages) 후 처리방침·지원 URL 살아 있음 확인 - docs/site/privacy.html·support.html 은 이미 작성돼 있다(낱알 사진 핫링크 고지 포함, 09-16)
+- [ ] App Store Connect: 앱 이름 "더잔잔"으로 통일, 부제 "더 잔잔한 하루를 위해", 카테고리(건강 및 피트니스 / 의료), **연령 등급 재확인**(의료·치료 정보: 자주)
+- [ ] 유료 앱 계약 체결(구독 만들기 전 필수) → 구독 그룹 "The잔잔 Pro" + 상품 2개(pro_yearly ₩19,900/년·7일 체험, pro_monthly ₩2,900/월) 생성, **구독 설명은 여섯 기능 문구**("약봉투 스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치를 열어요."), "제출 준비 완료" + 첫 버전 페이지에 첨부
+- [ ] EULA/약관 링크 기입(docs/site/terms.html 또는 애플 표준 EULA)
+- [ ] 스크린샷: **Pro Max 급으로 다시 찍은 세트**(4.3 참고 - 이전 세트는 규격 밖) + Apple Watch 세트, 한국어/영어(en-US) 로컬라이즈별 업로드. 홍보 이미지 4장(KR/EN, 1290×2796)은 세션 산출물로 확보됨
+- [ ] 앱 설명·키워드(한/영) 작성해 입력 - 아직 초안 없음(효능 표현 금지, 1.8)
+- [ ] 심사 노트 입력 - 아래 9절 개정본 복붙
+- [ ] Privacy Nutrition Label "데이터를 수집하지 않음" 저장
+- [ ] TestFlight 빌드에서: 알림 액션 3개, 워치 알림 미러링, 구독 샌드박스 구매·복원, 페이월 문구, 안전 카드, 약 모양으로 찾기(사진 로드), 데이터 삭제 확인
 - [ ] .p8·match 암호 비밀번호 관리자에 있음
 
-## 9. 심사 노트 초안
+## 9. 심사 노트 초안 (2026-09-16 개정 - 현재 코드와 대조 완료)
 
 ```
 [한국어]
-- 로그인/계정이 없습니다. 모든 기능을 바로 사용할 수 있습니다.
+- 로그인/계정이 없습니다. 모든 기능을 바로 사용할 수 있습니다. 한국어가 기본이고 설정에서 영어를 고를 수 있습니다.
 - 알림: 설정 > 알림에서 시간대를 설정하면 로컬 알림이 예약됩니다. 알림의 "복용함/건너뜀/30분 뒤" 액션은 잠금화면과 Apple Watch에서 동작합니다. Apple Watch 없이도 모든 기록은 iPhone에서 가능합니다.
-- 약 정보는 대한민국 식품의약품안전처 공개 데이터(e약은요, 낱알식별)를 원문 인용하며 출처와 기준일을 표기합니다. 앱은 진단, 약 추천, 용량 안내를 하지 않습니다.
-- 정신건강 관련 앱으로, 위기 상담 연락처(109, 1577-0199)를 안전 카드와 설정에서 제공합니다.
-- 구독: pro_monthly / pro_yearly (연간 7일 무료 체험). 페이월은 리포트 탭 > PDF 내보내기 또는 약 추가 > 스캔에서 볼 수 있습니다. 복원은 설정 > Pro.
+- 약 정보는 대한민국 식품의약품안전처 공공데이터(의약품 낱알식별 정보)를 인용하며 출처를 앱 안에 표기합니다. 앱은 진단, 약 추천, 용량 안내를 하지 않습니다. "약 모양으로 찾기"의 결과는 항상 "추측"으로 표시되고 의사·약사 확인 안내가 붙습니다.
+- 네트워크: 서버가 없습니다. 유일한 외부 요청은 "약 모양으로 찾기"에서 후보 약의 낱알 사진을 식약처 공식 서버(https://nedrug.mfds.go.kr)에서 실시간으로 불러오는 것뿐이며, 사진은 저장하지 않고 사용자 데이터는 어떤 것도 전송되지 않습니다. 그 외에는 사용자 본인 iCloud(CloudKit 개인 DB)와 App Store 결제뿐입니다.
+- 정신건강 관련 앱으로, 위기 상담 연락처(109, 1577-0199)를 안전 카드와 설정 > 안전에서 제공합니다.
+- 구독: pro_monthly / pro_yearly (연간 7일 무료 체험). 페이월 확인 경로: 설정 > Pro 알아보기, 약 탭 > + > 약봉투 스캔 또는 약 모양으로 찾기, 약 상세 > 용량 변경 "전후 보기", 설정 > 약 이름 가리기. 복원은 설정 > 구매 복원. 진료용 리포트 PDF 내보내기는 무료입니다.
 
 [English]
-- No account or login. All features are available immediately.
+- No account or login. All features are available immediately. Korean is the default language; English can be chosen in Settings.
 - Notifications are local; actions (Taken / Skipped / Snooze 30 min) work on the lock screen and Apple Watch. Everything can also be logged on iPhone without a Watch.
-- Medication information quotes public data from the Korean MFDS with source and date. The app does not diagnose, recommend medications, or suggest dosages.
-- Mental-health related: crisis hotline (109) is offered via a safety card and in Settings.
-- Subscriptions: pro_monthly / pro_yearly (7-day trial on yearly). Paywall: Reports > Export PDF, or Add Medication > Scan. Restore: Settings > Pro.
+- Medication appearance data quotes public data from the Korean MFDS, with the source shown in the app. The app does not diagnose, recommend medications, or suggest dosages. "Find by appearance" results are always labeled as guesses with a "confirm with your doctor or pharmacist" note.
+- Networking: there is no server. The only external request is loading candidate pill photos in "Find by appearance" from the official MFDS server (https://nedrug.mfds.go.kr) on demand; photos are not stored and no user data is ever sent. Everything else is the user's own iCloud (CloudKit private DB) and App Store billing.
+- Mental-health related: crisis hotlines (109, 1577-0199 - Korea) are offered via a safety card and in Settings.
+- Subscriptions: pro_monthly / pro_yearly (7-day trial on yearly). Paywall entry points: Settings > Learn about Pro; Meds tab > + > Pharmacy bag scan or Find by appearance; medication detail > dose change "Compare"; Settings > Hide medication names. Restore: Settings > Restore purchase. The visit-report PDF export is free.
 ```
