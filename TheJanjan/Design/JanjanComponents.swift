@@ -263,6 +263,9 @@ struct TogglePill: View {
                 .janjanBody(14, weight: .medium)
                 // 알약 안에서 줄바꿈되면 캡슐이 찌부러진다. 모양을 지키고 말줄임한다.
                 .lineLimit(1)
+                // 말줄임되기 전에 글자를 조금 줄여 본다 - "술 마셨어요" 같은
+                // 긴 라벨이 좁은 기기에서 "술 마셨…" 로 깨지지 않게.
+                .minimumScaleFactor(0.85)
                 .foregroundStyle(Color.janjan(isOn ? .surface : .ink2))
                 .frame(minWidth: minWidth)
                 .padding(.horizontal, CGFloat(fillsRow ? JanjanSpacing.xs : JanjanSpacing.s))
@@ -351,10 +354,14 @@ struct MaskedNameText: View {
 
     @State private var isRevealed = false
 
-    /// 가려졌을 때 보이는 점 표기. 글자 수를 흘리지 않도록 이름과 무관하게 늘 셋이다.
-    /// `TogglePill` 처럼 이 뷰를 그대로 못 쓰는 자리(누르면 다른 동작이 일어나는 자리)에서
-    /// 같은 표기를 쓰려고 밖에서도 볼 수 있게 둔다.
+    /// 가려졌을 때 보이는 점 표기. `TogglePill` 처럼 블러를 못 쓰는 자리
+    /// (누르면 다른 동작이 일어나는 캡슐 안)에서 쓰려고 남겨 둔다.
     static let maskGlyph = "● ● ●"
+
+    /// 뿌옇게 가리는 세기. 15pt 안팎의 글자가 형체만 남고 읽히지 않는 값.
+    /// 점 표기 대신 블러를 쓰는 것은 사용자 결정(2026-09-16) - 모자이크처럼
+    /// 보이게 하고, 누르면 글자로 보인다.
+    static let blurRadius: CGFloat = 6
 
     var body: some View {
         if !isMasked {
@@ -366,9 +373,13 @@ struct MaskedNameText: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint(Text(t("누르면 가려요", "Tap to hide")))
         } else {
-            Text(Self.maskGlyph)
+            Text(name)
+                .blur(radius: Self.blurRadius)
+                // 블러는 글자 상자 밖으로 번진다. 제자리에서만 뿌옇게 보이게 자른다.
+                .clipped()
                 .contentShape(Rectangle())
                 .onTapGesture { isRevealed = true }
+                // VoiceOver 가 진짜 이름을 읽으면 가림이 뚫린다 - 라벨을 통째로 바꾼다.
                 .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
                 .accessibilityHint(Text(t("누르면 보여요", "Tap to show")))
                 .accessibilityAddTraits(.isButton)

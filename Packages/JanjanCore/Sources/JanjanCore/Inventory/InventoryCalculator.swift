@@ -125,6 +125,58 @@ public enum InventoryCalculator {
         return lhs.id.uuidString > rhs.id.uuidString
     }
 
+    // MARK: - 이번 구간 (마지막 재고 사건 이후)
+
+    /// 약 목록 행의 "17/28정 · 총 9정 복용" 을 위한 값.
+    ///
+    /// 구간의 시작은 **마지막 재고 사건**(보충이든 직접 정정이든)이다.
+    /// `total` 은 그 직후의 잔여(= 구간 시작 총량), `consumed` 는 그 뒤로 줄어든 양.
+    /// 세 값은 늘 `total - consumed = 지금 잔여` 로 맞아떨어진다 - 화면의 세 숫자가
+    /// 서로 안 맞으면 사용자는 어느 것도 믿지 않게 된다.
+    public struct CycleStatus: Hashable, Sendable {
+        /// 구간 시작 시점의 총량.
+        public let total: Decimal
+        /// 구간 시작 이후 복용으로 줄어든 양(0 이상).
+        public let consumed: Decimal
+    }
+
+    /// 마지막 재고 사건 이후의 총량·소비량. 재고 사건이 없으면 nil.
+    public static func cycleStatus(
+        for medicationID: UUID,
+        stockEvents: [StockEvent],
+        doseEvents: [DoseEvent],
+        asOf: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CycleStatus? {
+
+        let cycleStart = stockEvents
+            .filter { $0.medicationID == medicationID && $0.occurredAt <= asOf }
+            .map(\.occurredAt)
+            .max()
+        guard let cycleStart else { return nil }
+
+        // remaining() 은 같은 시각이면 정정 → 보충 → 복용 순서로 계산하므로,
+        // asOf 를 구간 시작 시각으로 주면 "그 사건 직후" 의 값이 나온다.
+        let total = remaining(
+            for: medicationID,
+            stockEvents: stockEvents,
+            doseEvents: doseEvents,
+            asOf: cycleStart,
+            calendar: calendar
+        )
+        let current = remaining(
+            for: medicationID,
+            stockEvents: stockEvents,
+            doseEvents: doseEvents,
+            asOf: asOf,
+            calendar: calendar
+        )
+        return CycleStatus(
+            total: max(total, 0),
+            consumed: max(DecimalQuantity.round(total - current, scale: 4), 0)
+        )
+    }
+
     // MARK: - 복약률
 
     /// 기간 안의 복약률 = 복용함 ÷ (복용함 + 건너뜀 + 미기록).

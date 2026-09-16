@@ -50,15 +50,30 @@ enum MedicationStore {
     ///
     /// 보충은 **정정이 아니라 refill** 이다. 정정은 기준점을 새로 세워 그 이전을 지워 버리지만,
     /// 처방은 있던 것 위에 더해지는 사건이라서다(설계 05절).
+    ///
+    /// `leftovers` 는 진료일에 세어 둔 "받기 전 남아 있던 개수". 이것은 **정정**으로
+    /// 넣는다 - 같은 시각의 사건은 정정 → 보충 순서로 계산되므로(InventoryCalculator),
+    /// 진료일의 잔여가 기준점이 되고 그 위에 보충이 얹힌다.
     @discardableResult
     static func add(
         prescription: Prescription,
         refills: [(medicationID: UUID, quantity: Decimal)],
+        leftovers: [(medicationID: UUID, count: Decimal)] = [],
         at moment: Date = Date(),
         in context: ModelContext
     ) -> UUID {
 
         context.insert(PrescriptionRecord.make(from: prescription))
+
+        for leftover in leftovers {
+            let event = StockEvent.correction(
+                medicationID: leftover.medicationID,
+                setTo: max(leftover.count, 0),
+                at: moment,
+                note: "진료일에 세어 둔 개수"
+            )
+            context.insert(StockEventRecord.make(from: event))
+        }
 
         for refill in refills where refill.quantity > 0 {
             let event = StockEvent.refill(

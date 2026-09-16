@@ -83,12 +83,8 @@ struct MonthWaveCard: View {
     }
 
     private var footer: some View {
+        // 설명 문장은 사용자 결정(2026-09-16)으로 뺐다 - 그림만 있으면 된다.
         HStack(alignment: .bottom) {
-            Text(t("기록한 색만 남아요.\n해석은 하지 않아요.", "Only the colors you chose remain.\nNo interpretation is added."))
-                .janjanBody(12)
-                .foregroundStyle(Color.muted)
-                // HStack 에서 버튼과 폭을 다툴 때 세로로 눌려 잘리지 않게 한다.
-                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: CGFloat(JanjanSpacing.s))
             WhitePillButton(title: t("그림으로 저장", "Save as image"), systemImage: "square.and.arrow.down") {
                 export()

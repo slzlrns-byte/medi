@@ -375,7 +375,7 @@ struct MedicationDetailView: View {
                 .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
             }
 
-            WhitePillButton(title: t("전후 보기", "Compare")) {
+            WhitePillButton(title: t("약 변경 보기", "See the change")) {
                 comparingChange = entry
             }
             .proGated(.doseChangeCompare)
@@ -861,7 +861,7 @@ private struct DoseChangeCompareSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle(t("전후 보기", "Compare"))
+            .navigationTitle(t("약 변경 보기", "See the change"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -914,8 +914,8 @@ private struct DoseChangeCompareSheet: View {
 
             if comparison.after.days < DoseChangeComparison.windowDays {
                 Text(t(
-                    "후 구간은 아직 \(comparison.after.days)일째입니다.",
-                    "The after period is only \(comparison.after.days) days in so far."
+                    "변경한 지 \(comparison.after.days)일이 지났어요. \(DoseChangeComparison.windowDays)일이 모이면 앞뒤를 같은 길이로 비교해요.",
+                    "It's been \(comparison.after.days) days since the change. Once \(DoseChangeComparison.windowDays) days are in, both sides compare at equal length."
                 ))
                 .janjanBody(12)
                 .foregroundStyle(Color.muted)
@@ -962,14 +962,19 @@ private struct DoseChangeCompareSheet: View {
             .monospacedDigit()
     }
 
+    /// 두 줄로 나눈다 - 한 줄("0일 · 악몽 0일")은 좁은 화면에서 카드 오른쪽 끝에
+    /// 닿아 있어서, 숫자가 두 자리가 되는 순간 잘린다(사용자 발견 2026-09-16).
     private func dreamCell(_ window: DoseChangeComparison.Window) -> some View {
-        Text(t(
-            "\(window.dreamDays)일 · 악몽 \(window.nightmareDays)일",
-            "\(window.dreamDays) days · nightmares \(window.nightmareDays)"
-        ))
-        .janjanBody(15, weight: .medium)
-        .foregroundStyle(Color.ink)
-        .monospacedDigit()
+        VStack(alignment: .leading, spacing: 2) {
+            Text(t("\(window.dreamDays)일", "\(window.dreamDays) days"))
+                .janjanBody(15, weight: .medium)
+                .foregroundStyle(Color.ink)
+                .monospacedDigit()
+            Text(t("악몽 \(window.nightmareDays)일", "nightmares \(window.nightmareDays)"))
+                .janjanBody(11)
+                .foregroundStyle(Color.muted)
+                .monospacedDigit()
+        }
     }
 }
 

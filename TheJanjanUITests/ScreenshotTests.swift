@@ -190,7 +190,7 @@ final class ScreenshotTests: XCTestCase {
             if row.waitForExistence(timeout: 10) {
                 row.tap()
                 settle()
-                let compare = app.buttons["전후 보기"].firstMatch
+                let compare = app.buttons["약 변경 보기"].firstMatch
                 if !compare.waitForExistence(timeout: 3) {
                     // 용량 변경 카드는 화면 아래쪽이다.
                     app.swipeUp()

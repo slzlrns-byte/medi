@@ -314,4 +314,39 @@ final class InventoryCalculatorTests: XCTestCase {
         )
         XCTAssertEqual(rate, Decimal(string: "0.5"))
     }
+
+    // MARK: - 이번 구간 (총량 · 소비량)
+
+    func testCycleStatusAfterRefill() {
+        // 정정 17 + 같은 날 보충 28 → 구간 총량 45. 이후 3정 복용 → 소비 3, 잔여 42.
+        let visit = Fixed.date(2026, 8, 10)
+        let stock: [StockEvent] = [
+            .correction(medicationID: Fixed.medA, setTo: 17, at: visit, note: "진료일에 세어 둠"),
+            .refill(medicationID: Fixed.medA, quantity: 28, at: visit)
+        ]
+        var doses: [DoseEvent] = []
+        for day in 11...13 {
+            let at = Fixed.date(2026, 8, day, 21)
+            doses.append(DoseEvent(medicationID: Fixed.medA, scheduledAt: at, status: .taken, quantity: 1))
+        }
+
+        let cycle = InventoryCalculator.cycleStatus(
+            for: Fixed.medA, stockEvents: stock, doseEvents: doses, asOf: Fixed.date(2026, 8, 14)
+        )
+        XCTAssertEqual(cycle?.total, 45, "구간 총량 = 정정으로 세운 기준 + 같은 시각의 보충")
+        XCTAssertEqual(cycle?.consumed, 3)
+
+        let remaining = InventoryCalculator.remaining(
+            for: Fixed.medA, stockEvents: stock, doseEvents: doses, asOf: Fixed.date(2026, 8, 14)
+        )
+        XCTAssertEqual((cycle?.total ?? 0) - (cycle?.consumed ?? 0), remaining,
+                       "화면의 세 숫자(총량·소비·잔여)는 늘 맞아떨어져야 한다")
+    }
+
+    func testCycleStatusWithoutStockEventsIsNil() {
+        let cycle = InventoryCalculator.cycleStatus(
+            for: Fixed.medA, stockEvents: [], doseEvents: [], asOf: Fixed.date(2026, 8, 14)
+        )
+        XCTAssertNil(cycle, "재고를 한 번도 세지 않았으면 총량을 지어내지 않는다")
+    }
 }

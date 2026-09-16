@@ -228,7 +228,7 @@ struct TodayView: View {
         let pending = DayPlan.pendingSlotCount(in: plan)
         if plan.isEmpty { return t("오늘은 예정된 약이 없어요.", "No medications are scheduled for today.") }
         if pending == 0 { return t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.") }
-        return t("오늘 남은 시간대가 \(pending)번 있어요.", "\(pending) time \(pending == 1 ? "slot" : "slots") left today.")
+        return t("오늘은 약을 \(pending)번 더 복용해야 해요.", "You have \(pending) more dose\(pending == 1 ? "" : "s") to take today.")
     }
 
     // MARK: - 시간대 타일
@@ -338,13 +338,15 @@ struct TodayView: View {
     /// 시간대 타일의 이름 줄.
     ///
     /// 이 타일 전체가 그 시간대를 여는 버튼이라, 이름 자리에 따로 탭을 두면 타일 탭
-    /// (시트 열기)과 겹친다. 그래서 `MaskedNameText` 대신 가려졌을 때는 점 표기만
+    /// (시트 열기)과 겹친다. 그래서 `MaskedNameText` 대신 가려졌을 때는 블러만
     /// 보여 주고, 다시 눌러 보이게 하는 동작은 두지 않는다 - 시트를 열면 약마다
     /// `SlotRecordSheet` 의 `MaskedNameText` 로 따로 확인할 수 있다(약 목록 행과 같은 판단).
     private func slotNamesText(_ line: DayPlan.SlotLine) -> some View {
         Group {
             if masksNames {
-                Text(MaskedNameText.maskGlyph)
+                Text(line.medicationNames.joined(separator: " · "))
+                    .blur(radius: MaskedNameText.blurRadius)
+                    .clipped()
                     .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
             } else {
                 Text(line.medicationNames.joined(separator: " · "))

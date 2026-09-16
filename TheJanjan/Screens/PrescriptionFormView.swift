@@ -27,9 +27,14 @@ struct PrescriptionFormView: View {
     @State private var clinicNote = ""
     /// 약 id → 받아 온 개수. 여기 없으면 이번 처방에 없는 약이다.
     @State private var refills: [UUID: Decimal] = [:]
+    /// 약 id → 진료일에 세어 둔 "받기 전 남아 있던 개수". 안 세면 여기 없다.
+    /// 매 진료마다 남은 개수를 짚고 넘어가게 하는 손잡이다(사용자 결정 2026-09-16).
+    @State private var leftovers: [UUID: Decimal] = [:]
     @State private var isSaving = false
     /// 사용자가 개수를 직접 고친 약. 제안값을 다시 덮어쓰지 않으려고 기억해 둔다.
     @State private var edited: Set<UUID> = []
+    /// 이번 진료에서 처음 받은 약을 그 자리에서 등록하는 시트.
+    @State private var isShowingNewMedication = false
 
     init(onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
@@ -119,11 +124,12 @@ struct PrescriptionFormView: View {
                     .tint(Color.ink)
 
                 if hasNextVisit {
+                    // 시간까지 받는다(사용자 결정 2026-09-16) - 진료 알림이 그 시각에 맞춰진다.
                     DatePicker(
                         t("다음 진료", "Next visit"),
                         selection: $nextVisitDate,
                         in: visitDate...,
-                        displayedComponents: .date
+                        displayedComponents: [.date, .hourAndMinute]
                     )
                     .janjanBody(15)
                     .tint(Color.ink)
@@ -153,9 +159,31 @@ struct PrescriptionFormView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
+                Text(t("이름을 누르면 이번 처방에 넣거나 빼요.", "Tap a name to add it to or remove it from this prescription."))
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 ForEach(activeMedications) { medication in
                     medicationRow(medication)
                 }
+
+                // 이번 진료에서 처음 받은 약은 여기서 바로 등록한다 - 폼을 닫고
+                // 약 탭으로 돌아갔다 오게 하지 않는다(사용자 결정 2026-09-16).
+                WhitePillButton(title: t("여기 없는 약 등록", "Register a new medication"), systemImage: "plus") {
+                    isShowingNewMedication = true
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingNewMedication) {
+            NavigationStack {
+                MedicationFormView { isShowingNewMedication = false }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(t("닫기", "Close")) { isShowingNewMedication = false }
+                                .foregroundStyle(Color.ink)
+                        }
+                    }
             }
         }
     }
@@ -173,13 +201,40 @@ struct PrescriptionFormView: View {
                 let spokenName = masksNames
                     ? (medication.purposeLine.isEmpty ? t("가려진 약", "hidden medication") : medication.purposeLine)
                     : medication.name
-                CountStepper(
-                    text: t("\(DecimalQuantity.display(quantity))정", pillsEn(quantity)),
-                    decreaseLabelKo: t("\(spokenName) 개수 줄이기", "Decrease \(spokenName) count"),
-                    increaseLabelKo: t("\(spokenName) 개수 늘리기", "Increase \(spokenName) count"),
-                    onDecrease: { adjust(medication, by: -1) },
-                    onIncrease: { adjust(medication, by: 1) }
-                )
+
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                    Text(t("받아 온 개수", "Pills picked up"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                    CountStepper(
+                        text: t("\(DecimalQuantity.display(quantity))정", pillsEn(quantity)),
+                        decreaseLabelKo: t("\(spokenName) 개수 줄이기", "Decrease \(spokenName) count"),
+                        increaseLabelKo: t("\(spokenName) 개수 늘리기", "Increase \(spokenName) count"),
+                        onDecrease: { adjust(medication, by: -1) },
+                        onIncrease: { adjust(medication, by: 1) }
+                    )
+                }
+
+                if let leftover = leftovers[medication.id] {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        Text(t("받기 전 남아 있던 개수", "Pills left before this refill"))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.muted)
+                        CountStepper(
+                            text: t("\(DecimalQuantity.display(leftover))정", pillsEn(leftover)),
+                            decreaseLabelKo: t("\(spokenName) 남은 개수 줄이기", "Decrease \(spokenName) leftover count"),
+                            increaseLabelKo: t("\(spokenName) 남은 개수 늘리기", "Increase \(spokenName) leftover count"),
+                            onDecrease: { adjustLeftover(medication, by: -1) },
+                            onIncrease: { adjustLeftover(medication, by: 1) }
+                        )
+                    }
+                } else {
+                    // 매 진료마다 남은 개수를 짚고 가면 재고가 실제와 다시 맞는다.
+                    // 강요는 아니다 - 안 세면 그냥 보충만 더해진다.
+                    WhitePillButton(title: t("남아 있던 약도 세어 두기", "Also count what was left"), systemImage: "number") {
+                        leftovers[medication.id] = 0
+                    }
+                }
             }
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
@@ -267,6 +322,7 @@ struct PrescriptionFormView: View {
     private func toggle(_ medication: Medication) {
         if refills[medication.id] != nil {
             refills[medication.id] = nil
+            leftovers[medication.id] = nil
             edited.remove(medication.id)
         } else {
             refills[medication.id] = suggestedQuantity(for: medication)
@@ -277,6 +333,11 @@ struct PrescriptionFormView: View {
         guard let current = refills[medication.id] else { return }
         refills[medication.id] = max(current + delta, 0)
         edited.insert(medication.id)
+    }
+
+    private func adjustLeftover(_ medication: Medication, by delta: Decimal) {
+        guard let current = leftovers[medication.id] else { return }
+        leftovers[medication.id] = max(current + delta, 0)
     }
 
     /// 처방일수 × 하루 예정 개수. 스케줄이 없으면 하루 1정으로 본다.
@@ -312,9 +373,14 @@ struct PrescriptionFormView: View {
             medicationIDs: Array(chosen.keys)
         )
 
+        // 남은 개수는 이번 처방에 포함한 약의 것만 저장한다 - 세다가 약을 뺐으면
+        // 그 숫자는 버린다.
+        let counted = leftovers.filter { refills[$0.key] != nil }
+
         MedicationStore.add(
             prescription: prescription,
             refills: chosen.map { (medicationID: $0.key, quantity: $0.value) },
+            leftovers: counted.map { (medicationID: $0.key, count: $0.value) },
             at: visitDate,
             in: context
         )

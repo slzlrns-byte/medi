@@ -138,8 +138,8 @@ struct MedicationsView: View {
         let snapshot: InventoryCalculator.Snapshot
         /// 재고를 한 번도 세지 않았으면 잔여를 숫자로 말하지 않는다.
         let hasStock: Bool
-        /// 가장 최근 보충으로 받아 온 개수. 남은 개수의 눈금 역할을 한다.
-        let lastRefill: Decimal?
+        /// 마지막 재고 사건 이후의 총량·소비량. "17/28정 · 총 9정 복용" 의 재료.
+        let cycle: InventoryCalculator.CycleStatus?
     }
 
     private struct RowGroup {
@@ -178,7 +178,12 @@ struct MedicationsView: View {
                     asOf: today
                 ),
                 hasStock: stock.contains { $0.medicationID == medication.id },
-                lastRefill: StockEvent.lastRefillQuantity(of: medication.id, in: stock)
+                cycle: InventoryCalculator.cycleStatus(
+                    for: medication.id,
+                    stockEvents: stock,
+                    doseEvents: doses,
+                    asOf: today
+                )
             )
         }
     }
@@ -274,10 +279,11 @@ struct MedicationsView: View {
     private func medicationNameText(_ medication: Medication) -> some View {
         Group {
             if masksNames {
-                // 목록의 약이 전부 점이면 서로 구분이 안 된다. 워치와 같은 규칙으로
-                // 용도 한 줄("잠들기 쉽게")이 있으면 그것으로 부른다 - 무엇에 쓰는지는
-                // 보이되 이름은 곁의 시선에 남지 않고, 용도를 적을지는 사용자가 정한다.
-                Text(medication.purposeLine.isEmpty ? MaskedNameText.maskGlyph : medication.purposeLine)
+                // 이름 자체를 블러로 가린다(사용자 결정 2026-09-16). 글자로 보려면
+                // 상세로 들어간다 - 거기서 MaskedNameText 를 누르면 보인다.
+                Text(medication.name)
+                    .blur(radius: MaskedNameText.blurRadius)
+                    .clipped()
                     .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
             } else {
                 Text(medication.name)
@@ -311,13 +317,25 @@ struct MedicationsView: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
-                        Text(t("\(DecimalQuantity.display(max(row.snapshot.remaining, 0)))정", pillsEn(max(row.snapshot.remaining, 0))))
+                        // "17/28정" - 남은 숫자만으로는 많은지 적은지 모른다.
+                        // 이번 구간의 총량이 눈금이 된다(사용자 결정 2026-09-16).
+                        let remaining = max(row.snapshot.remaining, 0)
+                        if let cycle = row.cycle, cycle.total > 0 {
+                            Text(t(
+                                "\(DecimalQuantity.display(remaining))/\(DecimalQuantity.display(cycle.total))정",
+                                "\(DecimalQuantity.display(remaining))/\(DecimalQuantity.display(cycle.total)) pills"
+                            ))
                             .janjanDisplay(20)
                             .foregroundStyle(Color.ink)
                             .monospacedDigit()
-                        // 남은 숫자만으로는 많은지 적은지 모른다. 받아 온 개수가 눈금이 된다.
-                        if let refill = row.lastRefill {
-                            Text(t("받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill))"))
+                        } else {
+                            Text(t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining)))
+                                .janjanDisplay(20)
+                                .foregroundStyle(Color.ink)
+                                .monospacedDigit()
+                        }
+                        if let cycle = row.cycle, cycle.consumed > 0 {
+                            Text(t("총 \(DecimalQuantity.display(cycle.consumed))정 복용", "\(DecimalQuantity.display(cycle.consumed)) taken so far"))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                                 .monospacedDigit()
