@@ -6,10 +6,11 @@
 default_platform(:ios)
 
 SCHEME = "TheJanjan"
-# fastlane 은 fastlane/ 폴더 안에서 실행되므로 경로는 전부 그 기준이다.
-# 루트 기준("TheJanjan.xcodeproj")으로 적으면 fastlane/TheJanjan.xcodeproj 를
-# 찾다가 죽는다 - 첫 실전 실행(런 1)에서 그렇게 죽었다.
-PROJECT = "../TheJanjan.xcodeproj"
+# 경로 규칙이 둘로 갈린다(런 1·3에서 각각 확인):
+# - fastlane **액션**(increment_build_number, build_app 등)은 저장소 루트 기준
+# - Fastfile 안의 **맨 루비 코드**(File.directory?)와 sh 는 fastlane/ 폴더 기준
+# 그래서 액션에는 PROJECT, 루비 검사에는 ../#{PROJECT} 를 쓴다.
+PROJECT = "TheJanjan.xcodeproj"
 APP_ID = "com.thejanjan.app"
 WATCH_ID = "com.thejanjan.app.watchkitapp"
 WIDGET_ID = "com.thejanjan.app.widgets"
@@ -18,7 +19,9 @@ platform :ios do
 
   before_all do
     # XcodeGen 이 만든 프로젝트가 있어야 한다. 워크플로가 먼저 생성한다.
-    UI.user_error!("#{PROJECT} 가 없습니다. `xcodegen generate` 를 먼저 실행하세요.") unless File.directory?(PROJECT)
+    # 이 검사는 맨 루비라 fastlane/ 기준 - 루트의 프로젝트는 ../ 에 있다.
+    UI.user_error!("#{PROJECT} 가 없습니다. `xcodegen generate` 를 먼저 실행하세요.") unless
+      File.directory?("../#{PROJECT}") || File.directory?(PROJECT)
   end
 
   # Matchfile 이 가리키는 임시 키체인. match 는 키체인을 만들어 주지 않아서
@@ -117,7 +120,7 @@ platform :ios do
       scheme: SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      output_directory: "../build",
+      output_directory: "build",
       output_name: "TheJanjan.ipa",
       export_options: {
         provisioningProfiles: {
