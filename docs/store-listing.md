@@ -18,36 +18,39 @@
 더 잔잔한 하루를 위해
 ```
 
-### 프로모션 텍스트 (170자, 심사 없이 수시 수정 가능)
+### 프로모션 텍스트 (170자 제한, 아래 103자. 심사 없이 수시 수정 가능)
 ```
-정신과 약 복용과 마음 상태를 기록하는 앱입니다. 매일의 복용 여부와 기분을 남기고, 진료 때 한 장으로 정리해 가져가세요. 기록은 내 기기와 iCloud에만 저장됩니다.
+먹었는지 기억이 안 나는 날, 더잔잔을 열어 보세요. 오늘 기록이 그대로 남아 있어요. 진료 전날엔 지난 한 달이 PDF 한 장으로 정리돼요. 기록은 내 기기와 iCloud에만 남아요.
 ```
 
 ### 설명 (4,000자 제한)
+
+2026-09-16 확정. 커넥트케어(● 헤드라인 + 짧은 해요체)와 약 알림 태양이(장면
+재연, 추천 사용자 섹션)의 실제 소개문 구조를 참고해 다시 썼다. 축은 둘:
+까먹어도 두 번 먹지 않게 + 정신과·마음일기 전문.
+
 ```
-오늘 아침 약, 먹었는지 안 먹었는지 헷갈린 적 있으시죠. 더잔잔은 정신과 약 복용과 마음 상태를 가장 간단하게 남기고, 진료 때 보여줄 수 있게 한 장으로 정리해 주는 앱입니다.
+더잔잔은 정신과 약과 마음 상태를 기록하는 앱이에요. 먹었는지 가물가물한 날에도 오늘 기록이 그대로 남아 있어요. 기억 대신 기록이 답해요.
 
-이런 것을 할 수 있어요
+● 기록은 한 번이면 돼요
+- 먹으면 '먹었어요' 한 번. 알림이 오면 잠금화면에서 '복용함'을 눌러요.
+- 빠트린 날은 남은 알약을 세어 함께 찾아 드려요.
 
-· 탭 한 번으로 복약 기록 - 아침, 점심, 저녁, 취침, 그리고 내가 정한 시간대까지. 필요할 때만 먹는 약도 따로 기록됩니다.
-· 잠금화면에서 바로 - 알림이 오면 복용함, 건너뜀을 그 자리에서 누르면 끝입니다.
-· 빠트린 날 찾기 - 남은 알약을 세어 기록과 맞춰 보고, 비어 있는 날짜를 하나씩 채워 넣습니다.
-· 마음 기록 - 오늘은 기분 하나만, 여유 있는 날은 메모, 감정 단어, 수면, 증상까지. 쓰는 만큼이 기록이 됩니다.
-· 진료 준비 - 복약률, 한 달 기분 흐름, 약별 남은 개수, 의사에게 물어볼 것을 PDF 한 장으로. 진료실에서 그대로 보여주면 됩니다.
-· 처방 관리 - 다음 진료까지 며칠 남았는지 늘 보입니다.
+● 정신과 진료에 맞췄어요
+- 기분은 색 하나로. 여유 있는 날엔 마음일기, 수면, 증상까지.
+- 진료 전날엔 복약률과 한 달 기분 흐름이 PDF 한 장으로 나와요. 무료예요.
 
-Pro 구독
+● 이런 분께 맞아요
+- "오늘 아침 약 먹었나"가 하루에 한 번은 떠오르는 분
+- 진료실에 앉으면 지난 한 달이 잘 생각나지 않는 분
+- 약 먹는 걸 아무에게도 알리고 싶지 않은 분
 
-· 약봉투 스캔 - 약봉투 사진 한 장으로 약 이름을 읽어 등록합니다.
-· 약 모양으로 찾기 - 모양, 색, 각인으로 이 알약이 어떤 약인지 검색합니다. 식품의약품안전처 낱알식별 정보 기준입니다.
-· 소진 예측 - 진료 전에 약이 모자라지 않는지 미리 압니다.
-· 용량 변경 전후 비교 - 용량이 바뀐 앞뒤 2주의 기분, 수면, 증상을 나란히 봅니다.
-· 약 이름 가리기 - 화면 속 약 이름을 가려 두고, 필요할 때만 눌러서 봅니다.
-· Apple Watch - 손목에서 기록하고 알림에 바로 응답합니다.
+● Pro 구독
+- 약봉투 스캔, 약 모양으로 찾기(식약처 낱알 데이터 2,700여 개), 소진 예측, 용량 변경 전후 비교, 약 이름 가리기, Apple Watch.
 
-기록은 내 것
-
-서버가 없습니다. 기록은 내 기기와 내 iCloud에만 저장되고, 개발자는 어떤 데이터도 수집하지 않습니다. 로그인도 광고도 없으며, Face ID나 암호로 앱을 잠글 수 있습니다.
+● 기록은 내 것
+- 서버가 없어요. 기록은 내 기기와 iCloud에만 있어요.
+- 로그인도 광고도 없고, Face ID나 암호로 잠글 수 있어요.
 
 이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독입니다(월간 또는 연간, 연간은 7일 무료 체험). 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
 ```
@@ -78,36 +81,37 @@ The Janjan
 For calmer days
 ```
 
-### Promotional text (170)
+### Promotional text (170 제한, 아래 166자)
 ```
-Track your psychiatric meds and mood, and bring a one-page summary to your next appointment. Your data stays on your device and in your own iCloud.
+Can't remember whether you took your meds? Open the app - today's record is right there. Before your visit, get the past month on a one-page PDF. No server, no login.
 ```
 
 ### Description
+
+한국어판과 같은 구조(● 섹션 + It fits you if).
+
 ```
-Ever stood there wondering whether you already took this morning's dose? The Janjan makes logging your psychiatric meds and mood as simple as one tap, and turns it into a one-page summary you can show at your appointment.
+The Janjan is a medication and mood tracker built around psychiatric care. On the days you can't remember whether you took your dose, today's record is right there. Your record answers, so your memory doesn't have to.
 
-What you can do
+● One tap is all it takes
+- Tap 'Took it' when you take a dose, or answer right from the lock-screen reminder.
+- Missed some days? Count your remaining pills and find the gaps together.
 
-· Log doses in one tap - morning, noon, evening, bedtime, or any slot you add. As-needed doses are logged per intake.
-· Right from the lock screen - when a reminder comes in, tap Taken or Skipped and you're done.
-· Find the days you missed - count your remaining pills, compare with your records, and fill in the blank days one by one.
-· Keep a mood journal - just one mood on busy days; a note, emotion words, sleep, and symptoms when you feel like it.
-· Prepare for your visit - adherence, a month of mood at a glance, pills remaining, and questions for your doctor, on a single PDF.
-· Track prescriptions - always see how many days are left until your next visit.
+● Made for psychiatric visits
+- Log your mood with a single color. Add a journal, sleep, and symptoms when you feel like it.
+- The night before your visit, adherence and a month of mood come out on a one-page PDF. Free.
 
-Pro subscription
+● It fits you if
+- "Did I take my morning meds?" crosses your mind once a day.
+- The past month goes blank the moment you sit down in the exam room.
+- You'd rather keep your medication private.
 
-· Pharmacy bag scan - register meds from a single photo of the bag.
-· Find by pill appearance - search a pill by shape, color, and imprint, using Korean MFDS pill identification data.
-· Run-out forecast - know ahead of time whether your meds will last until the next visit.
-· Dose change comparison - see mood, sleep, and symptoms for the two weeks before and after a dose change, side by side.
-· Hide medication names - keep names covered on screen and tap to reveal only when needed.
-· Apple Watch - log and respond to reminders from your wrist.
+● Pro subscription
+- Pharmacy bag scan, find by pill appearance (2,700+ Korean MFDS pill records), run-out forecast, dose change comparison, hidden medication names, Apple Watch.
 
-Your records are yours
-
-There is no server. Records are stored only on your device and in your own iCloud, and the developer collects no data. No login, no ads, and you can lock the app with Face ID or a passcode.
+● Your records are yours
+- No server. Records live only on your device and in your own iCloud.
+- No login, no ads. Lock the app with Face ID or a passcode.
 
 This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions. Pro is an auto-renewing subscription (monthly or yearly, with a 7-day free trial on yearly). Payment is charged to your Apple Account, renews automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
 ```
