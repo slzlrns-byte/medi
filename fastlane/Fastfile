@@ -6,7 +6,10 @@
 default_platform(:ios)
 
 SCHEME = "TheJanjan"
-PROJECT = "TheJanjan.xcodeproj"
+# fastlane 은 fastlane/ 폴더 안에서 실행되므로 경로는 전부 그 기준이다.
+# 루트 기준("TheJanjan.xcodeproj")으로 적으면 fastlane/TheJanjan.xcodeproj 를
+# 찾다가 죽는다 - 첫 실전 실행(런 1)에서 그렇게 죽었다.
+PROJECT = "../TheJanjan.xcodeproj"
 APP_ID = "com.thejanjan.app"
 WATCH_ID = "com.thejanjan.app.watchkitapp"
 WIDGET_ID = "com.thejanjan.app.widgets"
@@ -95,7 +98,7 @@ platform :ios do
       scheme: SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      output_directory: "build",
+      output_directory: "../build",
       output_name: "TheJanjan.ipa",
       export_options: {
         provisioningProfiles: {
