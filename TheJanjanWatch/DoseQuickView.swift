@@ -14,6 +14,14 @@ struct DoseQuickView: View {
     @EnvironmentObject private var session: WatchSessionManager
     @Environment(\.dismiss) private var dismiss
 
+    /// 좌우 여백. 시스템 여백에 맡기면 왼쪽 4에 오른쪽 58 로 치우쳤다
+    /// (런 40 사용자 발견) - 기분 화면처럼 화면 폭에서 직접 계산한다.
+    private let sideMargin: CGFloat = 12
+
+    private var contentWidth: CGFloat {
+        WKInterfaceDevice.current().screenBounds.width - sideMargin * 2
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -55,6 +63,10 @@ struct DoseQuickView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
                 }
+                // 모든 줄을 같은 폭으로 묶어 화면 한가운데 놓는다 - 버튼과
+                // 안내문이 같은 왼끝·오른끝을 갖는다.
+                .frame(width: contentWidth)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle(titleText)
         }
