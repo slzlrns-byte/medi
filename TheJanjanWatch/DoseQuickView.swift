@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 import JanjanCore
 
 /// 복약 원탭 — 한 시간대를 통째로 기록한다 (설계 10절).
@@ -16,13 +17,17 @@ struct DoseQuickView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(slot.medicationNames, id: \.self) { name in
-                        Text(name)
-                            .font(.body)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    // 이름을 한 줄로 묶는다 - 세로 나열이면 41mm 에서 건너뜀이
+                    // 화면 밖으로 밀려 굴려야 눌렸다(사용자 발견 2026-09-18).
+                    Text(slot.medicationNames.joined(separator: "\u{00A0}· "))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(3)
 
+                    // 두 버튼은 같은 스타일 - 다른 스타일(채움/테두리)을 섞으면
+                    // 안쪽 여백이 달라 폭이 어긋나 보인다. 위계는 색으로만 가른다.
                     Button {
                         record(.taken)
                     } label: {
@@ -31,7 +36,7 @@ struct DoseQuickView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.green.opacity(0.7))
-                    .padding(.top, 6)
+                    .padding(.top, 2)
 
                     Button {
                         record(.skipped)
@@ -39,7 +44,8 @@ struct DoseQuickView: View {
                         Text(t("건너뜀", "Skipped"))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.gray.opacity(0.35))
 
                     Text(t(
                         "하나만 따로 기록하는 건 아이폰에서 할 수 있어요.",
@@ -49,7 +55,6 @@ struct DoseQuickView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
                 }
-                .padding(.horizontal, 4)
             }
             .navigationTitle(titleText)
         }
@@ -61,6 +66,8 @@ struct DoseQuickView: View {
     }
 
     private func record(_ action: WatchMessage.DoseAction) {
+        // 손목 진동으로 눌렸음을 알린다 - 화면을 보지 않고 누르는 경우가 많다.
+        WKInterfaceDevice.current().play(action == .taken ? .success : .click)
         session.send(.doseAction(
             medicationIDs: slot.medicationIDs,
             slotKey: slot.slotKey,

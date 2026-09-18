@@ -49,12 +49,26 @@ struct MoodQuickView: View {
         HStack(spacing: spacing) {
             ForEach(scores, id: \.self) { score in
                 Button {
+                    WKInterfaceDevice.current().play(.success)
                     session.send(.mood(score: score, at: Date()))
                     dismiss()
                 } label: {
                     Circle()
                         .fill(color(for: score))
                         .frame(width: circleSide, height: circleSide)
+                        // 양 끝 원에만 눈금을 흐리게 얹는다(사용자 요청 2026-09-18).
+                        // 아래 설명줄과 짝을 이뤄 어느 쪽이 힘든 쪽인지 바로 읽힌다.
+                        .overlay {
+                            if score == JanjanMood.scores.first {
+                                Text("−3")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.black.opacity(0.35))
+                            } else if score == JanjanMood.scores.last {
+                                Text("+3")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.black.opacity(0.35))
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(CheckIn.Mood(score).label(session.snapshot.language)))

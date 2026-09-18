@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 import JanjanCore
 
 /// 워치 홈 — 스크롤 없이 한 화면 (설계 10절).
@@ -148,9 +149,21 @@ struct WatchHomeView: View {
                 Text(slot.labelKo)
                     .font(.headline)
                 Spacer()
-                Text(slot.isCompleted ? t("완료", "Done") : slot.timeText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                if slot.isCompleted {
+                    // 글자와 아이콘을 함께 - 색만으로 상태를 말하지 않는다.
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text(t("완료", "Done"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(slot.timeText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             // 이름 앞의 공백을 붙임표(NBSP)로 두면 줄이 꺾일 때 "·" 가
             // 다음 줄 첫머리에 홀로 남지 않고 앞 이름 끝에 붙는다.
@@ -166,6 +179,8 @@ struct WatchHomeView: View {
     /// (작은 화면에서 결정을 받지 않는다는 원칙, 설계 10절.)
     private func asNeededRow(_ line: WatchSnapshot.AsNeededLine) -> some View {
         Button {
+            // 화면을 안 보고 누르는 경우가 많아 손목 진동으로 확인해 준다.
+            WKInterfaceDevice.current().play(.success)
             session.recordAsNeeded(line)
         } label: {
             asNeededRowBody(line)
