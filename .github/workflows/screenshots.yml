@@ -1,4 +1,4 @@
-# 더잔잔 — 화면 찍기 (런 41: 복약 시트 가운데 정렬)
+# 더잔잔 — 화면 찍기 (런 42: 복약 시트 가운데 정렬, 워치만)
 #
 # 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없다. 이 워크플로가 macOS 러너에서
 # 예시 기록을 심은 앱을 띄우고 화면마다 사진을 찍어, PNG 를 `ci/screenshots` 브랜치에
@@ -33,6 +33,12 @@ concurrency:
   group: screenshots
   cancel-in-progress: true
 
+env:
+  # "1" 이면 아이폰 단계를 전부 건너뛰고 워치만 찍는다. 워치 화면만 고친
+  # 런에서 45분짜리 전체 촬영을 다시 돌 이유가 없다. 이때 ci/screenshots 의
+  # 아이폰 사진은 지우지 않고 그대로 두고 워치 사진만 덮는다.
+  WATCH_ONLY: "1"
+
 permissions:
   contents: write
 
@@ -60,6 +66,7 @@ jobs:
 
       - name: 시뮬레이터 두 대 고르기
         id: simulator
+        if: env.WATCH_ONLY != '1'
         # 넓은 기기 하나, 좁은 기기 하나.
         #
         # 예전에는 "그 런타임의 첫 번째 아이폰" 을 썼다. 우연히 402x874 짜리가
@@ -121,6 +128,7 @@ jobs:
           '
 
       - name: 시뮬레이터 미리 켜 두기
+        if: env.WATCH_ONLY != '1'
         # 두 번째 기기에서 앱 실행이 타임아웃으로 죽은 적이 있다
         # ("Timed out while requesting launch progress", 2026-09-01).
         # xcodebuild 가 부팅까지 떠맡으면 느린 러너에서 실행 대기가 초과된다.
@@ -136,6 +144,7 @@ jobs:
           fi
 
       - name: UI 테스트로 화면 찍기 (넓은 기기)
+        if: env.WATCH_ONLY != '1'
         run: |
           set -o pipefail
           xcodebuild \
@@ -151,7 +160,7 @@ jobs:
 
       - name: UI 테스트로 화면 찍기 (좁은 기기)
         # 좁은 기기가 실패해도 넓은 기기 사진은 이미 있다. 여기서 멈추지 않는다.
-        if: always() && steps.simulator.outputs.narrow_udid != ''
+        if: always() && env.WATCH_ONLY != '1' && steps.simulator.outputs.narrow_udid != ''
         continue-on-error: true
         run: |
           set -o pipefail
@@ -171,7 +180,7 @@ jobs:
         # 테스트가 설치해 둔 앱을 영어 인자로 다시 띄워 화면마다 한 장씩 찍는다.
         # 탭·시트는 DEBUG 전용 인자(-JanjanTab, -JanjanShowUnrecorded)로 연다 -
         # 영어 스토어 스크린샷 세트의 재료다.
-        if: always()
+        if: always() && env.WATCH_ONLY != '1'
         continue-on-error: true
         run: |
           UDID="${{ steps.simulator.outputs.wide_udid }}"
@@ -204,7 +213,7 @@ jobs:
         # 원형·하양이 미리 골라진 채 열려 후보 목록이 보인다(-JanjanShowPillFinder).
         # 낱알 사진은 식약처 서버 핫링크라 넉넉히 기다린다 - 못 불러와도
         # 글만으로 성립하는 화면이니 그대로 찍는다.
-        if: always()
+        if: always() && env.WATCH_ONLY != '1'
         continue-on-error: true
         run: |
           UDID="${{ steps.simulator.outputs.wide_udid }}"
@@ -229,7 +238,7 @@ jobs:
       - name: 가림 화면 한 장 (넓은 기기)
         # 약 이름 가리기(Pro)가 켜진 오늘 화면. 인자 도메인으로 설정을 켜고,
         # 시뮬레이터에는 구독이 없으므로 디버그 백도어(JANJAN_FORCE_PRO)로 Pro 를 연다.
-        if: always()
+        if: always() && env.WATCH_ONLY != '1'
         continue-on-error: true
         run: |
           UDID="${{ steps.simulator.outputs.wide_udid }}"
@@ -254,7 +263,7 @@ jobs:
       - name: 첨부에서 PNG 꺼내기
         # 테스트가 걸려 죽어도 이미 찍힌 것은 꺼낸다. 지난번에 이게 없어서
         # 25분 멈춘 뒤 찍어 둔 사진까지 통째로 잃었다.
-        if: always()
+        if: always() && env.WATCH_ONLY != '1'
         continue-on-error: true
         env:
           WIDE_NAME: ${{ steps.simulator.outputs.wide_name }}
@@ -344,7 +353,7 @@ jobs:
         # 아이폰 사진까지 러너와 함께 사라진다. 여기서 한 번 올려 두면
         # 뒤가 어떻게 되든 아이폰 몫은 남는다. 마지막 단계가 전체(워치 포함)로
         # 다시 덮어쓴다.
-        if: always()
+        if: always() && env.WATCH_ONLY != '1'
         continue-on-error: true
         run: |
           set -e
@@ -515,6 +524,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir -p /tmp/shots
+
+          # 워치만 찍은 런은 지난 런의 아이폰 사진을 지우면 안 된다 -
+          # 브랜치의 기존 사진을 먼저 깔고 그 위에 새 사진을 덮는다.
+          if [ "$WATCH_ONLY" = "1" ] && git fetch origin ci/screenshots 2>/dev/null; then
+            git ls-tree -r --name-only FETCH_HEAD -- shots | while IFS= read -r f; do
+              git show "FETCH_HEAD:$f" > "/tmp/shots/$(basename "$f")"
+            done
+          fi
+
           cp build/named/*.png /tmp/shots/
 
           git checkout --orphan screenshots-tmp
