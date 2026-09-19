@@ -66,6 +66,9 @@ struct ReportView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            // 질문 칸에서 다른 곳을 누르거나 스크롤하면 키보드가 내려간다.
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { isEditingQuestions = false })
             .navigationTitle(t("진료 준비", "Visit prep"))
             .sheet(item: $exportURL) { file in
                 ShareSheet(items: [file.url])

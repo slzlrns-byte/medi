@@ -29,7 +29,13 @@ final class ProStore: ObservableObject {
     @Published private(set) var products: [Product] = []
 
     /// Pro 권한. 화면은 이 값 하나만 본다.
-    @Published private(set) var isPro = janjanForcesPro
+    /// SwiftUI 밖(알림 예약)에서도 봐야 해서 UserDefaults 에 그림자를 남긴다.
+    @Published private(set) var isPro = janjanForcesPro {
+        didSet { UserDefaults.standard.set(isPro, forKey: Self.cachedProKey) }
+    }
+
+    /// 알림 예약처럼 ProStore 를 들 수 없는 곳이 읽는 그림자 값.
+    static let cachedProKey = "janjan.pro.cached"
 
     /// 연간 7일 무료 체험을 받을 수 있는지. 못 받는 계정에는 체험 문구를 아예 숨긴다(3.1.2(b)).
     @Published private(set) var isYearlyTrialEligible = false

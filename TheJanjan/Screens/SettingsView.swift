@@ -31,6 +31,9 @@ struct SettingsView: View {
     @AppStorage(JanjanFontChoice.defaultsKey) private var fontChoiceRaw = JanjanFontChoice.standard.rawValue
     @AppStorage(JanjanTheme.defaultsKey) private var themeRaw = JanjanTheme.standard.rawValue
     @AppStorage(JanjanLanguage.defaultsKey) private var languageRaw = JanjanLanguage.standard.rawValue
+    // 똑똑한 재알림(Pro). 예약을 굽는 쪽(NotificationManager)과 같은 키를 본다.
+    @AppStorage(DoseNotification.followUpMinutesKey) private var followUpMinutes = 0
+    @AppStorage(DoseNotification.followUpCountKey) private var followUpCount = 2
 
     var body: some View {
         NavigationStack {
@@ -147,10 +150,18 @@ struct SettingsView: View {
             }
             Picker(t("테마", "Theme"), selection: $themeRaw) {
                 ForEach(JanjanTheme.allCases, id: \.rawValue) { theme in
-                    Text(theme.label(JanjanLanguage.current)).tag(theme.rawValue)
+                    Text(themeRowLabel(theme)).tag(theme.rawValue)
                 }
             }
-            .onChange(of: themeRaw) { _, _ in
+            .onChange(of: themeRaw) { old, new in
+                // Pro 테마를 무료로 고르면 되돌리고 페이월을 연다 - 반쯤 적용된
+                // 채 남기지 않는다.
+                let theme = JanjanTheme(rawValue: new) ?? .standard
+                if theme.isProOnly && !pro.isPro {
+                    themeRaw = old
+                    isShowingPaywall = true
+                    return
+                }
                 // 워치의 기분 원도 같은 색을 쓰게 새 스냅샷을 민다.
                 AppServices.shared.pushWatchSnapshot()
             }
@@ -204,6 +215,40 @@ struct SettingsView: View {
             .onChange(of: appointmentLeadDays) { _, _ in
                 Task { await ReminderPlanner.rescheduleAppointments(using: context) }
             }
+
+            // 똑똑한 재알림(Pro) - 답이 없으면 몇 분 뒤 몇 번 더 물을지.
+            if pro.isPro {
+                Picker(t("안 먹으면 다시 알리기", "Re-remind if not logged"), selection: $followUpMinutes) {
+                    Text(t("끄기", "Off")).tag(0)
+                    ForEach(DoseNotification.followUpMinuteChoices, id: \.self) { minutes in
+                        Text(t("\(minutes)분 간격", "Every \(minutes) min")).tag(minutes)
+                    }
+                }
+                .onChange(of: followUpMinutes) { _, _ in
+                    Task { await ReminderPlanner.reschedule(using: context) }
+                }
+                if followUpMinutes > 0 {
+                    Picker(t("다시 알리는 횟수", "How many times"), selection: $followUpCount) {
+                        ForEach(DoseNotification.followUpCountChoices, id: \.self) { count in
+                            Text(t("\(count)번", count == 1 ? "Once" : "\(count) times")).tag(count)
+                        }
+                    }
+                    .onChange(of: followUpCount) { _, _ in
+                        Task { await ReminderPlanner.reschedule(using: context) }
+                    }
+                }
+            } else {
+                Button {
+                    isShowingPaywall = true
+                } label: {
+                    HStack {
+                        Text(t("안 먹으면 다시 알리기", "Re-remind if not logged"))
+                            .foregroundStyle(Color.ink)
+                        Spacer(minLength: 0)
+                        ProBadge()
+                    }
+                }
+            }
         } header: {
             Text(t("알림", "Notifications"))
         } footer: {
@@ -233,6 +278,12 @@ struct SettingsView: View {
 
     private func refreshNotificationStatus() async {
         notificationStatus = await NotificationManager.shared.authorizationStatus()
+    }
+
+    /// Pro 테마에는 무료 사용자에게만 작은 표시를 붙인다 - 구독 중에는 군더더기다.
+    private func themeRowLabel(_ theme: JanjanTheme) -> String {
+        let name = theme.label(JanjanLanguage.current)
+        return theme.isProOnly && !pro.isPro ? "\(name) · Pro" : name
     }
 
     private func openSystemSettings() {

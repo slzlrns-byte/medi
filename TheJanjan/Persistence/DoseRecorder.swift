@@ -42,6 +42,14 @@ enum DoseRecorder {
         let targetDay = day ?? plannedDay(near: moment, scheduleTime: time, calendar: calendar)
         let scheduledAt = time.date(on: targetDay, calendar: calendar)
 
+        // 오늘 시간대에 답이 남으면 걸려 있던 되물음(Pro 재알림)은 걷는다 -
+        // 이미 먹었다고 적었는데 "아직 기록이 없어요" 가 또 오면 안 된다.
+        if calendar.isDate(targetDay, inSameDayAs: moment) {
+            Task { @MainActor in
+                NotificationManager.shared.clearFollowUps(slotKey: slotKey)
+            }
+        }
+
         if let existing = existingRecord(
             medicationID: medicationID,
             slotKey: slotKey,

@@ -23,15 +23,27 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
     case sprout
     /// 복숭아 노을 — 살구. 기분은 노을 보라에서 살구빛으로.
     case sunset
+    /// 밤 라일락 — Pro. 기분은 장미빛에서 라일락으로.
+    case dawn
+    /// 깊은 바다 — Pro. 기분은 남빛에서 청록으로.
+    case sea
 
     /// 선택을 모르는 곳(워치 기본값·테스트)이 쓰는 값.
     public static let standard: JanjanTheme = .sprout
+
+    /// 구독이 있어야 고를 수 있는 테마. 구독이 끝난 뒤에도 이미 고른 테마는
+    /// 그대로 둔다 - 화면 색이 어느 날 갑자기 바뀌는 쪽이 더 나쁘다.
+    public static let proOnly: Set<JanjanTheme> = [.dawn, .sea]
+
+    public var isProOnly: Bool { Self.proOnly.contains(self) }
 
     public var labelKo: String {
         switch self {
         case .sky: return "맑은 하늘"
         case .sprout: return "풋사과 크림"
         case .sunset: return "복숭아 노을"
+        case .dawn: return "밤 라일락"
+        case .sea: return "깊은 바다"
         }
     }
 
@@ -40,6 +52,8 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sky: return "Clear sky"
         case .sprout: return "Apple cream"
         case .sunset: return "Peach dusk"
+        case .dawn: return "Night lilac"
+        case .sea: return "Deep sea"
         }
     }
 
@@ -52,6 +66,8 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sky: return "기분이 흐린 보라에서 맑은 파랑으로 흘러요."
         case .sprout: return "기분이 보라에서 풋사과 초록으로 흘러요."
         case .sunset: return "기분이 노을 보라에서 살구빛으로 흘러요."
+        case .dawn: return "기분이 장미빛에서 라일락으로 흘러요."
+        case .sea: return "기분이 남빛에서 청록으로 흘러요."
         }
     }
 
@@ -60,6 +76,8 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sky: return "Mood flows from hazy violet to clear blue."
         case .sprout: return "Mood flows from violet to fresh green."
         case .sunset: return "Mood flows from dusk violet to apricot."
+        case .dawn: return "Mood flows from rose to lilac."
+        case .sea: return "Mood flows from indigo to teal."
         }
     }
 
@@ -150,90 +168,120 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sky: return "#C9DCE4"
             case .sprout: return "#D5E4C9"
             case .sunset: return "#EFD9C2"
+            case .dawn: return "#CAC9E4"
+            case .sea: return "#C2E1CE"
             }
         case .sageInk:
             switch theme {
             case .sky: return "#2F5B66"
             case .sprout: return "#55703F"
             case .sunset: return "#8A6238"
+            case .dawn: return "#2F3266"
+            case .sea: return "#2C5F3A"
             }
         case .lav:
             switch theme {
             case .sky: return "#C5D3EC"
             case .sprout: return "#DCEAE0"
             case .sunset: return "#E8DBEF"
+            case .dawn: return "#D4C5EC"
+            case .sea: return "#BDE9DD"
             }
         case .lavInk:
             switch theme {
             case .sky: return "#2F4A72"
             case .sprout: return "#4F7259"
             case .sunset: return "#5F4B82"
+            case .dawn: return "#462F72"
+            case .sea: return "#2C6B57"
             }
         case .butter:
             switch theme {
             case .sky: return "#DBE2EF"
             case .sprout: return "#F7ECD9"
             case .sunset: return "#FFE8CD"
+            case .dawn: return "#E3DBEF"
+            case .sea: return "#D4ECE5"
             }
         case .butterInk:
             switch theme {
             case .sky: return "#33587E"
             case .sprout: return "#8A6A2F"
             case .sunset: return "#9A6B2A"
+            case .dawn: return "#46337E"
+            case .sea: return "#30775A"
             }
         case .peach:
             switch theme {
             case .sky: return "#E8E2DA"
             case .sprout: return "#F1E4DC"
             case .sunset: return "#F5DCD3"
+            case .dawn: return "#E4E8DA"
+            case .sea: return "#E4D4D9"
             }
         case .peachInk:
             switch theme {
             case .sky: return "#6E6254"
             case .sprout: return "#8A5A45"
             case .sunset: return "#8A5A45"
+            case .dawn: return "#666E54"
+            case .sea: return "#685059"
             }
         case .mood1:
             switch theme {
             case .sky: return "#A183C2"
             case .sprout: return "#C0AECB"
             case .sunset: return "#B9A0C9"
+            case .dawn: return "#C283B4"
+            case .sea: return "#7C99BF"
             }
         case .mood2:
             switch theme {
             case .sky: return "#BBA4CE"
             case .sprout: return "#D2C5DA"
             case .sunset: return "#CDB8D8"
+            case .dawn: return "#CEA4C2"
+            case .sea: return "#9DAECA"
             }
         case .mood3:
             switch theme {
             case .sky: return "#D4C8DE"
             case .sprout: return "#E2DCD2"
             case .sunset: return "#E4D8E3"
+            case .dawn: return "#DEC8D7"
+            case .sea: return "#C2CBDA"
             }
         case .mood4:
             switch theme {
             case .sky: return "#E3E4E6"
             case .sprout: return "#E9E8E3"
             case .sunset: return "#EDEAE4"
+            case .dawn: return "#E4E3E6"
+            case .sea: return "#DEE1E0"
             }
         case .mood5:
             switch theme {
             case .sky: return "#BCD7E8"
             case .sprout: return "#D5E4C9"
             case .sunset: return "#F4D9BF"
+            case .dawn: return "#C2BCE8"
+            case .sea: return "#B4E5CB"
             }
         case .mood6:
             switch theme {
             case .sky: return "#8FBEDF"
             case .sprout: return "#B7D2A2"
             case .sunset: return "#EFC29B"
+            case .dawn: return "#9C8FDF"
+            case .sea: return "#87DDB2"
             }
         case .mood7:
             switch theme {
             case .sky: return "#4E97D1"
             case .sprout: return "#8FB877"
             case .sunset: return "#E3A272"
+            case .dawn: return "#674ED1"
+            case .sea: return "#46CF8E"
             }
         }
     }
@@ -254,66 +302,88 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sky: return "#21333B"
             case .sprout: return "#2A3524"
             case .sunset: return "#3B3222"
+            case .dawn: return "#23213B"
+            case .sea: return "#1D3426"
             }
         case .sageInk:
             switch theme {
             case .sky: return "#9CC6D8"
             case .sprout: return "#B4D19E"
             case .sunset: return "#E0C9A0"
+            case .dawn: return "#9F9CD8"
+            case .sea: return "#95D5AD"
             }
         case .lav:
             switch theme {
             case .sky: return "#232C41"
             case .sprout: return "#24332A"
             case .sunset: return "#322B41"
+            case .dawn: return "#302341"
+            case .sea: return "#1F3A35"
             }
         case .lavInk:
             switch theme {
             case .sky: return "#B4C8EE"
             case .sprout: return "#A8CBB4"
             case .sunset: return "#C4B0E0"
+            case .dawn: return "#CBB4EE"
+            case .sea: return "#ACECDB"
             }
         case .butter:
             switch theme {
             case .sky: return "#26313F"
             case .sprout: return "#362E1E"
             case .sunset: return "#3B2F1E"
+            case .dawn: return "#2E263F"
+            case .sea: return "#223931"
             }
         case .butterInk:
             switch theme {
             case .sky: return "#A8C4E8"
             case .sprout: return "#E0C48C"
             case .sunset: return "#E8C48C"
+            case .dawn: return "#BCA8E8"
+            case .sea: return "#A0E6CD"
             }
         case .peach:
             switch theme {
             case .sky: return "#33302B"
             case .sprout: return "#382E28"
             case .sunset: return "#3B2B24"
+            case .dawn: return "#30332B"
+            case .sea: return "#2D2628"
             }
         case .peachInk:
             switch theme {
             case .sky: return "#CBC0AE"
             case .sprout: return "#E0B9A3"
             case .sunset: return "#E8B49B"
+            case .dawn: return "#C0CBAE"
+            case .sea: return "#C7A8B1"
             }
         case .mood1:
             switch theme {
             case .sky: return "#8A6BB0"
             case .sprout: return "#937FA8"
             case .sunset: return "#8E77A4"
+            case .dawn: return "#B06BA2"
+            case .sea: return "#6486AC"
             }
         case .mood2:
             switch theme {
             case .sky: return "#9A82BC"
             case .sprout: return "#A392B6"
             case .sunset: return "#9E88B2"
+            case .dawn: return "#BC82B2"
+            case .sea: return "#7B9AB8"
             }
         case .mood3:
             switch theme {
             case .sky: return "#9C93AE"
             case .sprout: return "#999489"
             case .sunset: return "#968A92"
+            case .dawn: return "#AE93AC"
+            case .sea: return "#8D9EAA"
             }
         case .mood4: return "#8E8F8A"
         case .mood5:
@@ -321,18 +391,24 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sky: return "#6E93B0"
             case .sprout: return "#83A26E"
             case .sunset: return "#AA8A5C"
+            case .dawn: return "#7A6EB0"
+            case .sea: return "#67AC8B"
             }
         case .mood6:
             switch theme {
             case .sky: return "#5A94C4"
             case .sprout: return "#74A85A"
             case .sunset: return "#B28352"
+            case .dawn: return "#6F5AC4"
+            case .sea: return "#52C18E"
             }
         case .mood7:
             switch theme {
             case .sky: return "#4A88C8"
             case .sprout: return "#62984B"
             case .sunset: return "#BA7846"
+            case .dawn: return "#6A4AC8"
+            case .sea: return "#42C690"
             }
         }
     }

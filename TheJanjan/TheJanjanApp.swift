@@ -89,6 +89,9 @@ struct TheJanjanApp: App {
                     // 만료된 채로 Pro 화면이 열려 있게 된다.
                     if phase == .active {
                         Task { _ = await proStore.refreshEntitlements() }
+                        // 되물음(Pro)은 하루치만 걸려 있다 - 날이 바뀌었을 수
+                        // 있으니 앱이 앞으로 나올 때마다 오늘치를 다시 깐다.
+                        Task { await ReminderPlanner.reschedule(using: modelContainer.mainContext) }
                     }
                 }
         }

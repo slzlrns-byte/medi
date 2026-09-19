@@ -79,6 +79,10 @@ struct DiaryView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            // 다른 곳을 누르거나 스크롤하면 키보드가 내려간다(사용자 요청 2026-09-19).
+            // simultaneousGesture 라 버튼·칩 탭은 그대로 동작한다.
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { isEditingText = false })
             .navigationTitle(t("기록", "Journal"))
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -666,6 +670,8 @@ private struct SymptomEntrySheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { isEditingNote = false })
             .navigationTitle(t("증상 남기기", "Log a symptom"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

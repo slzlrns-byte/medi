@@ -18,17 +18,21 @@ enum ReminderPlanner {
         let schedules = (try? context.fetch(FetchDescriptor<ScheduleRecord>()))?.map(\.core) ?? []
 
         let reminders = DayPlan.weeklyReminders(schedules: schedules, medications: medications)
+        let slotReminders = reminders.map { reminder in
+            NotificationManager.SlotReminder(
+                slot: reminder.slot,
+                time: reminder.time,
+                weekdays: [reminder.weekday],
+                medicationIDs: reminder.medicationIDs,
+                medicationNames: reminder.medicationNames
+            )
+        }
 
-        await NotificationManager.shared.rescheduleDoseReminders(
-            reminders.map { reminder in
-                NotificationManager.SlotReminder(
-                    slot: reminder.slot,
-                    time: reminder.time,
-                    weekdays: [reminder.weekday],
-                    medicationIDs: reminder.medicationIDs,
-                    medicationNames: reminder.medicationNames
-                )
-            }
+        await NotificationManager.shared.rescheduleDoseReminders(slotReminders)
+        // 되물음(Pro)은 하루치만 - 같은 재료로 오늘 남은 시간대에 건다.
+        await NotificationManager.shared.rescheduleTodayFollowUps(
+            slotReminders,
+            isPro: UserDefaults.standard.bool(forKey: ProStore.cachedProKey)
         )
 
         await rescheduleAppointments(using: context)

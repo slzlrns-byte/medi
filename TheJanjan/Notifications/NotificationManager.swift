@@ -21,6 +21,14 @@ enum DoseNotification {
     /// 재알림은 30분 뒤 딱 한 번. 그 뒤로는 홈 화면에 조용히 남긴다.
     static let snoozeInterval: TimeInterval = 30 * 60
 
+    // 똑똑한 재알림(Pro) - 답이 없으면 몇 분 간격으로 몇 번 더 물을지.
+    // 설정과 예약이 같은 키를 봐야 해서 여기 둔다. 분이 0 이면 꺼진 것이다.
+    static let followUpMinutesKey = "janjan.notifications.followUpMinutes"
+    static let followUpCountKey = "janjan.notifications.followUpCount"
+    static let followUpMinuteChoices = [10, 20, 30]
+    static let followUpCountChoices = [1, 2, 3]
+    static let followUpIDPrefix = "dosefu-"
+
     /// 알림 응답에서 필요한 것만 뽑아 낸 값. 액터 경계를 건너야 해서 Sendable 이다.
     struct ActionPayload: Sendable {
         let actionIdentifier: String
@@ -180,6 +188,75 @@ final class NotificationManager: NSObject {
             content: content,
             trigger: trigger
         )
+    }
+
+    /// 오늘 남은 시간대의 되물음(Pro 똑똑한 재알림)을 다시 깐다.
+    ///
+    /// 하루치만 미리 건다 - iOS 의 예약 한도(64) 안에 머물고, 날이 바뀌면
+    /// 앱이 열리거나 기록이 남을 때 다시 깐다. 시간대에 답이 남으면
+    /// `clearFollowUps` 가 그 시간대 것을 걷는다.
+    func rescheduleTodayFollowUps(
+        _ reminders: [SlotReminder],
+        isPro: Bool,
+        now: Date = Date()
+    ) async {
+        let pending = await center.pendingNotificationRequests()
+        let ourIDs = pending.map(\.identifier).filter { $0.hasPrefix(DoseNotification.followUpIDPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ourIDs)
+
+        let defaults = UserDefaults.standard
+        let minutes = defaults.integer(forKey: DoseNotification.followUpMinutesKey)
+        let storedCount = defaults.object(forKey: DoseNotification.followUpCountKey) as? Int ?? 2
+        let count = max(1, min(storedCount, 3))
+        guard isPro, minutes > 0 else { return }
+
+        let calendar = Calendar.current
+        guard let today = Weekday(rawValue: calendar.component(.weekday, from: now)) else { return }
+
+        for reminder in reminders
+        where reminder.weekdays.contains(today) && !reminder.medicationIDs.isEmpty {
+            var components = calendar.dateComponents([.year, .month, .day], from: now)
+            components.hour = reminder.time.hour
+            components.minute = reminder.time.minute
+            guard let slotDate = calendar.date(from: components) else { continue }
+
+            for n in 1...count {
+                let fireAt = slotDate.addingTimeInterval(TimeInterval(minutes * 60 * n))
+                guard fireAt > now else { continue }
+
+                let content = UNMutableNotificationContent()
+                content.title = titleText(for: reminder.slot)
+                content.body = t("아직 기록이 없어요.", "Still not logged.")
+                content.sound = .default
+                content.categoryIdentifier = DoseNotification.categoryID
+                content.userInfo = [
+                    DoseNotification.slotKeyField: reminder.slot.storageKey,
+                    DoseNotification.medicationIDsField: reminder.medicationIDs.map(\.uuidString)
+                ]
+
+                let fireComponents = calendar.dateComponents(
+                    [.year, .month, .day, .hour, .minute],
+                    from: fireAt
+                )
+                let request = UNNotificationRequest(
+                    identifier: "\(DoseNotification.followUpIDPrefix)\(reminder.slot.storageKey)-\(n)",
+                    content: content,
+                    trigger: UNCalendarNotificationTrigger(dateMatching: fireComponents, repeats: false)
+                )
+                do {
+                    try await center.add(request)
+                } catch {
+                    logger.error("되물음 예약 실패: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    /// 이 시간대에 답이 남았다 - 걸려 있던 되물음과 이미 떠 있는 되물음을 걷는다.
+    func clearFollowUps(slotKey: String) {
+        let ids = (1...3).map { "\(DoseNotification.followUpIDPrefix)\(slotKey)-\($0)" }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        center.removeDeliveredNotifications(withIdentifiers: ids)
     }
 
     /// "아침 약" / "Morning meds". " 약" 을 그대로 붙이면 영어에서 어색해

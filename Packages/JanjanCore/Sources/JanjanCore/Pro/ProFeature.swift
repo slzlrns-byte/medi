@@ -11,6 +11,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case pharmacyScan
     case pillFinder
     case patternView
+    case smartFollowUp
+    case proThemes
     case runOutForecast
     case hideNames
     case doseChangeCompare
@@ -25,6 +27,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .pharmacyScan: return "약봉투 스캔"
         case .pillFinder: return "약 모양으로 찾기"
         case .patternView: return "패턴 보기"
+        case .smartFollowUp: return "똑똑한 재알림"
+        case .proThemes: return "Pro 테마"
         case .runOutForecast: return "소진 예측"
         case .hideNames: return "약 이름 가리기"
         case .doseChangeCompare: return "용량 변경 전후 비교"
@@ -41,6 +45,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .pharmacyScan: return "Pharmacy bag scan"
         case .pillFinder: return "Find by pill appearance"
         case .patternView: return "Pattern view"
+        case .smartFollowUp: return "Smart re-reminders"
+        case .proThemes: return "Pro themes"
         case .runOutForecast: return "Run-out forecast"
         case .hideNames: return "Hide medication names"
         case .doseChangeCompare: return "Dose change comparison"
@@ -78,9 +84,11 @@ public enum ProFeature: String, CaseIterable, Sendable {
         .pharmacyScan,
         .pillFinder,
         .patternView,
+        .smartFollowUp,
         .runOutForecast,
         .doseChangeCompare,
         .hideNames,
+        .proThemes,
         .watchApp
     ]
 }
