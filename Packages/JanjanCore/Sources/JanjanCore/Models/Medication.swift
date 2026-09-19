@@ -122,6 +122,23 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
     ///
     /// "기록 없이 지나간 시간대" 가 이걸 본다 - 중단하기 **전**의 빈 시간대는
     /// 여전히 사실이므로 계속 들되, 중단한 뒤의 침묵은 빠트림이 아니다.
+    /// 이 약을 등록한 시각.
+    ///
+    /// **계획을 과거로 소급하지 않기 위해 필요하다.** DayPlan 은 지난 날의
+    /// 계획을 저장하지 않고 매번 지금의 스케줄로 다시 만든다. 등록 시각이
+    /// 없으면 오늘 넣은 약이 지난 한 달 내내 있었던 것이 되고, 오늘 화면은
+    /// 등록하자마자 "기록 없이 지나간 시간대 6번" 을 띄운다. 그 자리에서
+    /// "기억나지 않아요" 를 누르면 존재한 적 없는 처방의 미기록 사건이
+    /// 저장되고, 그것이 진료 리포트의 복약률에 섞인다(QA 2026-09-19).
+    ///
+    /// 저장소에는 처음부터 있던 값인데 core 모델로 넘어오지 않고 버려지고
+    /// 있었다 - 이어 주기만 하면 된다.
+    ///
+    /// **옵셔널인 이유**: 저장소를 거치지 않고 손으로 만든 값(테스트·예시)은
+    /// 언제부터였는지 모른다. 모르는 것을 "지금부터" 로 단정하면 그 값으로
+    /// 만든 과거 계획이 통째로 비어 버린다. 모르면 막지 않는다.
+    public var createdAt: Date?
+
     public var stoppedAt: Date?
     /// 가장 최근 중단 구간이 끝난(다시 복용을 시작한) 시각.
     /// `[stoppedAt, resumedAt)` 사이의 빈 시간대는 빠트림이 아니다.
@@ -140,7 +157,8 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         catalogID: String? = nil,
         purposeLine: String = "",
         stoppedAt: Date? = nil,
-        resumedAt: Date? = nil
+        resumedAt: Date? = nil,
+        createdAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -153,6 +171,7 @@ public struct Medication: Identifiable, Hashable, Codable, Sendable {
         self.purposeLine = purposeLine
         self.stoppedAt = stoppedAt
         self.resumedAt = resumedAt
+        self.createdAt = createdAt
     }
 
     /// "쿠에티아핀 25mg" 처럼 한 줄로 합친 표시용 문자열.

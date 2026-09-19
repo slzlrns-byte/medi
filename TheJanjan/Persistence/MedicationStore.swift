@@ -104,6 +104,18 @@ enum MedicationStore {
         save("약 수정", in: context)
     }
 
+    /// 이 날짜보다 나중에 적용된 용량 변경이 이미 있는가.
+    private static func hasLaterChange(
+        than changedAt: Date,
+        for medicationID: UUID,
+        in context: ModelContext
+    ) -> Bool {
+        let descriptor = FetchDescriptor<DoseChangeRecord>(
+            predicate: #Predicate { $0.medicationID == medicationID }
+        )
+        return ((try? context.fetch(descriptor)) ?? []).contains { $0.changedAt > changedAt }
+    }
+
     /// 옮겨진 시간대의 지난 기록도 함께 옮긴다.
     ///
     /// 이것을 하지 않으면 직접 넣은 시간대의 시각을 고치는 순간, 그 시간대에
@@ -161,9 +173,16 @@ enum MedicationStore {
         let trimmed = newStrengthText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let toText = trimmed.isEmpty ? nil : trimmed
 
-        if let toText { record.strengthText = toText }
+        // **더 나중의 변경이 이미 있으면 지금 값을 앞으로 당기지 않는다.**
+        // 9/10 에 20mg 으로 바꿔 둔 뒤 9/3 에 15mg 이었다는 걸 뒤늦게 적으면,
+        // 순서를 안 보면 현재 표기가 15mg 으로 되돌아간다 - 재고와 소진
+        // 예측까지 옛 개수로 계산된다(QA 2026-09-19). 이력에는 남기되
+        // 지금 값은 건드리지 않는다.
+        let applies = !hasLaterChange(than: changedAt, for: medicationID, in: context)
 
-        if let dose = newDosePerIntake {
+        if applies, let toText { record.strengthText = toText }
+
+        if applies, let dose = newDosePerIntake {
             let descriptor = FetchDescriptor<ScheduleRecord>(
                 predicate: #Predicate { $0.medicationID == medicationID }
             )

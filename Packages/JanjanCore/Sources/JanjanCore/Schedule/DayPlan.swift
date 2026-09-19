@@ -109,8 +109,17 @@ public enum DayPlan {
         }
 
         let todaysSchedules = schedules.filter { schedule in
-            activeMedications[schedule.medicationID] != nil
-                && schedule.isActive(on: day, calendar: calendar)
+            guard let medication = activeMedications[schedule.medicationID] else { return false }
+            // **약이 아직 없던 날에는 그 약의 계획도 없다**(QA 2026-09-19).
+            // 계획은 저장하지 않고 매번 지금의 스케줄로 다시 만드는 구조라,
+            // 이 가드가 없으면 오늘 등록한 약이 지난 한 달 내내 있었던 것이
+            // 되고 "기록 없이 지나간 시간대" 가 등록하자마자 쏟아진다.
+            // 시간대를 나중에 더한 경우는 Schedule.startDate 가 막는다.
+            if let createdAt = medication.createdAt,
+               calendar.startOfDay(for: createdAt) > calendar.startOfDay(for: day) {
+                return false
+            }
+            return schedule.isActive(on: day, calendar: calendar)
         }
 
         // 그 날의 정기 예정분 사건만 미리 추려 둔다. 스케줄마다 전체를 훑지 않기 위해서다.

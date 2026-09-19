@@ -111,7 +111,10 @@ struct SettingsView: View {
             .foregroundStyle(pro.isLoading ? Color.muted : Color.ink)
             .disabled(pro.isLoading)
 
-            if pro.isPro, let url = URL(string: ProProduct.manageSubscriptionsURLString) {
+            // 평생 이용권 구매자에게는 보이지 않는다 - 해지할 구독이 없어
+            // 애플 화면에서 빈 목록을 만난다(QA 2026-09-19).
+            if pro.isPro, !pro.hasLifetime,
+               let url = URL(string: ProProduct.manageSubscriptionsURLString) {
                 Link(t("구독 관리", "Manage subscription"), destination: url)
                     .foregroundStyle(Color.ink)
             }
@@ -274,7 +277,7 @@ struct SettingsView: View {
             )
         default:
             return t(
-                "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다. 진료 알림은 처방에 다음 진료일을 적어 두면 갑니다.",
+                "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보여요. 진료 알림은 진료 기록에 다음 진료일을 적어 두면 가요.",
                 "Turning on name hiding shows only a count in the notification, like \"2 bedtime medications.\" Appointment reminders go out once a prescription has a next visit date."
             )
         }
@@ -355,17 +358,17 @@ struct SettingsView: View {
         if lock.isEnabled {
             guard lock.canRecoverWithDevice else {
                 return t(
-                    "앱을 열 때 네 자리 번호를 누릅니다. 이 기기에는 기기 암호가 없어서, 번호를 잊으면 기록을 열 방법이 없습니다.",
+                    "앱을 열 때 네 자리 번호를 눌러요. 이 기기에는 기기 암호가 없어서, 번호를 잊으면 기록을 열 방법이 없어요.",
                     "You enter your 4-digit code to open the app. This device has no passcode set, so if you forget your code, there is no way to open your records."
                 )
             }
             return t(
-                "앱을 열 때 네 자리 번호를 누릅니다. 번호를 잊으면 Face ID · Touch ID 또는 기기 암호로 되찾을 수 있습니다.",
+                "앱을 열 때 네 자리 번호를 눌러요. 번호를 잊으면 Face ID · Touch ID 또는 기기 암호로 되찾을 수 있어요.",
                 "You enter your 4-digit code to open the app. If you forget it, you can recover with Face ID, Touch ID, or your device passcode."
             )
         }
         return t(
-            "켜면 앱을 열 때 네 자리 번호를 누릅니다. 번호는 이 기기에만 저장되고 다른 기기로 따라가지 않습니다.",
+            "켜면 앱을 열 때 네 자리 번호를 눌러요. 번호는 이 기기에만 저장되고 다른 기기로 따라가지 않아요.",
             "Turning this on requires a 4-digit code to open the app. The code is stored only on this device and does not carry over to others."
         )
     }
@@ -401,11 +404,11 @@ struct SettingsView: View {
 
     private var privacyFooterKo: String {
         let hideNamesCaption = t(
-            "켜면 화면의 약 이름이 가려지고, 가려진 자리를 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실립니다 - 의사에게 보여 주는 종이라서요.",
+            "켜면 화면의 약 이름이 가려지고, 가려진 자리를 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실려요 - 의사에게 보여 주는 종이라서요.",
             "When this is on, medication names on screen are hidden, and tapping a hidden name shows it only in that spot. Names still print in full on the visit PDF, since that page is meant to be shown to your doctor."
         )
         let storageCaption = t(
-            "로그인도 서버도 없습니다. 기록은 이 기기와 사용자의 iCloud에만 있습니다.",
+            "로그인도 서버도 없어요. 기록은 이 기기와 내 iCloud 에만 있어요.",
             "There is no sign-in and no server. Your records live only on this device and in your own iCloud."
         )
         return "\(hideNamesCaption)\n\n\(storageCaption)"
@@ -482,9 +485,9 @@ struct SettingsView: View {
     /// iCloud 를 쓰는 중이면 삭제가 동기화를 타고 다른 기기에서도 사라진다.
     /// 그 사실을 누르기 전에 말해 준다.
     private var deleteWarningKo: String {
-        let base = t("되돌릴 수 없습니다. 기록·약·설정이 모두 사라집니다.", "This cannot be undone. Records, medications, and settings will all be gone.")
+        let base = t("되돌릴 수 없어요. 기록·약·설정이 모두 사라져요.", "This cannot be undone. Records, medications, and settings will all be gone.")
         guard JanjanModelContainer.activeStorage == .cloudKit else { return base }
-        return base + " " + t("iCloud 로 연결된 다른 기기에서도 사라집니다.", "It will also disappear from other devices connected through iCloud.")
+        return base + " " + t("iCloud 로 연결된 다른 기기에서도 사라져요.", "It will also disappear from other devices connected through iCloud.")
     }
 
     /// 저장된 것을 전부 지운다.

@@ -23,7 +23,12 @@ enum DemoSeed {
         MedicationStore.deleteEverything(in: context)
 
         for medication in SampleData.medications {
-            context.insert(MedicationRecord.make(from: medication))
+            let record = MedicationRecord.make(from: medication)
+            // 예시 기록은 지난 넉 주를 담는다. 등록 시각이 "지금" 이면 DayPlan 이
+            // 그 앞의 날들을 이 약이 없던 날로 보고 통째로 비운다 - 스크린샷의
+            // 복약 흐름과 패턴이 사라진다(2026-09-19).
+            record.createdAt = Calendar.current.date(byAdding: .day, value: -60, to: now) ?? now
+            context.insert(record)
         }
         for schedule in SampleData.schedules {
             context.insert(ScheduleRecord.make(from: schedule))

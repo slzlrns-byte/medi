@@ -32,6 +32,8 @@ struct ReportView: View {
 
     @State private var exportURL: ExportedFile?
     @State private var isExporting = false
+    /// 내보내기가 실패한 이유. 조용히 끝나면 사용자는 앱이 고장 난 줄 안다.
+    @State private var exportError: String?
     /// 무료 내보내기에 붙는 보상형 광고. Pro 면 만들기만 하고 쓰지 않는다.
     @StateObject private var rewarded = RewardedAdLoader()
     /// 광고를 도중에 닫았을 때 조용히 아무 일도 안 일어나면 고장으로 보인다.
@@ -206,7 +208,7 @@ struct ReportView: View {
                         .foregroundStyle(Color.muted)
                 }
 
-                Text(t("건너뜀도 정상적인 선택으로 함께 셉니다.", "Skipped doses are counted too, as a normal choice."))
+                Text(t("건너뜀도 정상적인 선택으로 함께 세요.", "Skipped doses are counted too, as a normal choice."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
@@ -296,12 +298,19 @@ struct ReportView: View {
                 .disabled(isExporting)
 
                 Text(t(
-                    "만들어진 파일은 사용자가 직접 공유할 때만 기기 밖으로 나갑니다.",
+                    "만든 파일은 직접 공유할 때만 기기 밖으로 나가요.",
                     "The file leaves this device only when you share it yourself."
                 ))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if let exportError {
+                    Text(exportError)
+                        .janjanBody(13)
+                        .foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if !pro.isPro {
                     Text(didSkipAd
@@ -389,7 +398,7 @@ struct ReportView: View {
     private func export() {
         guard !isExporting else { return }
         isExporting = true
-        defer { isExporting = false }
+        exportError = nil
 
         let content = ReportComposer.make(
             endingAt: today,
@@ -410,7 +419,20 @@ struct ReportView: View {
             language: JanjanLanguage.current
         )
 
-        if let url = ReportPDF.write(content) {
+        // 한 박자 넘긴 뒤에 그린다. 동기로 이어 붙이면 isExporting 이 true 인
+        // 화면이 한 번도 그려지지 않아, "만드는 중" 표시가 눈에 보이지 않았다
+        // (QA 2026-09-19). 기록이 많으면 그 사이 버튼이 눌리는 것처럼 보인다.
+        Task { @MainActor in
+            defer { isExporting = false }
+            guard let url = ReportPDF.write(content) else {
+                // 저장 공간이 없을 때가 대부분이다. 광고까지 보고 아무 말도
+                // 없이 끝나면 사용자는 앱이 고장 난 줄 안다.
+                exportError = t(
+                    "PDF 를 만들지 못했어요. 기기에 저장 공간이 남아 있는지 확인하고 다시 시도해 주세요.",
+                    "Couldn't make the PDF. Check that your device has free space and try again."
+                )
+                return
+            }
             exportURL = ExportedFile(url: url)
         }
     }

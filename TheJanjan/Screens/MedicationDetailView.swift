@@ -908,7 +908,7 @@ private struct DoseChangeCompareSheet: View {
 
                     JanjanCard {
                         Text(t(
-                            "변경 전 2주와 후 2주의 기록을 그대로 놓았습니다. 해석은 진료에서 함께 하시면 됩니다.",
+                            "변경 전 2주와 후 2주의 기록을 그대로 놓았어요. 해석은 진료에서 함께 하시면 돼요.",
                             "The two weeks before and after are laid out as recorded. You can go over what it means together at your visit."
                         ))
                         .janjanBody(13)
@@ -920,7 +920,7 @@ private struct DoseChangeCompareSheet: View {
                         if comparison.hasAnything {
                             compareTable
                         } else {
-                            Text(t("이 구간에는 아직 기록이 없습니다.", "There are no records in this period yet."))
+                            Text(t("이 구간에는 아직 기록이 없어요.", "There are no records in this period yet."))
                                 .janjanBody(15)
                                 .foregroundStyle(Color.muted)
                         }

@@ -71,6 +71,9 @@ final class MedicationRecord {
             note: core.note,
             catalogID: core.catalogID,
             purposeLine: core.purposeLine,
+            // 저장할 때는 반드시 값을 갖는다. 저장소를 거친 뒤로는
+            // "언제부터인지 모르는 약" 이 없다.
+            createdAt: core.createdAt ?? Date(),
             stoppedAt: core.stoppedAt,
             resumedAt: core.resumedAt
         )
@@ -88,7 +91,8 @@ final class MedicationRecord {
             catalogID: catalogID,
             purposeLine: purposeLine,
             stoppedAt: stoppedAt,
-            resumedAt: resumedAt
+            resumedAt: resumedAt,
+            createdAt: createdAt
         )
     }
 }

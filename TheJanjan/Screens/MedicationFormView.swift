@@ -91,6 +91,10 @@ struct MedicationFormView: View {
         /// DatePicker 가 Date 만 다뤄서 시·분을 Date 에 얹어 들고 있는다.
         var time: Date
         var dose: Decimal
+        /// 고치기로 열 때 이 줄이 갖고 있던 시작일. 그대로 돌려준다 -
+        /// 고치기 한 번에 모든 줄의 시작일을 오늘로 바꾸면 지난 복약률이
+        /// 통째로 다시 계산된다.
+        var originalStartDate: Date?
         /// 고치기로 열 때 이 줄이 갖고 있던 저장 키. 새로 만드는 줄이면 nil.
         ///
         /// 직접 넣은 시간대는 **시각이 곧 키**다("custom-14:30"). 고치기에서
@@ -139,6 +143,7 @@ struct MedicationFormView: View {
                     rows[index].isOn = true
                     rows[index].time = time
                     rows[index].dose = schedule.dosePerIntake
+                    rows[index].originalStartDate = schedule.startDate
                     rows[index].originalSlotKey = schedule.slot.storageKey
                 } else {
                     extras.append(SlotDraft(
@@ -146,6 +151,7 @@ struct MedicationFormView: View {
                         isOn: true,
                         time: time,
                         dose: schedule.dosePerIntake,
+                        originalStartDate: schedule.startDate,
                         originalSlotKey: schedule.slot.storageKey
                     ))
                 }
@@ -469,6 +475,11 @@ struct MedicationFormView: View {
     // MARK: - 저장
 
     /// 켜 둔 줄만 스케줄이 된다. 필요시 약은 시간대를 갖지 않는다.
+    ///
+    /// 고치면서 **새로 켠 시간대에는 오늘을 시작일로 박는다**(QA 2026-09-19).
+    /// 아침만 먹던 약에 저녁을 더했을 때, 시작일이 없으면 지난 한 달의 저녁이
+    /// 전부 "빠트린 것" 으로 되살아난다 - 그 시간대는 그때 존재하지 않았다.
+    /// 원래 있던 줄은 갖고 있던 시작일을 그대로 돌려준다.
     private func makeSchedules(for medicationID: UUID) -> [Schedule] {
         (kind == .scheduled ? drafts.filter(\.isOn) : []).map { draft in
             Schedule(
@@ -476,9 +487,20 @@ struct MedicationFormView: View {
                 slot: draft.slot,
                 timeOfDay: draft.timeOfDay,
                 weekdays: weekdays,
-                dosePerIntake: draft.dose
+                dosePerIntake: draft.dose,
+                startDate: startDate(for: draft)
             )
         }
+    }
+
+    private func startDate(for draft: SlotDraft) -> Date? {
+        if let original = draft.originalStartDate { return original }
+        // 원래 있던 줄(키를 갖고 열린 줄)은 시작일이 없던 그대로 둔다 -
+        // 약의 등록 시각이 이미 경계를 잡아 준다.
+        if draft.originalSlotKey != nil { return nil }
+        // 새로 만드는 약의 줄도 마찬가지다. 고치면서 더한 줄만 오늘부터다.
+        guard isEditing else { return nil }
+        return Calendar.current.startOfDay(for: Date())
     }
 
     /// 고치면서 저장 키가 옮겨진 시간대. 지난 기록의 키도 같이 옮겨야 한다.

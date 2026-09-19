@@ -73,6 +73,10 @@ struct PaywallView: View {
                         foreground: .ink,
                         diameter: 36
                     )
+                    // 동그라미는 36 이지만 손가락 자리는 44 다(QA 2026-09-19).
+                    // 하필 무료 사용자가 이 화면에서 제일 먼저 찾는 버튼이다.
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(t("닫기", "Close")))
@@ -354,7 +358,12 @@ struct PaywallView: View {
                 externalLink(t("개인정보처리방침", "Privacy Policy"), Janjan.privacyPolicyURLString)
             }
 
-            externalLink(t("구독 관리", "Manage subscription"), ProProduct.manageSubscriptionsURLString)
+            // 평생 이용권에는 기간도 해지도 없다. 여기로 보내면 "구독 없음"
+            // 빈 화면을 만난다 - 위 alreadyProCard 는 그것을 알고 문구를
+            // 피해 썼는데 이 줄만 남아 있었다(QA 2026-09-19).
+            if !pro.hasLifetime {
+                externalLink(t("구독 관리", "Manage subscription"), ProProduct.manageSubscriptionsURLString)
+            }
         }
         .janjanBody(12)
         .foregroundStyle(Color.ink2)
