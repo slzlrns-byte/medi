@@ -50,12 +50,16 @@
 - PDF 한 장으로 나와요. 필요하다면 진료실에서 그대로 보여주면 돼요.
 - 다음 진료까지 며칠 남았는지 늘 보여요.
 
-● Pro 구독
+● Pro
+- 패턴 보기: 최근 4주의 기분, 복약, 수면을 같은 눈금에 놓고 봐요.
+- 똑똑한 재알림: 기록이 없으면 정한 간격으로 다시 물어봐요.
 - 약봉투 스캔: 사진 한 장으로 약 이름을 읽어 등록해요.
 - 약 모양으로 찾기: 모양, 색, 각인으로 검색해요. 식약처 낱알식별 정보 기준이에요.
 - 소진 예측: 진료 전에 약이 모자라는지 미리 알 수 있어요.
-- 용량 변경 전후 비교: 바뀐 앞뒤 2주를 나란히 봐요.
-- 약 이름 가리기: 필요한경우 가려 두고 필요할 때만 눌러서 볼 수 있어요.
+- 용량 변경 전후 비교: 바뀐 앞뒤 2주와 바꾼 뒤의 흐름을 나란히 봐요.
+- 지난 진료 기록: 회차별 처방 이력을 모두 봐요. 바로 이전 회차까지는 무료예요.
+- 약 이름 가리기: 필요한 경우 가려 두고 필요할 때만 눌러서 볼 수 있어요.
+- Pro 테마: 두 가지 색을 더 골라요.
 - Apple Watch: 손목에서 기록하고 알림에 바로 응답해요.
 
 ● 기록은 내 것
@@ -63,7 +67,7 @@
 - 개발자는 어떤 데이터도 수집하지 않아요.
 - 보안을 위해 Face ID나 암호로 잠글 수 있어요.
 
-이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독입니다(월간 또는 연간, 연간은 7일 무료 체험). 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
+이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독(월간 또는 연간, 연간은 7일 무료 체험) 또는 평생 이용권(한 번 결제, 자동 갱신 없음)으로 열 수 있습니다. 구독 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
 ```
 
 ### 키워드 (100자 제한, 아래 85자)
@@ -123,12 +127,16 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 - It comes out as a single PDF you can show at the clinic.
 - Always see how many days are left until your next visit.
 
-● Pro subscription
+● Pro
+- Pattern view: mood, doses, and sleep from the past 4 weeks on one scale.
+- Smart re-reminders: if nothing is logged, it asks again at the interval you choose.
 - Pharmacy bag scan: register meds from one photo.
 - Find by pill appearance: search by shape, color, and imprint, based on Korean MFDS pill identification data.
 - Run-out forecast: know ahead whether your meds will last until the next visit.
-- Dose change comparison: see the two weeks before and after, side by side.
+- Dose change comparison: the two weeks before and after, and the flow since, side by side.
+- Visit history: every past prescription by visit. The most recent two stay free.
 - Hide medication names: keep them covered, reveal only when needed.
+- Pro themes: two more colors to choose from.
 - Apple Watch: log and respond to reminders from your wrist.
 
 ● Your records are yours
@@ -136,7 +144,7 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 - The developer collects no data. No login, no ads.
 - Lock the app with Face ID or a passcode.
 
-This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions. Pro is an auto-renewing subscription (monthly or yearly, with a 7-day free trial on yearly). Payment is charged to your Apple Account, renews automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
+This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions. Pro opens with an auto-renewing subscription (monthly or yearly, with a 7-day free trial on yearly) or a lifetime purchase (one-time, nothing auto-renews). Subscription payment is charged to your Apple Account, renews automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
 ```
 
 ### Keywords (100, 아래 97자)
@@ -166,3 +174,7 @@ This is the first release of The Janjan.
     작업 브랜치에서 처리방침을 고치면 main 의 docs/site/ 에도 반영해야 산다.
 - 저작권: © 2026 (개발자 이름)
 - 구독 설명(구독 그룹 로컬라이즈): "패턴 보기·똑똑한 재알림·소진 예측·약봉투 스캔·워치를 열어요."
+- **평생 이용권(비소모성 인앱 결제, ASC 에서 별도 생성 필요)**: 제품 ID `pro_lifetime`,
+  참조 이름 "Pro 평생 이용권", 가격 ₩49,000(연간의 약 2.5배 - 앵커 겸 구독 기피층 흡수),
+  표시 이름 "Pro 평생 이용권", 설명 "한 번 결제로 Pro 전부를 계속 써요. 구독이 아니에요."
+  구독 그룹이 아니라 **인앱 결제 > 비소모성** 메뉴에서 만든다. 심사 스크린샷 필요.

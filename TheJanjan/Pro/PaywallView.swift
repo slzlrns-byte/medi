@@ -18,6 +18,7 @@ struct PaywallView: View {
     enum Plan: Hashable {
         case yearly
         case monthly
+        case lifetime
     }
 
     var body: some View {
@@ -164,6 +165,16 @@ struct PaywallView: View {
                     tag: nil
                 )
             }
+            // 평생 이용권(2026-09-19 결정). 구독이 아니라는 것이 이 줄의 핵심 정보라
+            // 부제로 또박또박 말한다 - "한 번 결제" 를 크게 파는 화면은 만들지 않는다.
+            if let lifetime = pro.lifetimeProduct {
+                planCard(
+                    plan: .lifetime,
+                    title: t("평생 · \(lifetime.displayPrice)", "Lifetime · \(lifetime.displayPrice)"),
+                    subtitle: t("한 번 결제 · 구독 아님", "One-time purchase · not a subscription"),
+                    tag: nil
+                )
+            }
         }
     }
 
@@ -254,7 +265,12 @@ struct PaywallView: View {
     }
 
     private func buy() {
-        let product: Product? = selectedPlan == .yearly ? pro.yearlyProduct : pro.monthlyProduct
+        let product: Product?
+        switch selectedPlan {
+        case .yearly: product = pro.yearlyProduct
+        case .monthly: product = pro.monthlyProduct
+        case .lifetime: product = pro.lifetimeProduct
+        }
         guard let product else { return }
         Task { await pro.purchase(product) }
     }
@@ -289,6 +305,15 @@ struct PaywallView: View {
             return t(
                 "월 \(price)이 해지할 때까지 자동으로 갱신돼요. \(cancelSentence)",
                 "\(price) is billed monthly and auto-renews until cancelled. \(cancelSentence)"
+            )
+        case .lifetime:
+            guard let price = pro.lifetimeProduct?.displayPrice else {
+                return t("한 번 결제하면 계속 쓸 수 있어요. 자동 갱신이 없어요.",
+                         "Pay once and keep it. Nothing auto-renews.")
+            }
+            return t(
+                "\(price)을 한 번만 결제해요. 자동 갱신이 없어요.",
+                "\(price) is billed once. Nothing auto-renews."
             )
         }
     }

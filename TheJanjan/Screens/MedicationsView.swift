@@ -20,6 +20,7 @@ struct MedicationsView: View {
 
     @State private var isShowingAddFlow = false
     @State private var isShowingPrescription = false
+    @State private var isShowingVisitHistory = false
     @State private var pendingDeletion: Row?
 
     private var today: Date { Date() }
@@ -99,6 +100,9 @@ struct MedicationsView: View {
                             }
                         }
                 }
+            }
+            .sheet(isPresented: $isShowingVisitHistory) {
+                VisitHistoryView()
             }
             .confirmationDialog(
                 t("이 약의 기록을 모두 지울까요?", "Delete all records for this medication?"),
@@ -250,15 +254,35 @@ struct MedicationsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                WhitePillButton(title: t("처방 기록하기", "Log a prescription"), systemImage: "doc.text") {
-                    isShowingPrescription = true
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    WhitePillButton(title: t("처방 기록하기", "Log a prescription"), systemImage: "doc.text") {
+                        isShowingPrescription = true
+                    }
+                    .overlay(
+                        Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                    )
+
+                    // 남긴 진료가 있어야 여는 문을 보여 준다 - 빈 화면으로 이끌지 않는다.
+                    if hasVisitHistory {
+                        WhitePillButton(title: t("지난 진료", "Past visits"), systemImage: "clock") {
+                            isShowingVisitHistory = true
+                        }
+                        .overlay(
+                            Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                        )
+                    }
                 }
-                .overlay(
-                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                )
             }
         }
         .padding(.top, CGFloat(JanjanSpacing.s))
+    }
+
+    /// 실제로 다녀온 진료가 하나라도 있는지. VisitHistoryView 와 같은 규칙으로 센다.
+    private var hasVisitHistory: Bool {
+        prescriptionRecords.contains {
+            !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty)
+                && $0.visitDate <= today
+        }
     }
 
     private var nextVisitText: String {

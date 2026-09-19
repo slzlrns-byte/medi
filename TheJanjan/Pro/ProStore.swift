@@ -80,6 +80,9 @@ final class ProStore: ObservableObject {
 
     var yearlyProduct: Product? { product(for: ProProduct.yearly) }
     var monthlyProduct: Product? { product(for: ProProduct.monthly) }
+    /// 비소모성 평생 이용권. 구독과 같은 isPro 하나로 열린다 —
+    /// 비소모성은 만료일이 없어 currentEntitlements 에 계속 남는다.
+    var lifetimeProduct: Product? { product(for: ProProduct.lifetime) }
 
     func product(for id: String) -> Product? {
         products.first { $0.id == id }

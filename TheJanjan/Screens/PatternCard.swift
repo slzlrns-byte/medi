@@ -9,21 +9,31 @@ import JanjanCore
 struct PatternCard: View {
 
     let timeline: PatternTimeline
-    /// 무료 사용자는 흐리게 보인다. 잠금 배지와 페이월은 밖의 proGated 가 단다.
+    /// 무료 사용자에게는 최근 7일만 선명하고 그 앞은 흐리다.
+    /// 잠금 배지와 페이월은 밖의 proGated 가 단다.
+    ///
+    /// 흐림을 전부에 씌우지 않는 이유(2026-09-19 결정): "이 앱이 나를 안다" 는
+    /// 순간을 한 번은 겪어야 잠긴 3주가 궁금해진다. 인사이트를 통째로 벽 뒤에
+    /// 두면 그 순간을 경험하기 전에 떠난다는 것이 리서치의 결론이었다.
     let isLocked: Bool
+    /// 진료 준비 탭 밖(용량 변경 체크포인트)에서 다른 제목으로 재사용한다.
+    var title: String?
+    var subtitle: String?
 
     private let rowHeight: CGFloat = 18
     private let spacing: CGFloat = 2
+    /// 무료에게 선명하게 보여 주는 최근 일수.
+    static let freeClearDays = 7
 
     private var lang: JanjanLanguage { .current }
 
     var body: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("패턴 보기", "Pattern view"))
+                Text(title ?? t("패턴 보기", "Pattern view"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text(t(
+                Text(subtitle ?? t(
                     "최근 4주의 기분·복약·수면을 같은 눈금에 놓았어요.",
                     "Mood, doses, and sleep from the past 4 weeks on one scale."
                 ))
@@ -32,14 +42,34 @@ struct PatternCard: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 chart
-                    .blur(radius: isLocked ? 5 : 0)
 
                 legend
+
+                if isLocked {
+                    Text(t(
+                        "최근 7일은 그대로 보여요. 4주 전체는 Pro 에서 열려요.",
+                        "The last 7 days stay clear. The full 4 weeks open with Pro."
+                    ))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
 
     // MARK: - 그림
+
+    /// 이 날짜보다 이전은 흐리게. 무료가 아니면 nil - 아무것도 흐리지 않는다.
+    private var blurBefore: Date? {
+        guard isLocked, timeline.days.count > Self.freeClearDays else { return nil }
+        return timeline.days[timeline.days.count - Self.freeClearDays].date
+    }
+
+    private func isBlurred(_ day: PatternTimeline.Day) -> Bool {
+        guard let blurBefore else { return false }
+        return day.date < blurBefore
+    }
 
     private var chart: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
@@ -72,6 +102,8 @@ struct PatternCard: View {
             HStack(spacing: spacing) {
                 ForEach(timeline.days, id: \.date) { day in
                     mark(day)
+                        // 칸마다 흐린다 - 최근 7일 칸은 잠겨 있어도 선명하다.
+                        .blur(radius: isBlurred(day) ? 5 : 0)
                         .frame(maxWidth: .infinity)
                 }
             }

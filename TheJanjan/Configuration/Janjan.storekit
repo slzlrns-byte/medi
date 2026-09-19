@@ -3,6 +3,21 @@
   "nonRenewingSubscriptions" : [
   ],
   "products" : [
+    {
+      "displayPrice" : "49000",
+      "familyShareable" : false,
+      "internalID" : "7D28C951",
+      "localizations" : [
+        {
+          "description" : "한 번 결제로 Pro 전부를 계속 써요. 구독이 아니에요.",
+          "displayName" : "Pro 평생 이용권",
+          "locale" : "ko_KR"
+        }
+      ],
+      "productID" : "pro_lifetime",
+      "referenceName" : "Pro 평생 이용권",
+      "type" : "NonConsumable"
+    }
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,

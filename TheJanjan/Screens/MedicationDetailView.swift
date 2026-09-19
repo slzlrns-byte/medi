@@ -792,8 +792,12 @@ private struct DoseChangeSheet: View {
     }
 }
 
-/// 용량 변경 하나의 전후 2주를 나란히 놓는 시트 (Pro).
+/// 용량 변경 하나의 전후 2주 비교와, 바꾼 날부터 오늘까지의 체크포인트를
+/// 나란히 놓는 시트 (Pro).
 ///
+/// 체크포인트(2026-09-19 결정)는 사용자 제안 그대로다 — 감량·증량은 의사가
+/// 계획하고 상태를 봐 가며 하는 것이니 앱은 절대 일정이나 판단을 만들지 않고,
+/// 바뀐 날부터 다음 진료까지의 변동을 **따로 모아 보여 주기만** 한다.
 /// 여기서도 강점 결정서 D12 그대로다 — 숫자와 사실만 나란히 두고, 좋아졌다·
 /// 나빠졌다 같은 말은 붙이지 않는다. 방향은 `DoseChangeComparison.moodText`
 /// 가 주는 부호 글자로만 보이고, 색으로는 말하지 않는다.
@@ -808,8 +812,14 @@ private struct DoseChangeCompareSheet: View {
     // StockRecountSheet 와 같은 패턴 — 걸러 두지 않고 받아서 코어 계산에 그대로 넘긴다.
     @Query private var checkInRecords: [CheckInRecord]
     @Query private var symptomRecords: [SymptomEntryRecord]
+    // 체크포인트 타임라인의 재료. 패턴 보기와 같은 계산기를 쓴다.
+    @Query private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+    @Query private var prescriptionRecords: [PrescriptionRecord]
 
     private var lang: JanjanLanguage { .current }
+    private var today: Date { Date() }
 
     private var comparison: DoseChangeComparison {
         DoseChangeComparison.make(
@@ -817,6 +827,36 @@ private struct DoseChangeCompareSheet: View {
             checkIns: checkInRecords.map(\.core),
             symptomEntries: symptomRecords.map(\.core)
         )
+    }
+
+    /// 바꾼 날부터 오늘까지 며칠째인지 (바꾼 날 = 1일째).
+    private var daysSinceChange: Int {
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: change.changedAt),
+            to: calendar.startOfDay(for: today)
+        ).day ?? 0
+        return days + 1
+    }
+
+    /// 체크포인트 그림. 4주(패턴 보기와 같은 폭)를 넘으면 최근 4주만 그린다.
+    private var checkpointTimeline: PatternTimeline {
+        PatternTimeline.make(
+            dayCount: min(max(daysSinceChange, 1), 28),
+            endingAt: today,
+            checkIns: checkInRecords.map(\.core),
+            schedules: scheduleRecords.map(\.core),
+            medications: medicationRecords.map { $0.core.displayReady },
+            doseEvents: doseRecords.map(\.core)
+        )
+    }
+
+    private var nextVisit: Date? {
+        prescriptionRecords
+            .compactMap { $0.core.nextVisitDate }
+            .filter { $0 >= today }
+            .min()
     }
 
     var body: some View {
@@ -854,6 +894,25 @@ private struct DoseChangeCompareSheet: View {
                                 .foregroundStyle(Color.muted)
                         }
                     }
+
+                    // 체크포인트: 바꾼 날부터 오늘까지의 흐름을 따로 모은다.
+                    PatternCard(
+                        timeline: checkpointTimeline,
+                        isLocked: false,
+                        title: t("변경 후 흐름", "Since the change"),
+                        subtitle: daysSinceChange > 28
+                            ? t("바꾼 지 4주가 넘어 최근 4주만 보여요.", "It's been over 4 weeks, so this shows the latest 4.")
+                            : t("바꾼 날부터 오늘까지의 기분·복약·수면이에요.", "Mood, doses, and sleep from the change to today.")
+                    )
+
+                    if let nextVisit {
+                        JanjanCard {
+                            Text(nextVisitLine(nextVisit))
+                                .janjanBody(13)
+                                .foregroundStyle(Color.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
                 .padding(.top, CGFloat(JanjanSpacing.s))
@@ -870,6 +929,23 @@ private struct DoseChangeCompareSheet: View {
                 }
             }
         }
+    }
+
+    /// 다음 진료가 잡혀 있으면 그 흐름을 언제 같이 볼지 한 줄로 잇는다.
+    /// 날짜 계산만 하고 판단은 하지 않는다.
+    private func nextVisitLine(_ visit: Date) -> String {
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: today),
+            to: calendar.startOfDay(for: visit)
+        ).day ?? 0
+        if days == 0 {
+            return t("오늘이 진료일이에요. 이 흐름을 함께 보시면 돼요.",
+                     "Your visit is today. You can go over this together.")
+        }
+        return t("다음 진료까지 \(days)일. 이 흐름을 그날 함께 보시면 돼요.",
+                 "\(days) days to your next visit. You can go over this together then.")
     }
 
     // MARK: - 표
