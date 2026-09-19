@@ -248,7 +248,8 @@ private struct MonthWaveGrid: View {
     }
 }
 
-/// 달과 해를 한 줄로. 화면 헤더와 내보내는 그림이 같은 것을 쓴다.private func monthWaveYearMonthText(_ wave: MonthWave) -> String {
+/// 달과 해를 한 줄로. 화면 헤더와 내보내는 그림이 같은 것을 쓴다.
+private func monthWaveYearMonthText(_ wave: MonthWave) -> String {
     guard JanjanLanguage.current == .english else {
         return "\(String(wave.year))년 \(wave.month)월"
     }
