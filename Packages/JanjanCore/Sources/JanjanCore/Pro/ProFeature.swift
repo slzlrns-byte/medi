@@ -65,6 +65,50 @@ public enum ProFeature: String, CaseIterable, Sendable {
         language == .english ? titleEn : titleKo
     }
 
+    /// 페이월에서 줄을 묶는 이름. 열 줄을 그냥 늘어놓으면 읽는 사람이
+    /// 아무것도 기억하지 못한다 - 무엇을 위한 것인지로 묶는다(2026-09-19).
+    public enum Group: String, CaseIterable, Sendable {
+        case guarding
+        case clinic
+        case easier
+        case mine
+
+        public var titleKo: String {
+            switch self {
+            case .guarding: return "놓치지 않게"
+            case .clinic: return "진료실에 들고 갈 것"
+            case .easier: return "손이 덜 가게"
+            case .mine: return "내게 맞게"
+            }
+        }
+
+        public var titleEn: String {
+            switch self {
+            case .guarding: return "So you don't miss it"
+            case .clinic: return "To bring to your visit"
+            case .easier: return "Less to do by hand"
+            case .mine: return "Made yours"
+            }
+        }
+
+        public func title(_ language: JanjanLanguage) -> String {
+            language == .english ? titleEn : titleKo
+        }
+    }
+
+    public var group: Group {
+        switch self {
+        case .smartFollowUp, .runOutForecast, .watchApp:
+            return .guarding
+        case .patternView, .doseChangeCompare, .visitHistory, .reports:
+            return .clinic
+        case .pharmacyScan, .pillFinder, .iCloudSync:
+            return .easier
+        case .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
+            return .mine
+        }
+    }
+
     /// 페이월에 적는 줄. **여기 적은 것은 앱에서 실제로 잠겨 있어야 한다.**
     ///
     /// 원래 넷이었는데(2026-08-17 결정) 셋을 뺐다.
@@ -96,6 +140,14 @@ public enum ProFeature: String, CaseIterable, Sendable {
         .proThemes,
         .watchApp
     ]
+
+    /// 페이월이 그리는 차례. 빈 묶음은 빼고, 모든 줄이 정확히 한 묶음에 속한다.
+    public static var launchGroups: [(group: Group, features: [ProFeature])] {
+        Group.allCases.compactMap { group in
+            let features = launchHighlights.filter { $0.group == group }
+            return features.isEmpty ? nil : (group, features)
+        }
+    }
 }
 
 /// Pro 상품. 구독 그룹 1개(월간·연간) + 비소모성 평생 이용권 1개.

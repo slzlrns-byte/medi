@@ -415,6 +415,17 @@ struct MedicationsView: View {
                         Text(text)
                             .janjanBody(12)
                             .foregroundStyle(Color.muted)
+                    } else if showsLockedForecast(row) {
+                        // 무료에게 이 줄을 통째로 숨기면 소진 예측이 있다는
+                        // 사실조차 모른다 - 스토어에서는 파는데 앱에는 흔적이
+                        // 없던 유일한 Pro 였다(2026-09-19).
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .regular))
+                            Text(t("소진 예측", "Run-out forecast"))
+                                .janjanBody(12)
+                        }
+                        .foregroundStyle(Color.muted)
                     }
                 }
             }
@@ -433,6 +444,14 @@ struct MedicationsView: View {
             }
             Button(t("삭제", "Delete"), role: .destructive) { pendingDeletion = row }
         }
+    }
+
+    /// 무료에게 "소진 예측" 자물쇠 줄을 보일지. 세어 둔 재고가 있고 계산이
+    /// 실제로 나오는 줄에만 단다 - 보여 줄 것도 없는데 자물쇠만 붙이면
+    /// 목록이 잠금 표시로 뒤덮인다.
+    private func showsLockedForecast(_ row: Row) -> Bool {
+        guard !pro.isPro, row.hasStock, row.snapshot.remaining >= 0 else { return false }
+        return row.snapshot.daysRemaining != nil || (row.snapshot.shortfallDays ?? 0) > 0
     }
 
     /// 잔여 개수는 무료다 — 사용자가 직접 센 숫자이므로.

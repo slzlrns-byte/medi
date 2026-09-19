@@ -84,27 +84,47 @@ struct PaywallView: View {
     }
 
     private var headline: some View {
-        Text(t("더 잔잔한 하루를 위해,\nPro", "For a calmer day,\nPro"))
-            .janjanDisplay(30, relativeTo: .largeTitle)
-            .foregroundStyle(Color.ink)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+            Text(t("더 잔잔한 하루를 위해,\nPro", "For a calmer day,\nPro"))
+                .janjanDisplay(30, relativeTo: .largeTitle)
+                .foregroundStyle(Color.ink)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // 제목과 기능 목록 사이를 잇는 한 문장. 열 줄이 무엇을 위한
+            // 것인지 먼저 말하지 않으면 목록은 읽히지 않는다(2026-09-19).
+            Text(t(
+                "약을 놓치지 않게 지켜 주고, 진료실에 들고 갈 것을 대신 모아 둬요.",
+                "It keeps you from missing a dose, and gathers what you'll bring to your visit."
+            ))
+                .janjanBody(14)
+                .foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
-    /// 라벤더 타일 안에 출시 시점 Pro 4줄. 문구는 JanjanCore 가 들고 있다.
+    /// 라벤더 타일 안에 출시 시점 Pro. 무엇을 위한 것인지로 묶어 그린다 -
+    /// 문구도 묶음도 JanjanCore 가 들고 있다.
     private var featureCard: some View {
         JanjanTile(tint: .lav, padding: CGFloat(JanjanSpacing.xl)) {
-            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xl)) {
-                ForEach(ProFeature.launchHighlights, id: \.self) { feature in
-                    HStack(spacing: CGFloat(JanjanSpacing.s)) {
-                        CircleGlyph(
-                            systemImage: "checkmark",
-                            background: .surface,
-                            foreground: .lavInk,
-                            diameter: 22
-                        )
-                        Text(feature.title(JanjanLanguage.current))
-                            .janjanBody(16, weight: .medium)
-                            .foregroundStyle(Color.ink)
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.l)) {
+                ForEach(ProFeature.launchGroups, id: \.group) { section in
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                        Text(section.group.title(JanjanLanguage.current))
+                            .janjanBody(12, weight: .semibold)
+                            .foregroundStyle(Color.janjan(.lavInk))
+                        ForEach(section.features, id: \.self) { feature in
+                            HStack(spacing: CGFloat(JanjanSpacing.s)) {
+                                CircleGlyph(
+                                    systemImage: "checkmark",
+                                    background: .surface,
+                                    foreground: .lavInk,
+                                    diameter: 22
+                                )
+                                Text(feature.title(JanjanLanguage.current))
+                                    .janjanBody(16, weight: .medium)
+                                    .foregroundStyle(Color.ink)
+                            }
+                        }
                     }
                 }
             }

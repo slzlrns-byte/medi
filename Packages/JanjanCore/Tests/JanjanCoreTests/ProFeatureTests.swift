@@ -24,6 +24,19 @@ final class ProFeatureTests: XCTestCase {
         XCTAssertFalse(ProFeature.launchHighlights.contains(.reports))
     }
 
+    /// 페이월은 묶음으로 그린다. 한 줄이 두 묶음에 들어가거나 어느 묶음에도
+    /// 없으면 화면에서 조용히 사라지거나 두 번 보인다.
+    func testEveryAdvertisedFeatureAppearsInExactlyOneGroup() {
+        let grouped = ProFeature.launchGroups.flatMap(\.features)
+        XCTAssertEqual(grouped.count, ProFeature.launchHighlights.count)
+        XCTAssertEqual(Set(grouped), Set(ProFeature.launchHighlights))
+        for (group, features) in ProFeature.launchGroups {
+            XCTAssertFalse(features.isEmpty, "\(group) 묶음이 비어 있다")
+            XCTAssertFalse(group.titleKo.isEmpty)
+            XCTAssertFalse(group.titleEn.isEmpty)
+        }
+    }
+
     func testProductIdentifiersMatchAppStoreConnectExactly() {
         XCTAssertEqual(ProProduct.monthly, "pro_monthly")
         XCTAssertEqual(ProProduct.yearly, "pro_yearly")
