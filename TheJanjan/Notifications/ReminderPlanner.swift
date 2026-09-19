@@ -29,10 +29,25 @@ enum ReminderPlanner {
         }
 
         await NotificationManager.shared.rescheduleDoseReminders(slotReminders)
+
         // 되물음(Pro)은 하루치만 - 같은 재료로 오늘 남은 시간대에 건다.
+        // 이미 답한 시간대는 뺀다: 아침 약을 적고 앱을 다시 열었는데
+        // "아직 기록이 없어요" 가 또 걸리면 안 된다.
+        let calendar = Calendar.current
+        let now = Date()
+        let answered = Set(
+            ((try? context.fetch(FetchDescriptor<DoseEventRecord>())) ?? [])
+                .filter {
+                    $0.kindRaw == DoseEvent.Kind.scheduled.rawValue
+                        && $0.statusRaw != DoseEvent.Status.unrecorded.rawValue
+                        && calendar.isDate($0.scheduledAt, inSameDayAs: now)
+                }
+                .compactMap(\.slotKey)
+        )
         await NotificationManager.shared.rescheduleTodayFollowUps(
             slotReminders,
-            isPro: UserDefaults.standard.bool(forKey: ProStore.cachedProKey)
+            isPro: UserDefaults.standard.bool(forKey: ProStore.cachedProKey),
+            answeredSlotKeys: answered
         )
 
         await rescheduleAppointments(using: context)

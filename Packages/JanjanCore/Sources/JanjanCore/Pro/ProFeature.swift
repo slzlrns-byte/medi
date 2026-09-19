@@ -77,9 +77,9 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// **App Store Connect 의 구독 설명도 이 목록과 같아야 한다.** 한쪽만 고치면
     /// 앱과 스토어가 서로 다른 약속을 하게 된다.
     ///
-    /// 패턴 보기(2026-09-19 신설)를 더해 일곱이 됐다. ASC 구독 설명은 45자
-    /// 제한이라 일곱을 다 못 적어 전후 비교를 뺀 여섯만 적는다 - 설명이
-    /// 약속한 것이 실제 잠금의 부분집합이면 어긋남이 아니다(체크리스트 3.10).
+    /// 패턴 보기·똑똑한 재알림·Pro 테마(2026-09-19 신설)를 더해 아홉이 됐다.
+    /// ASC 구독 설명은 45자 제한이라 아홉을 다 못 적어 다섯 항목만 적는다 -
+    /// 설명이 약속한 것이 실제 잠금의 부분집합이면 어긋남이 아니다(체크리스트 3.10).
     public static let launchHighlights: [ProFeature] = [
         .pharmacyScan,
         .pillFinder,

@@ -149,9 +149,14 @@ final class NotificationManager: NSObject {
     }
 
     /// 시간대별 알림을 통째로 다시 깐다. 스케줄이 바뀌면 이 함수만 다시 부르면 된다.
+    ///
+    /// 예약된 스누즈("dose-snooze-")는 건드리지 않는다 - "30분 뒤" 를 눌러 둔
+    /// 사람이 그 사이 앱을 열면 약속한 재알림이 사라졌다(QA 2026-09-19).
     func rescheduleDoseReminders(_ reminders: [SlotReminder]) async {
         let pending = await center.pendingNotificationRequests()
-        let ourIDs = pending.map(\.identifier).filter { $0.hasPrefix("dose-") }
+        let ourIDs = pending.map(\.identifier).filter {
+            $0.hasPrefix("dose-") && !$0.hasPrefix("dose-snooze-")
+        }
         center.removePendingNotificationRequests(withIdentifiers: ourIDs)
 
         for reminder in reminders where !reminder.medicationIDs.isEmpty {
@@ -194,10 +199,12 @@ final class NotificationManager: NSObject {
     ///
     /// 하루치만 미리 건다 - iOS 의 예약 한도(64) 안에 머물고, 날이 바뀌면
     /// 앱이 열리거나 기록이 남을 때 다시 깐다. 시간대에 답이 남으면
-    /// `clearFollowUps` 가 그 시간대 것을 걷는다.
+    /// `clearFollowUps` 가 그 시간대 것을 걷고, 이미 답한 시간대는
+    /// 처음부터 걸지 않는다.
     func rescheduleTodayFollowUps(
         _ reminders: [SlotReminder],
         isPro: Bool,
+        answeredSlotKeys: Set<String> = [],
         now: Date = Date()
     ) async {
         let pending = await center.pendingNotificationRequests()
@@ -210,17 +217,30 @@ final class NotificationManager: NSObject {
         let count = max(1, min(storedCount, 3))
         guard isPro, minutes > 0 else { return }
 
+        // 예약 한도(64) 방어. 넘치면 iOS 가 아무거나 조용히 버리는데,
+        // 그 "아무거나" 가 기본 복약 알림이면 최악이다. 되물음은 남는
+        // 자리에만 채우고, 자리가 없으면 이른 시간대부터 채운다.
+        var budget = max(0, 60 - (pending.count - ourIDs.count))
+
         let calendar = Calendar.current
         guard let today = Weekday(rawValue: calendar.component(.weekday, from: now)) else { return }
 
-        for reminder in reminders
-        where reminder.weekdays.contains(today) && !reminder.medicationIDs.isEmpty {
+        let todayReminders = reminders
+            .filter {
+                $0.weekdays.contains(today)
+                    && !$0.medicationIDs.isEmpty
+                    && !answeredSlotKeys.contains($0.slot.storageKey)
+            }
+            .sorted { ($0.time.hour, $0.time.minute) < ($1.time.hour, $1.time.minute) }
+
+        for reminder in todayReminders {
             var components = calendar.dateComponents([.year, .month, .day], from: now)
             components.hour = reminder.time.hour
             components.minute = reminder.time.minute
             guard let slotDate = calendar.date(from: components) else { continue }
 
             for n in 1...count {
+                guard budget > 0 else { return }
                 let fireAt = slotDate.addingTimeInterval(TimeInterval(minutes * 60 * n))
                 guard fireAt > now else { continue }
 
@@ -245,6 +265,7 @@ final class NotificationManager: NSObject {
                 )
                 do {
                     try await center.add(request)
+                    budget -= 1
                 } catch {
                     logger.error("되물음 예약 실패: \(error.localizedDescription, privacy: .public)")
                 }
@@ -316,6 +337,9 @@ final class NotificationManager: NSObject {
 
     /// 30분 뒤 재알림. 한 번만 걸고 그 뒤로는 홈에 조용히 남긴다.
     func snooze(slotKey: String, medicationIDs: [UUID]) {
+        // "30분 뒤" 를 눌렀으면 그 스누즈가 이 시간대의 재알림이다 - 남아 있던
+        // 되물음(Pro)까지 그대로 두면 비슷한 시각에 같은 것을 두 번 묻는다.
+        clearFollowUps(slotKey: slotKey)
         let slot = DoseSlot(storageKey: slotKey)
         let content = UNMutableNotificationContent()
         if let slot {

@@ -87,11 +87,16 @@ struct TheJanjanApp: App {
                     // 구독이 밤사이 끝나도 Transaction.updates 는 새 거래가 없으면
                     // 울리지 않는다. 앱을 다시 켤 때 권한을 한 번 더 확인하지 않으면
                     // 만료된 채로 Pro 화면이 열려 있게 된다.
+                    //
+                    // 권한 확인 → 알림 다시 깔기 순서를 지킨다 - 되물음 예약이
+                    // Pro 그림자 값을 읽는데, 나란히 돌리면 지난 값으로 깐다.
                     if phase == .active {
-                        Task { _ = await proStore.refreshEntitlements() }
-                        // 되물음(Pro)은 하루치만 걸려 있다 - 날이 바뀌었을 수
-                        // 있으니 앱이 앞으로 나올 때마다 오늘치를 다시 깐다.
-                        Task { await ReminderPlanner.reschedule(using: modelContainer.mainContext) }
+                        Task {
+                            _ = await proStore.refreshEntitlements()
+                            // 되물음(Pro)은 하루치만 걸려 있다 - 날이 바뀌었을 수
+                            // 있으니 앱이 앞으로 나올 때마다 오늘치를 다시 깐다.
+                            await ReminderPlanner.reschedule(using: modelContainer.mainContext)
+                        }
                     }
                 }
         }
@@ -128,6 +133,12 @@ final class AppServices {
 
         NotificationManager.shared.doseLogger = logger
         NotificationManager.shared.bootstrap()
+
+        // 기록이 남으면 그 시간대 되물음을 걷는다. DoseRecorder 가 직접 부르지
+        // 못하는 이유는 그 파일 주석에 있다(위젯 타깃).
+        DoseRecorder.onScheduledRecordToday = { slotKey in
+            NotificationManager.shared.clearFollowUps(slotKey: slotKey)
+        }
 
         PhoneSessionManager.shared.doseLogger = logger
         PhoneSessionManager.shared.snapshotProvider = { [weak self] in

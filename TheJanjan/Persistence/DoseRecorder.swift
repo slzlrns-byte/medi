@@ -14,6 +14,14 @@ import JanjanCore
 @MainActor
 enum DoseRecorder {
 
+    /// 오늘 시간대에 답이 남을 때 앱이 되물음 알림을 걷도록 끼우는 고리.
+    ///
+    /// NotificationManager 를 여기서 직접 부르면 안 된다 - 이 파일은 위젯
+    /// 타깃도 컴파일하는데(project.yml 의 경고 참조) 거기에는 그 클래스가
+    /// 없다. 앱만 AppServices 가 이 고리를 채우고, 위젯에서는 비어 있다 -
+    /// 위젯에서 남긴 기록의 되물음은 앱이 다음에 앞으로 나올 때 정리된다.
+    static var onScheduledRecordToday: ((_ slotKey: String) -> Void)?
+
     /// 한 약의 한 시간대 기록을 남기거나 고친다.
     ///
     /// - Parameters:
@@ -45,9 +53,7 @@ enum DoseRecorder {
         // 오늘 시간대에 답이 남으면 걸려 있던 되물음(Pro 재알림)은 걷는다 -
         // 이미 먹었다고 적었는데 "아직 기록이 없어요" 가 또 오면 안 된다.
         if calendar.isDate(targetDay, inSameDayAs: moment) {
-            Task { @MainActor in
-                NotificationManager.shared.clearFollowUps(slotKey: slotKey)
-            }
+            onScheduledRecordToday?(slotKey)
         }
 
         if let existing = existingRecord(

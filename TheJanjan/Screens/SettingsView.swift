@@ -154,11 +154,15 @@ struct SettingsView: View {
                 }
             }
             .onChange(of: themeRaw) { old, new in
+                guard old != new else { return }
                 // Pro 테마를 무료로 고르면 되돌리고 페이월을 연다 - 반쯤 적용된
-                // 채 남기지 않는다.
+                // 채 남기지 않는다. 되돌아갈 곳(old)마저 Pro 테마면(구독이 끝난 뒤
+                // 남아 있던 경우) 기본 테마로 내린다 - 서로를 되돌리며 무한히
+                // 오가는 재진입을 막는다(QA 2026-09-19).
                 let theme = JanjanTheme(rawValue: new) ?? .standard
                 if theme.isProOnly && !pro.isPro {
-                    themeRaw = old
+                    let previous = JanjanTheme(rawValue: old) ?? .standard
+                    themeRaw = previous.isProOnly ? JanjanTheme.standard.rawValue : old
                     isShowingPaywall = true
                     return
                 }
