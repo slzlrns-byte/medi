@@ -24,7 +24,24 @@ final class AppLayerTests: XCTestCase {
             purposeLine: "잠들기 쉽게"
         )
         let restored = MedicationRecord.make(from: core).core
-        XCTAssertEqual(restored, core)
+
+        // 저장을 거치면 등록 시각이 생긴다. 손으로 만든 값은 언제부터였는지
+        // 모르지만(createdAt == nil), 저장소를 지난 뒤로는 모르는 약이 없다 -
+        // 그 값으로 DayPlan 이 과거 소급을 막는다(2026-09-19).
+        XCTAssertNil(core.createdAt)
+        XCTAssertNotNil(restored.createdAt)
+
+        var expected = core
+        expected.createdAt = restored.createdAt
+        XCTAssertEqual(restored, expected)
+    }
+
+    /// 저장된 등록 시각은 왕복해도 그대로다. 예시 데이터가 등록 시각을
+    /// 앞으로 당겨 두는 것이 이 성질에 기댄다.
+    func testMedicationRecordKeepsAGivenCreatedAt() {
+        let registered = Date(timeIntervalSince1970: 1_750_000_000)
+        let core = Medication(name: "라모트리진", createdAt: registered)
+        XCTAssertEqual(MedicationRecord.make(from: core).core.createdAt, registered)
     }
 
     func testDoseEventRecordRoundTripKeepsHalfTablet() {
