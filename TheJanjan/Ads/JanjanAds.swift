@@ -211,13 +211,13 @@ final class RewardedAdLoader: NSObject, ObservableObject {
 
 extension RewardedAdLoader: GADFullScreenContentDelegate {
 
-    nonisolated func adDidDismissFullScreenContent(_ ad: GADFullScreenContentAd) {
+    nonisolated func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) {
         Task { @MainActor in self.finish() }
     }
 
     /// 띄우는 데 실패하면 광고 없이 통과시킨다. 여기서 막으면 잃는 것이
     /// 광고 한 번이 아니라 진료 준비다.
-    nonisolated func ad(_ ad: GADFullScreenContentAd, didFailToPresentFullScreenContentWithError error: Error) {
+    nonisolated func ad(_ ad: GADFullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
         Task { @MainActor in
             self.didEarnThisShow = true
             self.onReward?()
