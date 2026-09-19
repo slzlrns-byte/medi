@@ -44,14 +44,20 @@ struct RootTabView: View {
         TabView(selection: $selection) {
             TodayView(isShowingSettings: $isShowingSettings)
                 .id(redrawKey)
+                .bannerSlot()
                 .tabItem { Label(t("오늘", "Today"), systemImage: "sun.horizon") }
                 .tag(Tab.today)
 
             MedicationsView()
                 .id(redrawKey)
+                .bannerSlot()
                 .tabItem { Label(t("약", "Meds"), systemImage: "pills") }
                 .tag(Tab.medications)
 
+            // 기록 탭에는 배너를 달지 않는다. 기분과 증상을 적는 자리이고,
+            // 그 순간에 광고를 두지 않기로 했다(2026-09-19). 처음에는 TabView
+            // 통째에 달아 이 탭에도 붙었고, 처리방침에 적어 둔 약속과
+            // 어긋났다(QA 2026-09-19).
             DiaryView()
                 .id(redrawKey)
                 .tabItem { Label(t("기록", "Journal"), systemImage: "book.closed") }
@@ -59,13 +65,11 @@ struct RootTabView: View {
 
             ReportView()
                 .id(redrawKey)
+                .bannerSlot()
                 .tabItem { Label(t("진료 준비", "Visit prep"), systemImage: "chart.bar") }
                 .tag(Tab.report)
         }
         .tint(Color.ink)
-        // 무료에게만 붙는 하단 띠. 일기·증상처럼 마음을 적는 자리는 시트로
-        // 열려 화면을 덮으므로 그 위에서는 구조적으로 보이지 않는다.
-        .bannerSlot()
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
         }

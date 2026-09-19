@@ -6,8 +6,8 @@ import JanjanCore
 //
 // 한 곳에 모아 둔 이유: 광고는 "조금 넣고 시작해서 더 붙일지 뺄지 나중에
 // 정한다" 는 전제로 들어왔다. 빼기로 하면 이 파일과 project.yml 의 의존성
-// 한 줄을 지우고, 부르는 자리 셋(RootTabView 배너 · ReportView 내보내기 ·
-// 설정 안내)만 걷어 내면 된다.
+// 한 줄, 그리고 부르는 자리 둘(RootTabView 의 bannerSlot · ReportView 의
+// 내보내기)만 걷어 내면 된다.
 //
 // 지키는 규칙:
 //   · **비개인화 광고만 쓴다.** 애플이 건강·의료 데이터 기반 타겟 광고를
@@ -15,8 +15,9 @@ import JanjanCore
 //     팝업이 필요 없고 "추적하지 않습니다" 를 계속 지킨다.
 //   · **Pro 에게는 아무것도 부르지 않는다.** 화면이 먼저 isPro 를 보고
 //     여기까지 오지 않는다 - SDK 를 깨우는 일조차 없다.
-//   · **마음을 적는 자리에는 두지 않는다.** 배너는 탭 화면 아래에만 붙고,
-//     기록·증상 시트는 화면을 덮으므로 구조적으로 가려진다.
+//   · **마음을 적는 자리에는 두지 않는다.** 배너를 다는 곳을 RootTabView 가
+//     탭별로 정하고, 기록 탭에는 달지 않는다(QA 2026-09-19 - 처음에는
+//     TabView 통째로 달아 기록 탭에도 붙었다).
 enum JanjanAds {
 
     // MARK: - 광고 단위
@@ -43,6 +44,8 @@ enum JanjanAds {
     }
 
     /// 모든 요청이 지나는 한 곳. 비개인화(npa=1)를 여기서 한 번만 건다.
+    /// 배너와 보상형이 둘 다 이 함수를 거치므로 처리방침의 "비개인화 광고만
+    /// 요청한다" 는 문장이 코드로 지켜진다.
     static func request() -> GADRequest {
         let request = GADRequest()
         let extras = GADExtras()
@@ -64,19 +67,27 @@ enum JanjanAds {
 
 // MARK: - 하단 띠 배너
 
+/// 배너가 실제로 붙었는지. 안 붙었으면 자리를 0 으로 접어 빈 띠를 남기지 않는다.
+@MainActor
+final class BannerState: ObservableObject {
+    @Published var isLoaded = false
+}
+
 /// 탭 화면 아래에 붙는 띠. 무료에게만 보인다.
-///
-/// 자리를 미리 잡아 두지 않는다 - 광고가 안 붙으면 높이 0으로 사라져서
-/// 빈 회색 띠가 남지 않는다.
 struct JanjanBannerView: UIViewRepresentable {
 
     static let height: CGFloat = 50
+
+    @ObservedObject var state: BannerState
+
+    func makeCoordinator() -> Coordinator { Coordinator(state: state) }
 
     func makeUIView(context: Context) -> GADBannerView {
         JanjanAds.startIfNeeded()
         let view = GADBannerView(adSize: GADAdSizeBanner)
         view.adUnitID = JanjanAds.Unit.banner
         view.rootViewController = JanjanAds.rootViewController
+        view.delegate = context.coordinator
         view.load(JanjanAds.request())
         return view
     }
@@ -87,28 +98,54 @@ struct JanjanBannerView: UIViewRepresentable {
             view.rootViewController = JanjanAds.rootViewController
         }
     }
+
+    /// 로드 성공·실패를 상태로 옮긴다. 네트워크가 없거나 채울 광고가 없는
+    /// 일은 드물지 않고, 그때 회색 띠만 남으면 고장처럼 보인다(QA 2026-09-19).
+    final class Coordinator: NSObject, GADBannerViewDelegate {
+
+        private let state: BannerState
+
+        init(state: BannerState) { self.state = state }
+
+        func bannerViewDidReceiveAd(_ bannerView: GADBannerView) {
+            Task { @MainActor in state.isLoaded = true }
+        }
+
+        func bannerView(_ bannerView: GADBannerView, didFailToReceiveAdWithError error: Error) {
+            Task { @MainActor in state.isLoaded = false }
+        }
+    }
 }
 
 /// 배너를 붙이는 손잡이. Pro 면 아무것도 하지 않는다.
+///
+/// **이것을 TabView 통째에 걸지 않는다.** 탭마다 따로 단다 - 기록 탭은
+/// 기분과 증상을 적는 자리라 광고를 두지 않기로 했다.
 struct BannerSlot: ViewModifier {
 
     @EnvironmentObject private var pro: ProStore
+    @StateObject private var state = BannerState()
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !pro.isPro {
-                    JanjanBannerView()
-                        .frame(height: JanjanBannerView.height)
+                    JanjanBannerView(state: state)
+                        // 광고가 안 붙었으면 자리를 접는다.
+                        .frame(height: state.isLoaded ? JanjanBannerView.height : 0)
                         .frame(maxWidth: .infinity)
-                        .background(Color.janjan(.surface2))
+                        .background(state.isLoaded ? Color.janjan(.surface2) : Color.clear)
+                        .clipped()
                 }
             }
+            // 구독이 끝나 배너가 돌아올 때 레이아웃이 툭 튀지 않게 한다.
+            .animation(.easeInOut(duration: 0.2), value: pro.isPro)
+            .animation(.easeInOut(duration: 0.2), value: state.isLoaded)
     }
 }
 
 extension View {
-    /// 무료 사용자에게 하단 띠 배너를 붙인다.
+    /// 무료 사용자에게 하단 띠 배너를 붙인다. 기록 탭에는 쓰지 않는다.
     func bannerSlot() -> some View { modifier(BannerSlot()) }
 }
 
@@ -117,39 +154,74 @@ extension View {
 /// "광고를 보고 받기". 강제로 끼어드는 전면 광고가 아니라 사용자가 눌러서
 /// 여는 교환이다 - 진료 준비를 하는 손을 막지 않는다.
 @MainActor
-final class RewardedAdLoader: ObservableObject {
-
-    @Published private(set) var isBusy = false
+final class RewardedAdLoader: NSObject, ObservableObject {
 
     private var ad: GADRewardedAd?
+    private var isLoading = false
+
+    /// 이번에 띄운 광고에서 보상을 받았는지. 도중에 닫으면 false 로 남는다.
+    private var didEarnThisShow = false
+    private var onReward: (() -> Void)?
+    private var onSkip: (() -> Void)?
 
     /// 미리 받아 둔다. 누른 뒤에 받으면 몇 초를 기다리게 된다.
     func preload() {
-        guard ad == nil, !isBusy else { return }
+        guard ad == nil, !isLoading else { return }
         JanjanAds.startIfNeeded()
-        isBusy = true
+        isLoading = true
         GADRewardedAd.load(withAdUnitID: JanjanAds.Unit.rewarded, request: JanjanAds.request()) { [weak self] ad, _ in
             Task { @MainActor in
                 self?.ad = ad
-                self?.isBusy = false
+                self?.isLoading = false
             }
         }
     }
 
-    /// 광고를 보여 주고 끝나면 `onReward` 를 부른다.
+    /// 광고를 보여 주고, 끝까지 봤으면 `onReward` 를, 도중에 닫았으면
+    /// `onSkip` 을 부른다.
     ///
     /// **광고를 못 받았으면 그냥 통과시킨다.** 네트워크가 없다고 해서 진료에
     /// 들고 갈 종이를 못 만들게 하지는 않는다 - 광고는 부탁이지 통행료가 아니다.
-    func show(onReward: @escaping () -> Void) {
+    func show(onReward: @escaping () -> Void, onSkip: @escaping () -> Void) {
         guard let ad, let root = JanjanAds.rootViewController else {
             onReward()
             preload()
             return
         }
         self.ad = nil
-        ad.present(fromRootViewController: root) {
-            onReward()
+        self.onReward = onReward
+        self.onSkip = onSkip
+        didEarnThisShow = false
+        ad.fullScreenContentDelegate = self
+        ad.present(fromRootViewController: root) { [weak self] in
+            guard let self else { return }
+            self.didEarnThisShow = true
+            self.onReward?()
+            self.onReward = nil
         }
+    }
+
+    private func finish() {
+        if !didEarnThisShow { onSkip?() }
+        onReward = nil
+        onSkip = nil
         preload()
+    }
+}
+
+extension RewardedAdLoader: GADFullScreenContentDelegate {
+
+    nonisolated func adDidDismissFullScreenContent(_ ad: GADFullScreenContentAd) {
+        Task { @MainActor in self.finish() }
+    }
+
+    /// 띄우는 데 실패하면 광고 없이 통과시킨다. 여기서 막으면 잃는 것이
+    /// 광고 한 번이 아니라 진료 준비다.
+    nonisolated func ad(_ ad: GADFullScreenContentAd, didFailToPresentFullScreenContentWithError error: Error) {
+        Task { @MainActor in
+            self.didEarnThisShow = true
+            self.onReward?()
+            self.finish()
+        }
     }
 }

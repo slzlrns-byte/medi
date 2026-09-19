@@ -27,6 +27,11 @@ final class ProFeatureTests: XCTestCase {
     /// 페이월은 묶음으로 그린다. 한 줄이 두 묶음에 들어가거나 어느 묶음에도
     /// 없으면 화면에서 조용히 사라지거나 두 번 보인다.
     func testEveryAdvertisedFeatureAppearsInExactlyOneGroup() {
+        // 페이월이 실제로 그리는 것은 launchGroups 다. 평평한 배열의 첫 줄만
+        // 보면 "광고 없이" 가 맨 마지막 묶음에 묻혀도 테스트가 초록이다
+        // (QA 2026-09-19 - 실제로 그렇게 묻혀 있었다).
+        XCTAssertEqual(ProFeature.launchGroups.first?.features.first, .noAds)
+
         let grouped = ProFeature.launchGroups.flatMap(\.features)
         XCTAssertEqual(grouped.count, ProFeature.launchHighlights.count)
         XCTAssertEqual(Set(grouped), Set(ProFeature.launchHighlights))

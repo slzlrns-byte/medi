@@ -71,6 +71,9 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// 페이월에서 줄을 묶는 이름. 열 줄을 그냥 늘어놓으면 읽는 사람이
     /// 아무것도 기억하지 못한다 - 무엇을 위한 것인지로 묶는다(2026-09-19).
     public enum Group: String, CaseIterable, Sendable {
+        /// 맨 앞에 둔다. 페이월은 `allCases` 순서로 그리므로 이 차례가 화면
+        /// 차례다(QA 2026-09-19 - 평평한 배열의 첫 줄로는 소용이 없었다).
+        case quiet
         case guarding
         case clinic
         case easier
@@ -78,6 +81,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
 
         public var titleKo: String {
             switch self {
+            case .quiet: return "조용하게"
             case .guarding: return "놓치지 않게"
             case .clinic: return "진료실에 들고 갈 것"
             case .easier: return "손이 덜 가게"
@@ -87,6 +91,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
 
         public var titleEn: String {
             switch self {
+            case .quiet: return "Quietly"
             case .guarding: return "So you don't miss it"
             case .clinic: return "To bring to your visit"
             case .easier: return "Less to do by hand"
@@ -107,7 +112,9 @@ public enum ProFeature: String, CaseIterable, Sendable {
             return .clinic
         case .pharmacyScan, .pillFinder, .iCloudSync:
             return .easier
-        case .noAds, .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
+        case .noAds:
+            return .quiet
+        case .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
             return .mine
         }
     }

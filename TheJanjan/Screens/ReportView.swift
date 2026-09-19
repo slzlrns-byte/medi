@@ -34,6 +34,8 @@ struct ReportView: View {
     @State private var isExporting = false
     /// 무료 내보내기에 붙는 보상형 광고. Pro 면 만들기만 하고 쓰지 않는다.
     @StateObject private var rewarded = RewardedAdLoader()
+    /// 광고를 도중에 닫았을 때 조용히 아무 일도 안 일어나면 고장으로 보인다.
+    @State private var didSkipAd = false
     /// 질문 칸의 키보드를 "완료" 로 내리기 위한 초점(사용자 요청 2026-09-19).
     @FocusState private var isEditingQuestions: Bool
 
@@ -305,10 +307,11 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !pro.isPro {
-                    Text(t(
-                        "내보내기는 무료예요. 짧은 광고를 보면 바로 만들어 드려요.",
-                        "Exporting is free — watch a short ad and it's made right away."
-                    ))
+                    Text(didSkipAd
+                         ? t("광고를 끝까지 보면 바로 만들어 드려요. Pro 를 쓰시면 광고 없이 나와요.",
+                             "Watch the ad through and it's made right away. With Pro it comes out without one.")
+                         : t("내보내기는 무료예요. 짧은 광고를 보면 바로 만들어 드려요.",
+                             "Exporting is free — watch a short ad and it's made right away."))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -378,7 +381,11 @@ struct ReportView: View {
         if pro.isPro {
             export()
         } else {
-            rewarded.show { export() }
+            didSkipAd = false
+            rewarded.show(
+                onReward: { export() },
+                onSkip: { didSkipAd = true }
+            )
         }
     }
 
