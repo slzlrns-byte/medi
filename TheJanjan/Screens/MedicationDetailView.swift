@@ -337,6 +337,11 @@ struct MedicationDetailView: View {
                     doseChangeRow(entry)
                 }
 
+                // 용량이 실제로 바뀐 바로 그때. 적어 둔 것이 없으면 권하지 않는다.
+                if !mine.isEmpty {
+                    ProMomentNote(moment: .doseChangeLogged)
+                }
+
                 WhitePillButton(title: t("적어 두기", "Write it down"), systemImage: "plus") {
                     isShowingDoseChangeSheet = true
                 }

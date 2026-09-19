@@ -30,6 +30,22 @@ public enum Janjan {
     /// App ID 두 개 모두에 App Groups capability 가 켜져 있어야 서명이 통과한다.
     public static let appGroupID = "group.com.thejanjan.app"
 
+    /// 위젯이 앱을 열 때 쓰는 주소 체계. Info.plist 의 CFBundleURLSchemes 와
+    /// 글자 하나까지 같아야 한다 - 다르면 버튼이 조용히 아무 일도 하지 않는다.
+    public static let urlScheme = "thejanjan"
+
+    /// 무료 위젯의 "먹었어요" 가 여는 자리. 앱은 기본으로 오늘 탭에서 열리고,
+    /// 그 시간대 카드가 바로 거기 있다. 시간대 키를 실어 두는 것은 나중에
+    /// 그 카드로 더 정확히 데려갈 때를 위해서다.
+    public static func logSlotURL(slotKey: String) -> URL {
+        var components = URLComponents()
+        components.scheme = urlScheme
+        components.host = "log"
+        components.queryItems = [URLQueryItem(name: "slot", value: slotKey)]
+        // 구성 요소가 전부 상수라 실패할 수 없지만, 강제 해제는 두지 않는다.
+        return components.url ?? URL(string: "\(urlScheme)://log")!
+    }
+
     /// 정책 페이지. 원본은 저장소의 `docs/site/` 이고 GitHub Pages 로 낸다.
     /// App Store Connect 의 URL 칸과 앱 설정 화면이 같은 주소를 쓴다.
     public static let privacyPolicyURLString = "https://slzlrns-byte.github.io/medi/site/privacy.html"

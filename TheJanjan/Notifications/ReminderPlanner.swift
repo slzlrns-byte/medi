@@ -46,7 +46,7 @@ enum ReminderPlanner {
         )
         await NotificationManager.shared.rescheduleTodayFollowUps(
             slotReminders,
-            isPro: UserDefaults.standard.bool(forKey: ProStore.cachedProKey),
+            isPro: JanjanEntitlement.isPro,
             answeredSlotKeys: answered
         )
 

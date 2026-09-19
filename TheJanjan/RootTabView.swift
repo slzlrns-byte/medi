@@ -66,6 +66,14 @@ struct RootTabView: View {
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
         }
+        // 무료 위젯의 "먹었어요" 는 기록하는 대신 앱을 연다. 앱이 이미
+        // 다른 탭에 떠 있었다면 그대로 앞으로 나올 뿐이라, 기록할 자리인
+        // 오늘 탭으로 옮겨 준다. 시간대 키는 아직 쓰지 않는다.
+        .onOpenURL { url in
+            guard url.scheme == Janjan.urlScheme, url.host == "log" else { return }
+            selection = .today
+            isShowingSettings = false
+        }
     }
 }
 

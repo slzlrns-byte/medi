@@ -254,6 +254,11 @@ struct MedicationsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                // 처방일수와 다음 진료일이 둘 다 들어와 계산 재료가 막 갖춰졌을 때.
+                if hasForecastMaterial {
+                    ProMomentNote(moment: .forecastReady)
+                }
+
                 // HStack 이 아니라 FlowRow: 큰 글씨 설정에서 두 캡슐이 카드 폭을
                 // 넘으면 잘리는 대신 줄을 바꾼다(QA 2026-09-19).
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
@@ -277,6 +282,12 @@ struct MedicationsView: View {
             }
         }
         .padding(.top, CGFloat(JanjanSpacing.s))
+    }
+
+    /// 소진 예측을 권할 재료가 갖춰졌는지 - 다음 진료일이 있고, 받아 온 개수를
+    /// 세어 둔 약이 하나라도 있어야 계산이 나온다.
+    private var hasForecastMaterial: Bool {
+        nextVisit != nil && rows.contains { $0.hasStock }
     }
 
     /// 실제로 다녀온 진료가 하나라도 있는지. VisitHistoryView 와 같은 규칙으로 센다.

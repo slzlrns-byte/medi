@@ -31,11 +31,14 @@ final class ProStore: ObservableObject {
     /// Pro 권한. 화면은 이 값 하나만 본다.
     /// SwiftUI 밖(알림 예약)에서도 봐야 해서 UserDefaults 에 그림자를 남긴다.
     @Published private(set) var isPro = janjanForcesPro {
-        didSet { UserDefaults.standard.set(isPro, forKey: Self.cachedProKey) }
+        // 위젯은 별도 프로세스라 standard defaults 가 안 보인다.
+        // 앱 그룹에도 같이 써야 홈 화면이 같은 값을 본다.
+        didSet { JanjanEntitlement.store(isPro) }
     }
 
     /// 알림 예약처럼 ProStore 를 들 수 없는 곳이 읽는 그림자 값.
-    static let cachedProKey = "janjan.pro.cached"
+    /// 저장·조회는 `JanjanEntitlement` 가 맡는다.
+    static let cachedProKey = JanjanEntitlement.proKey
 
     /// Pro 가 평생 이용권으로 열렸는지. 기능 잠금은 isPro 하나로 충분하지만,
     /// 평생권 구매자에게 "구독 관리에서 해지" 라고 말하면 거짓말이 된다(QA 2026-09-19).

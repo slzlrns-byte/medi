@@ -53,8 +53,15 @@ struct ReportView: View {
                     adherenceCard
                     MonthWaveCard(checkIns: checkIns)
                     // 패턴 보기는 Pro. 무료에서는 흐린 그림 위에 자물쇠가 얹힌다.
-                    PatternCard(timeline: patternTimeline, isLocked: !pro.isPro)
-                        .proGated(.patternView)
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                        PatternCard(timeline: patternTimeline, isLocked: !pro.isPro)
+                            .proGated(.patternView)
+                        // 그림이 처음 생길 만큼 쌓였을 때만. 빈 그림 앞에서
+                        // 권하면 무엇을 여는지 알 수 없다.
+                        if hasEnoughForPattern {
+                            ProMomentNote(moment: .patternReady)
+                        }
+                    }
                     perMedicationCard
                     askDoctorCard
                     exportCard
@@ -148,6 +155,13 @@ struct ReportView: View {
 
     private var activeMedications: [Medication] {
         medications.filter { $0.status == .active }
+    }
+
+    /// 무료에게 패턴 보기를 권할 만큼 기록이 쌓였는지. 최근 4주 중 기분이나
+    /// 복약이 기록된 날이 이레는 되어야 그림이 그림처럼 보인다.
+    private var hasEnoughForPattern: Bool {
+        patternTimeline.days.filter { $0.moodScore != nil || $0.takenFraction != nil }.count
+            >= PatternCard.freeClearDays
     }
 
     /// 패턴 보기의 원자료. 계산은 JanjanCore 가 한다 - 화면은 그리기만.

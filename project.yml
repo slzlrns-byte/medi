@@ -102,6 +102,12 @@ targets:
         CFBundlePackageType: "APPL"
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
+        # 무료 위젯의 "먹었어요" 가 앱을 여는 데 쓴다(Janjan.urlScheme 과 동일해야 함).
+        # 밖에서 들어오는 주소를 받기만 하고, 이 주소로 나가는 링크는 앱에 없다.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.thejanjan.app
+            CFBundleURLSchemes:
+              - thejanjan
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

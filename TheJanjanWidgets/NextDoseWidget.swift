@@ -196,14 +196,42 @@ struct NextDoseWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
+    /// 손목(워치)과 같은 규칙이다 - **보는 것은 무료, 여기서 바로 기록하는 것이 Pro**.
+    ///
+    /// 무료에서도 버튼은 그대로 있고 눌린다. 다만 위젯이 직접 기록하지 않고
+    /// 앱이 열린다(widgetURL 이 아니라 Link 로 그 자리만 연다). 기록 자체를
+    /// 막지 않는 것이 이 선의 핵심이다 - 약을 놓치게 만드는 구조는 만들지 않는다.
+    @ViewBuilder
     private func takenButton(slotKey: String) -> some View {
-        Button(intent: LogDoseIntent(slotKey: slotKey)) {
+        if JanjanEntitlement.isPro {
+            Button(intent: LogDoseIntent(slotKey: slotKey)) {
+                takenLabel(opensApp: false)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primary)
+        } else {
+            Link(destination: Janjan.logSlotURL(slotKey: slotKey)) {
+                takenLabel(opensApp: true)
+            }
+        }
+    }
+
+    private func takenLabel(opensApp: Bool) -> some View {
+        HStack(spacing: 4) {
             Text(t("먹었어요", "Took it"))
                 .font(.system(size: 15, weight: .medium))
-                .frame(maxWidth: .infinity, minHeight: 40)
+            if opensApp {
+                // 앱이 열린다는 것을 눌러 보기 전에 알 수 있어야 한다.
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 11, weight: .regular))
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.primary)
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .foregroundStyle(opensApp ? Color.primary : Color(uiColor: .systemBackground))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(opensApp ? Color.secondary.opacity(0.18) : Color.primary)
+        )
     }
 }
 
