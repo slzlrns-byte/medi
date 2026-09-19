@@ -132,10 +132,13 @@ final class AutoFilledUnrecordedTests: XCTestCase {
         )
     }
 
+    /// **하루만 본다.** 다음 날까지 창을 열면 그 날의 아침이 답이 없어
+    /// 늘 걸리므로, 출처에 따른 차이를 재는 저울이 못 된다(CI 124 에서
+    /// 이 테스트가 그렇게 헛돌았다).
     private func asksAgain(source: DoseEvent.Source) -> Bool {
         !UnrecordedSlots.find(
             from: day,
-            until: Fixed.date(2026, 9, 13),
+            until: Fixed.date(2026, 9, 12, 23, 0),
             schedules: [morning],
             medications: [medication],
             doseEvents: [event(source: source)],
