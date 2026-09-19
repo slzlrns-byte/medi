@@ -59,7 +59,7 @@ struct RootTabView: View {
 
             ReportView()
                 .id(redrawKey)
-                .tabItem { Label(t("리포트", "Report"), systemImage: "chart.bar") }
+                .tabItem { Label(t("진료 준비", "Visit prep"), systemImage: "chart.bar") }
                 .tag(Tab.report)
         }
         .tint(Color.ink)

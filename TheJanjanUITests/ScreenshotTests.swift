@@ -75,7 +75,7 @@ final class ScreenshotTests: XCTestCase {
             capture("05b-기록-아래")
         }
 
-        tap(tab: "리포트")
+        tap(tab: "진료 준비")
         capture("06-리포트")
 
         // 바닥까지 내려 본다. 탭 막대는 떠 있고 내용은 그 아래로 지나가므로,

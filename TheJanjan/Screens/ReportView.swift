@@ -63,7 +63,7 @@ struct ReportView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle(t("리포트", "Report"))
+            .navigationTitle(t("진료 준비", "Visit prep"))
             .sheet(item: $exportURL) { file in
                 ShareSheet(items: [file.url])
                     .onDisappear {
