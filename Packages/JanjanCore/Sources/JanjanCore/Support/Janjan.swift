@@ -48,9 +48,13 @@ public enum Janjan {
 
     /// 정책 페이지. 원본은 저장소의 `docs/site/` 이고 GitHub Pages 로 낸다.
     /// App Store Connect 의 URL 칸과 앱 설정 화면이 같은 주소를 쓴다.
-    public static let privacyPolicyURLString = "https://slzlrns-byte.github.io/medi/site/privacy.html"
-    public static let supportURLString = "https://slzlrns-byte.github.io/medi/site/support.html"
-    public static let termsURLString = "https://slzlrns-byte.github.io/medi/site/terms.html"
+    // **커스텀 도메인을 쓴다**(docs/CNAME = janjan.loviti.app).
+    // github.io 주소도 이쪽으로 넘어가지만, 앱과 App Store Connect 가 같은
+    // 주소를 말해야 심사관이 보는 것과 앱에서 열리는 것이 일치한다.
+    // 도메인을 바꾸면 여기와 docs/CNAME 과 ASC 세 곳을 함께 고친다.
+    public static let privacyPolicyURLString = "https://janjan.loviti.app/site/privacy.html"
+    public static let supportURLString = "https://janjan.loviti.app/site/support.html"
+    public static let termsURLString = "https://janjan.loviti.app/site/terms.html"
 
     /// 앱 어디에도 진단·조언을 쓰지 않는다는 약속을 문장으로 고정해 둔다.
     public static let medicalDisclaimerKo =

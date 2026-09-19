@@ -243,8 +243,8 @@ This is the first release of The Janjan.
   (새 정의가 '진단 또는 지침 제공' 인데 앱은 일부러 안 함), 건강/웰빙 주제
   "예", 음주·흡연 언급 "드묾". 나머지 전부 없음/아니요.
   처음에 의료 정보를 "빈번" 으로 넣었더니 16+ 가 나와 정의대로 고쳐 13+.
-- 개인정보처리방침 URL: https://slzlrns-byte.github.io/medi/site/privacy.html
-- 지원 URL: https://slzlrns-byte.github.io/medi/site/support.html
+- 개인정보처리방침 URL: https://janjan.loviti.app/site/privacy.html
+- 지원 URL: https://janjan.loviti.app/site/support.html
 - 저작권: © 2026 (개발자 이름)
 
 ### 5. 제출 직전 마지막 확인

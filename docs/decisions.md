@@ -69,10 +69,10 @@
 
   | 페이지 | 주소 |
   | --- | --- |
-  | 랜딩 | `https://slzlrns-byte.github.io/medi/site/` |
-  | 개인정보처리방침 | `https://slzlrns-byte.github.io/medi/site/privacy.html` |
-  | 지원 | `https://slzlrns-byte.github.io/medi/site/support.html` |
-  | 이용약관 | `https://slzlrns-byte.github.io/medi/site/terms.html` |
+  | 랜딩 | `https://janjan.loviti.app/site/` |
+  | 개인정보처리방침 | `https://janjan.loviti.app/site/privacy.html` |
+  | 지원 | `https://janjan.loviti.app/site/support.html` |
+  | 이용약관 | `https://janjan.loviti.app/site/terms.html` |
 
   App Store Connect 의 개인정보 처리방침 URL · 지원 URL · EULA 보조 링크와 앱 설정 화면이 모두 이 주소를 쓴다(심사 리스크 2.1 · 3.2).
 
