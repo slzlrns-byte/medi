@@ -22,6 +22,12 @@ enum DemoSeed {
     static func apply(to context: ModelContext, now: Date = Date()) {
         MedicationStore.deleteEverything(in: context)
 
+        // 기록을 새로 심었으니 "오늘은 이미 훑었다" 는 깃발도 버린다.
+        // 촬영은 같은 시뮬레이터에서 앱을 여러 번 띄우는데, 깃발이 남아
+        // 있으면 두 번째부터는 빠트림이 채워지지 않아 같은 세트 안에서
+        // 화면이 서로 달라진다(QA 2026-09-19).
+        UnrecordedBackfill.forgetLastRun()
+
         for medication in SampleData.medications {
             let record = MedicationRecord.make(from: medication)
             // 예시 기록은 **지난 16일치**다(SampleData.doseEvents).

@@ -28,6 +28,17 @@ enum UnrecordedBackfill {
     /// 마지막으로 훑은 날. 하루에 한 번이면 족하다.
     private static let lastRunKey = "janjan.backfill.lastRunDay"
 
+    /// "오늘은 이미 훑었다" 를 잊는다.
+    ///
+    /// 저장소를 통째로 갈아 끼운 직후에 부른다. 기록이 새것인데 깃발만
+    /// 남아 있으면 그날은 아무것도 채우지 않는다 - 예시 데이터를 다시 심고
+    /// 앱을 여러 번 띄우는 화면 촬영에서 정확히 그 일이 일어났다
+    /// (QA 2026-09-19). 첫 실행에서만 빠트림이 채워지고 그 뒤 실행에서는
+    /// 비어 있어, 같은 세트 안에서 화면이 서로 달라진다.
+    static func forgetLastRun() {
+        UserDefaults.standard.removeObject(forKey: lastRunKey)
+    }
+
     /// 한 번 훑고 비어 있던 자리를 채운다. 여러 번 불러도 결과가 같다 -
     /// 이미 사건이 있는 자리는 건너뛴다.
     /// - Parameter force: 날이 같아도 다시 훑는다. 테스트와 "이 자리에서
