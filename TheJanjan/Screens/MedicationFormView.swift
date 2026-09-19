@@ -67,7 +67,12 @@ struct MedicationFormView: View {
         _kind = State(initialValue: existing.medication.kind)
         // 요일은 줄마다 따로 저장되지만 화면에서는 약 하나에 한 벌이다.
         // 지금까지 만들어진 약은 줄들이 같은 요일을 갖고 있으므로 첫 줄을 쓴다.
-        _weekdays = State(initialValue: existing.schedules.first?.weekdays ?? Weekday.everyday)
+        //
+        // 시간대가 없는 약(필요시)을 고치러 열면 고를 요일이 없다. 그때
+        // "매일" 로 채워 두면 새 등록에서 일부러 없앴던 그 기본값이 —
+        // 지나치기 쉬워서 없앴다 — 이 문을 통해 되살아난다(QA 2026-09-19).
+        // 새 등록과 같이 빈 채로 시작한다.
+        _weekdays = State(initialValue: existing.schedules.first?.weekdays ?? [])
         _drafts = State(initialValue: SlotDraft.from(existing.schedules))
     }
 
@@ -85,6 +90,14 @@ struct MedicationFormView: View {
         /// DatePicker 가 Date 만 다뤄서 시·분을 Date 에 얹어 들고 있는다.
         var time: Date
         var dose: Decimal
+        /// 고치기로 열 때 이 줄이 갖고 있던 저장 키. 새로 만드는 줄이면 nil.
+        ///
+        /// 직접 넣은 시간대는 **시각이 곧 키**다("custom-14:30"). 고치기에서
+        /// 14:30 을 15:00 으로 옮기면 키가 바뀌고, 그 시간대에 이미 답해 둔
+        /// 지난 날들이 새 키로는 안 잡혀 "기록 없이 지나간 시간대" 로 되살아난다
+        /// (QA 2026-09-19). 옮기기 전 키를 들고 있다가 지난 기록의 키도 함께
+        /// 옮겨 준다.
+        var originalSlotKey: String?
 
         var timeOfDay: TimeOfDay {
             let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
@@ -125,12 +138,14 @@ struct MedicationFormView: View {
                     rows[index].isOn = true
                     rows[index].time = time
                     rows[index].dose = schedule.dosePerIntake
+                    rows[index].originalSlotKey = schedule.slot.storageKey
                 } else {
                     extras.append(SlotDraft(
                         preset: nil,
                         isOn: true,
                         time: time,
-                        dose: schedule.dosePerIntake
+                        dose: schedule.dosePerIntake,
+                        originalSlotKey: schedule.slot.storageKey
                     ))
                 }
             }
@@ -249,6 +264,19 @@ struct MedicationFormView: View {
 
                 ForEach($drafts) { $draft in
                     slotRow($draft)
+                }
+
+                // 요일 카드와 같은 규칙 - 저장이 막히는 이유는 막는 자리에서 말한다.
+                // 여기만 안내가 없어서 "요일은 골랐는데 왜 저장이 안 되지" 가 됐다
+                // (QA 2026-09-19).
+                if !drafts.contains(where: \.isOn) {
+                    Text(t(
+                        "시간대를 하나는 켜 주세요. 켠 시간대에만 알림이 가요.",
+                        "Turn on at least one time slot. Reminders only go out for the slots you turn on."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // 정신과 처방은 하루 네 번을 넘기도 한다(분복 등). 모자라면 더 넣는다.
@@ -447,6 +475,19 @@ struct MedicationFormView: View {
         }
     }
 
+    /// 고치면서 저장 키가 옮겨진 시간대. 지난 기록의 키도 같이 옮겨야 한다.
+    /// 프리셋은 시각을 옮겨도 키가 그대로라 여기 들어올 일이 없다.
+    private var slotKeyRenames: [String: String] {
+        var renames: [String: String] = [:]
+        guard kind == .scheduled else { return renames }
+        for draft in drafts where draft.isOn {
+            guard let original = draft.originalSlotKey else { continue }
+            let now = draft.slot.storageKey
+            if original != now { renames[original] = now }
+        }
+        return renames
+    }
+
     private func save() {
         guard canSave, !isSaving else { return }
         isSaving = true
@@ -503,7 +544,8 @@ struct MedicationFormView: View {
                 form: form,
                 kind: kind,
                 purposeLine: purpose.trimmingCharacters(in: .whitespacesAndNewlines),
-                schedules: makeSchedules(for: medicationID)
+                schedules: makeSchedules(for: medicationID),
+                slotKeyRenames: slotKeyRenames
             ),
             for: medicationID,
             in: context

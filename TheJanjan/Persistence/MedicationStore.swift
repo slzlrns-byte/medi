@@ -58,6 +58,12 @@ enum MedicationStore {
         var kind: Medication.Kind
         var purposeLine: String
         var schedules: [Schedule]
+        /// 저장 키가 옮겨진 시간대(옛 키 → 새 키).
+        ///
+        /// 직접 넣은 시간대는 시각이 곧 키다("custom-14:30"). 시각을 옮기면
+        /// 키가 바뀌고, 그 키로 매여 있던 지난 복용 기록이 떨어져 나간다.
+        /// 아침·점심·저녁·취침은 시각을 옮겨도 키가 그대로라 여기 오지 않는다.
+        var slotKeyRenames: [String: String] = [:]
     }
 
     /// 등록한 약을 **제자리에서** 고친다.
@@ -93,7 +99,34 @@ enum MedicationStore {
             context.insert(ScheduleRecord.make(from: schedule))
         }
 
+        renameSlotKeys(edit.slotKeyRenames, for: medicationID, in: context)
+
         save("약 수정", in: context)
+    }
+
+    /// 옮겨진 시간대의 지난 기록도 함께 옮긴다.
+    ///
+    /// 이것을 하지 않으면 직접 넣은 시간대의 시각을 고치는 순간, 그 시간대에
+    /// 이미 "먹었어요" 라고 답해 둔 지난 날들이 전부 미답으로 돌아가
+    /// "기록 없이 지나간 시간대" 가 같은 질문을 다시 묻는다(QA 2026-09-19).
+    /// 같은 질문을 반복하는 것은 이 앱이 가장 하지 않으려는 일이다.
+    ///
+    /// 알림 식별자도 같은 키를 쓰므로, 예약된 알림은 바깥에서
+    /// `ReminderPlanner.reschedule` 이 통째로 다시 깔아 맞춘다.
+    private static func renameSlotKeys(
+        _ renames: [String: String],
+        for medicationID: UUID,
+        in context: ModelContext
+    ) {
+        guard !renames.isEmpty else { return }
+
+        let descriptor = FetchDescriptor<DoseEventRecord>(
+            predicate: #Predicate { $0.medicationID == medicationID }
+        )
+        for event in (try? context.fetch(descriptor)) ?? [] {
+            guard let old = event.slotKey, let new = renames[old] else { continue }
+            event.slotKey = new
+        }
     }
 
     /// 진료에서 들은 용량 변경을 **적어 두고 동시에 적용한다.**

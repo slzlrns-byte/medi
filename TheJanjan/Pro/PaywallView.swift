@@ -393,9 +393,6 @@ struct PaywallView: View {
                 WhitePillButton(title: t("다시 시도", "Try again"), systemImage: "arrow.clockwise") {
                     pro.load()
                 }
-                .overlay(
-                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                )
             }
         }
     }

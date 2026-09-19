@@ -40,6 +40,10 @@ struct DoseQuickView: View {
                         record(.taken)
                     } label: {
                         Text(takenTitle)
+                            // "전부 먹었어요" 는 "전부 건너뜀" 보다 길다. 한쪽만
+                            // 두 줄로 꺾이면 두 버튼의 높이가 어긋난다(QA 2026-09-19).
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -50,6 +54,8 @@ struct DoseQuickView: View {
                         record(.skipped)
                     } label: {
                         Text(skippedTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)

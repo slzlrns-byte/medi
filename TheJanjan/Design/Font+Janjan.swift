@@ -191,28 +191,33 @@ enum JanjanFontChoice: String, CaseIterable {
 
 // MARK: - 한글 줄바꿈
 
-/// 한글 문장을 어절 단위로 끊어 읽게 한다.
+/// 한글 문장이 어절 한가운데서 꺾이지 않게 한다.
 ///
-/// 문장 하나가 카드를 통째로 채우는 자리(오늘의 질문)에서는 줄바꿈 한 번이
-/// 크게 거슬린다. "언제였어요?" 가 "언제였 / 어요?" 로 갈리면 읽다가 걸린다.
-/// TextKit 에 한글 어절 우선 규칙을 직접 걸어 그 자리를 띄어쓰기로 옮긴다.
+/// 한글은 음절마다 줄을 바꿀 수 있어서, 기본 줄바꿈이 "언제였어요?" 를
+/// "언제였 / 어요?" 로 갈라 놓는다. 짧은 라벨에서는 티가 안 나지만 문장
+/// 하나가 카드를 통째로 채우는 자리(오늘의 질문)에서는 그 한 번이 크게 거슬린다.
 ///
-/// 문단 서식을 통째로 주므로 SwiftUI 의 `.lineSpacing` 이 덮인다 —
-/// 그래서 행간을 같은 토큰에서 다시 계산해 넣는다. 자간·서체는 밖의
-/// `janjanDisplay` / `janjanBody` 가 그대로 얹는다.
+/// 처음에는 문단 서식(`NSParagraphStyle.lineBreakStrategy = .hangulWordPriority`)
+/// 으로 고쳤는데, SwiftUI 의 `Text` 는 AttributedString 의 **문단 속성을 읽지
+/// 않는다** - 글자 단위 속성(서체·색·자간)만 본다. 그래서 그 방식은 아무 일도
+/// 하지 않는 코드였다(QA 2026-09-19).
+///
+/// 대신 어절 안의 글자 사이에 **줄바꿈 금지 문자**(U+2060 WORD JOINER)를
+/// 끼운다. 어절 안에 끊을 자리를 없애면 남는 자리는 띄어쓰기뿐이고, 이것은
+/// 어느 렌더러에서도 같게 동작한다. 폭이 0 인 서식 문자라 눈에도 보이지 않고
+/// 음성으로도 읽히지 않는다.
+///
+/// 한 어절이 한 줄보다 길면 그때는 예전처럼 어절 안에서 꺾인다 - 금지는
+/// 제안이라 마지막에는 양보한다. 접근성 큰 글씨에서 글자가 잘리는 대신
+/// 원래 동작으로 되돌아갈 뿐이라 안전하다.
 enum JanjanText {
 
-    static func wordWrapped(
-        _ string: String,
-        size: Double,
-        role: JanjanTypography.Role = .display
-    ) -> AttributedString {
-        var attributed = AttributedString(string)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakStrategy = .hangulWordPriority
-        paragraph.lineBreakMode = .byWordWrapping
-        paragraph.lineSpacing = CGFloat(JanjanTypography.lineSpacing(forSize: size, role: role))
-        attributed.paragraphStyle = paragraph
-        return attributed
+    private static let wordJoiner = "\u{2060}"
+
+    static func wordWrapped(_ string: String) -> String {
+        string
+            .split(separator: " ", omittingEmptySubsequences: false)
+            .map { word in word.map(String.init).joined(separator: wordJoiner) }
+            .joined(separator: " ")
     }
 }

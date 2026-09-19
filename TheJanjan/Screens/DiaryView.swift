@@ -460,8 +460,7 @@ struct DiaryView: View {
                 // 한가운데서 일어나지 않게 어절 우선 규칙을 걸어 둔다.
                 Text(JanjanText.wordWrapped(
                     card?.text(JanjanLanguage.current)
-                        ?? t("오늘은 그냥 여기까지여도 괜찮아요.", "It's okay to stop here for today."),
-                    size: 19
+                        ?? t("오늘은 그냥 여기까지여도 괜찮아요.", "It's okay to stop here for today.")
                 ))
                     .janjanDisplay(19)
                     .foregroundStyle(Color.ink)

@@ -312,9 +312,6 @@ struct PrescriptionFormView: View {
                     doseEdits[medication.id] = nil
                     refreshSuggestions()
                 }
-                .overlay(
-                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                )
             }
             .padding(.top, CGFloat(JanjanSpacing.xxs))
         } else {
@@ -324,9 +321,6 @@ struct PrescriptionFormView: View {
                     perIntake: commonDose(medication)
                 )
             }
-            .overlay(
-                Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-            )
             .padding(.top, CGFloat(JanjanSpacing.xxs))
         }
     }
@@ -339,14 +333,16 @@ struct PrescriptionFormView: View {
     private func togglePill(for medication: Medication) -> some View {
         if masksNames {
             // 여러 약이 전부 점이면 어느 것을 고르는지 알 수 없다. 목록 행과 같은
-            // 규칙으로 용도 한 줄이 있으면 그것으로 부른다.
+            // 규칙으로 용도 한 줄이 있으면 그것으로 부르고, 그것도 없으면
+            // 용량 표기를 붙인다 - "10mg" 은 약 이름이 아니라서 가림이 뚫리지
+            // 않으면서, 점 두 개를 서로 다른 것으로 만들어 준다(QA 2026-09-19).
             TogglePill(
-                text: medication.purposeLine.isEmpty ? MaskedNameText.maskGlyph : medication.purposeLine,
+                text: maskedLabel(for: medication),
                 isOn: refills[medication.id] != nil
             ) {
                 toggle(medication)
             }
-            .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+            .accessibilityLabel(Text(maskedSpokenLabel(for: medication)))
         } else {
             TogglePill(
                 text: medication.displayTitle,
@@ -355,6 +351,25 @@ struct PrescriptionFormView: View {
                 toggle(medication)
             }
         }
+    }
+
+    /// 이름을 가린 약을 화면에서 부르는 말. 용도 한 줄 → 용량 표기 → 점 차례다.
+    private func maskedLabel(for medication: Medication) -> String {
+        if !medication.purposeLine.isEmpty { return medication.purposeLine }
+        if !medication.strengthText.isEmpty {
+            return "\(MaskedNameText.maskGlyph) \(medication.strengthText)"
+        }
+        return MaskedNameText.maskGlyph
+    }
+
+    /// VoiceOver 가 읽을 말. 가린 이름은 절대 읽지 않는다 - 소리로 뚫리면
+    /// 가림이 아니다.
+    private func maskedSpokenLabel(for medication: Medication) -> String {
+        if !medication.purposeLine.isEmpty { return medication.purposeLine }
+        if !medication.strengthText.isEmpty {
+            return t("가려진 약, \(medication.strengthText)", "Hidden medication, \(medication.strengthText)")
+        }
+        return t("가려진 약 이름", "Hidden medication name")
     }
 
     private var noteCard: some View {

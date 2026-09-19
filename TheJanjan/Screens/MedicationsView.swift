@@ -265,18 +265,12 @@ struct MedicationsView: View {
                     WhitePillButton(title: t("진료 기록하기", "Log a visit"), systemImage: "doc.text") {
                         isShowingPrescription = true
                     }
-                    .overlay(
-                        Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                    )
 
                     // 남긴 진료가 있어야 여는 문을 보여 준다 - 빈 화면으로 이끌지 않는다.
                     if hasVisitHistory {
                         WhitePillButton(title: t("지난 진료", "Past visits"), systemImage: "clock") {
                             isShowingVisitHistory = true
                         }
-                        .overlay(
-                            Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                        )
                     }
                 }
             }
@@ -326,9 +320,6 @@ struct MedicationsView: View {
                 WhitePillButton(title: t("약 등록하기", "Add a medication"), systemImage: "plus") {
                     isShowingAddFlow = true
                 }
-                .overlay(
-                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                )
                 .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
         }

@@ -109,10 +109,19 @@ struct MoodPickerRow: View {
 }
 
 /// 나머지 버튼은 전부 흰 알약.
+///
+/// **테두리가 기본이다**(QA 2026-09-19). 알약의 면(surface #FFFFFF)은 흰
+/// 카드의 면과 같은 색이라, 카드 안에 놓이면 알약이 통째로 사라지고 글자만
+/// 떠 보였다. 다크 모드도 마찬가지다(#1F201E 위 #1F201E). 몇몇 화면은
+/// 부르는 자리마다 `.overlay` 로 테두리를 덧대 고쳐 왔는데, 그 방식은 새로
+/// 부르는 자리가 생길 때마다 같은 실수를 되풀이하게 한다. 부품이 스스로
+/// 경계를 갖게 하고, 정말 필요 없는 자리에서만 `hasBorder: false` 로 뺀다.
 struct WhitePillButton: View {
 
     let title: String
     var systemImage: String?
+    /// 포그 배경 위처럼 경계가 이미 보이는 자리에서만 끈다.
+    var hasBorder: Bool = true
     let action: () -> Void
 
     var body: some View {
@@ -132,6 +141,10 @@ struct WhitePillButton: View {
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .padding(.vertical, CGFloat(JanjanSpacing.s))
             .background(Capsule(style: .continuous).fill(Color.surface))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.hairline, lineWidth: hasBorder ? 1 : 0)
+            )
         }
         .buttonStyle(.plain)
     }

@@ -389,9 +389,6 @@ struct TodayView: View {
                 WhitePillButton(title: t("살펴보기", "Take a look")) {
                     isShowingUnrecordedSheet = true
                 }
-                .overlay(
-                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
-                )
             }
         }
         .overlay(
