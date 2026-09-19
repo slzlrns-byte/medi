@@ -456,9 +456,17 @@ struct DiaryView: View {
                 Text(t("오늘의 질문", "Today's question"))
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
-                Text(card?.text(JanjanLanguage.current) ?? t("오늘은 그냥 여기까지여도 괜찮아요.", "It's okay to stop here for today."))
+                // 질문은 한 문장이 카드를 통째로 채운다. 줄바꿈이 어절
+                // 한가운데서 일어나지 않게 어절 우선 규칙을 걸어 둔다.
+                Text(JanjanText.wordWrapped(
+                    card?.text(JanjanLanguage.current)
+                        ?? t("오늘은 그냥 여기까지여도 괜찮아요.", "It's okay to stop here for today."),
+                    size: 19
+                ))
                     .janjanDisplay(19)
                     .foregroundStyle(Color.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

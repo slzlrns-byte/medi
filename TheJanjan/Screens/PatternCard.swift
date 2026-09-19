@@ -34,8 +34,8 @@ struct PatternCard: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(subtitle ?? t(
-                    "최근 4주의 기분·복약·수면을 같은 눈금에 놓았어요.",
-                    "Mood, doses, and sleep from the past 4 weeks on one scale."
+                    "최근 4주의 기분, 복약, 수면을 확인할 수 있어요.",
+                    "See mood, doses, and sleep from the past 4 weeks."
                 ))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)

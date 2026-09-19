@@ -10,6 +10,15 @@ import JanjanCore
 enum DoseNotification {
 
     static let categoryID = "DOSE_REMINDER"
+    /// 한 시간대에 약이 둘 이상일 때 쓰는 카테고리. 처리는 똑같고 버튼 문구만
+    /// 다르다 - "복용함" 한 번이 그 시간대의 약 **전부**에 걸린다는 것을
+    /// 버튼이 직접 말해야 잠금화면과 워치에서 믿고 누를 수 있다(2026-09-19).
+    static let categoryAllID = "DOSE_REMINDER_ALL"
+
+    /// 약이 하나뿐인 시간대에 "전부" 라고 말하면 그것대로 어색하다. 개수로 고른다.
+    static func category(forMedicationCount count: Int) -> String {
+        count > 1 ? categoryAllID : categoryID
+    }
 
     static let actionTaken = "DOSE_TAKEN"
     static let actionSkipped = "DOSE_SKIPPED"
@@ -109,18 +118,39 @@ final class NotificationManager: NSObject {
         await center.notificationSettings().authorizationStatus
     }
 
+    /// 카테고리는 둘이다. 액션 식별자가 같으므로 응답을 받는 쪽은 구분할 필요가 없다.
     func registerCategories() {
-        let taken = UNNotificationAction(identifier: DoseNotification.actionTaken, title: t("복용함", "Taken"), options: [])
-        let skipped = UNNotificationAction(identifier: DoseNotification.actionSkipped, title: t("건너뜀", "Skip"), options: [])
-        let snooze = UNNotificationAction(identifier: DoseNotification.actionSnooze, title: t("30분 뒤", "In 30 min"), options: [])
-
-        let category = UNNotificationCategory(
-            identifier: DoseNotification.categoryID,
-            actions: [taken, skipped, snooze],
-            intentIdentifiers: [],
+        let snooze = UNNotificationAction(
+            identifier: DoseNotification.actionSnooze,
+            title: t("30분 뒤", "In 30 min"),
             options: []
         )
-        center.setNotificationCategories([category])
+
+        func category(_ identifier: String, taken: String, skipped: String) -> UNNotificationCategory {
+            UNNotificationCategory(
+                identifier: identifier,
+                actions: [
+                    UNNotificationAction(identifier: DoseNotification.actionTaken, title: taken, options: []),
+                    UNNotificationAction(identifier: DoseNotification.actionSkipped, title: skipped, options: []),
+                    snooze
+                ],
+                intentIdentifiers: [],
+                options: []
+            )
+        }
+
+        center.setNotificationCategories([
+            category(
+                DoseNotification.categoryID,
+                taken: t("복용함", "Taken"),
+                skipped: t("건너뜀", "Skip")
+            ),
+            category(
+                DoseNotification.categoryAllID,
+                taken: t("전부 복용함", "All taken"),
+                skipped: t("전부 건너뜀", "Skip all")
+            )
+        ])
     }
 
     // MARK: - 예약
@@ -176,7 +206,7 @@ final class NotificationManager: NSObject {
         content.title = titleText(for: reminder.slot)
         content.body = bodyText(for: reminder)
         content.sound = .default
-        content.categoryIdentifier = DoseNotification.categoryID
+        content.categoryIdentifier = DoseNotification.category(forMedicationCount: reminder.medicationIDs.count)
         content.userInfo = [
             DoseNotification.slotKeyField: reminder.slot.storageKey,
             DoseNotification.medicationIDsField: reminder.medicationIDs.map(\.uuidString)
@@ -248,7 +278,7 @@ final class NotificationManager: NSObject {
                 content.title = titleText(for: reminder.slot)
                 content.body = t("아직 기록이 없어요.", "Still not logged.")
                 content.sound = .default
-                content.categoryIdentifier = DoseNotification.categoryID
+                content.categoryIdentifier = DoseNotification.category(forMedicationCount: reminder.medicationIDs.count)
                 content.userInfo = [
                     DoseNotification.slotKeyField: reminder.slot.storageKey,
                     DoseNotification.medicationIDsField: reminder.medicationIDs.map(\.uuidString)
@@ -349,7 +379,7 @@ final class NotificationManager: NSObject {
         }
         content.body = t("아직 남아 있어요.", "Still waiting for you.")
         content.sound = .default
-        content.categoryIdentifier = DoseNotification.categoryID
+        content.categoryIdentifier = DoseNotification.category(forMedicationCount: medicationIDs.count)
         content.userInfo = [
             DoseNotification.slotKeyField: slotKey,
             DoseNotification.medicationIDsField: medicationIDs.map(\.uuidString)

@@ -22,7 +22,7 @@ struct ProMomentNote: View {
 
         var textKo: String {
             switch self {
-            case .patternReady: return "2주가 모이면 4주 전체가 한눈에 보여요."
+            case .patternReady: return "2주간 기록하면 패턴을 확인할 수 있어요."
             case .forecastReady: return "이 처방으로 다음 진료까지 버틸 수 있는지 계산해 드릴 수 있어요."
             case .doseChangeLogged: return "바꾼 뒤의 기분·수면 변화를 다음 진료까지 모아 볼 수 있어요."
             }
@@ -30,7 +30,7 @@ struct ProMomentNote: View {
 
         var textEn: String {
             switch self {
-            case .patternReady: return "Once two weeks are in, the whole four weeks come into view."
+            case .patternReady: return "Log for two weeks and the pattern comes into view."
             case .forecastReady: return "We can work out whether this prescription lasts until your next visit."
             case .doseChangeLogged: return "You can gather how mood and sleep shift after the change, up to your next visit."
             }
@@ -49,7 +49,9 @@ struct ProMomentNote: View {
 
     var body: some View {
         if !pro.isPro, !isDismissed, !UserDefaults.standard.bool(forKey: moment.defaultsKey) {
-            HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
+            // 줄 높이는 44pt 닫기 버튼이 정한다. 글자를 .top 으로 붙여 두면
+            // 한 줄짜리 안내가 상자 위쪽에 치우쳐 보인다(QA 2026-09-19).
+            HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.xs)) {
                 Button {
                     isShowingPaywall = true
                 } label: {

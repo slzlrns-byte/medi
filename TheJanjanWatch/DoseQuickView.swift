@@ -39,7 +39,7 @@ struct DoseQuickView: View {
                     Button {
                         record(.taken)
                     } label: {
-                        Text(t("먹었어요", "Took it"))
+                        Text(takenTitle)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -49,7 +49,7 @@ struct DoseQuickView: View {
                     Button {
                         record(.skipped)
                     } label: {
-                        Text(t("건너뜀", "Skipped"))
+                        Text(skippedTitle)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -70,6 +70,18 @@ struct DoseQuickView: View {
             }
             .navigationTitle(titleText)
         }
+    }
+
+    /// 한 번 눌러 그 시간대의 약 전부를 기록한다. 약이 둘 이상이면 버튼이
+    /// 그렇게 말한다 - 잠금화면 알림의 "전부 복용함" 과 같은 규칙이다.
+    private var coversManyMedications: Bool { slot.medicationIDs.count > 1 }
+
+    private var takenTitle: String {
+        coversManyMedications ? t("전부 먹었어요", "All taken") : t("먹었어요", "Took it")
+    }
+
+    private var skippedTitle: String {
+        coversManyMedications ? t("전부 건너뜀", "Skip all") : t("건너뜀", "Skipped")
     }
 
     private var titleText: String {

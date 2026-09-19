@@ -188,3 +188,31 @@ enum JanjanFontChoice: String, CaseIterable {
         language == .english ? detailEn : detailKo
     }
 }
+
+// MARK: - 한글 줄바꿈
+
+/// 한글 문장을 어절 단위로 끊어 읽게 한다.
+///
+/// 문장 하나가 카드를 통째로 채우는 자리(오늘의 질문)에서는 줄바꿈 한 번이
+/// 크게 거슬린다. "언제였어요?" 가 "언제였 / 어요?" 로 갈리면 읽다가 걸린다.
+/// TextKit 에 한글 어절 우선 규칙을 직접 걸어 그 자리를 띄어쓰기로 옮긴다.
+///
+/// 문단 서식을 통째로 주므로 SwiftUI 의 `.lineSpacing` 이 덮인다 —
+/// 그래서 행간을 같은 토큰에서 다시 계산해 넣는다. 자간·서체는 밖의
+/// `janjanDisplay` / `janjanBody` 가 그대로 얹는다.
+enum JanjanText {
+
+    static func wordWrapped(
+        _ string: String,
+        size: Double,
+        role: JanjanTypography.Role = .display
+    ) -> AttributedString {
+        var attributed = AttributedString(string)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakStrategy = .hangulWordPriority
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.lineSpacing = CGFloat(JanjanTypography.lineSpacing(forSize: size, role: role))
+        attributed.paragraphStyle = paragraph
+        return attributed
+    }
+}
