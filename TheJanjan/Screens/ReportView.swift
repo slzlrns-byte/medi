@@ -52,6 +52,9 @@ struct ReportView: View {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     adherenceCard
                     MonthWaveCard(checkIns: checkIns)
+                    // 패턴 보기는 Pro. 무료에서는 흐린 그림 위에 자물쇠가 얹힌다.
+                    PatternCard(timeline: patternTimeline, isLocked: !pro.isPro)
+                        .proGated(.patternView)
                     perMedicationCard
                     askDoctorCard
                     exportCard
@@ -142,6 +145,18 @@ struct ReportView: View {
 
     private var activeMedications: [Medication] {
         medications.filter { $0.status == .active }
+    }
+
+    /// 패턴 보기의 원자료. 계산은 JanjanCore 가 한다 - 화면은 그리기만.
+    private var patternTimeline: PatternTimeline {
+        PatternTimeline.make(
+            dayCount: 28,
+            endingAt: today,
+            checkIns: checkIns,
+            schedules: schedules,
+            medications: medications,
+            doseEvents: doses
+        )
     }
 
     // MARK: - 조각

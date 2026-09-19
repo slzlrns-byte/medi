@@ -10,6 +10,7 @@ import Foundation
 public enum ProFeature: String, CaseIterable, Sendable {
     case pharmacyScan
     case pillFinder
+    case patternView
     case runOutForecast
     case hideNames
     case doseChangeCompare
@@ -23,6 +24,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         switch self {
         case .pharmacyScan: return "약봉투 스캔"
         case .pillFinder: return "약 모양으로 찾기"
+        case .patternView: return "패턴 보기"
         case .runOutForecast: return "소진 예측"
         case .hideNames: return "약 이름 가리기"
         case .doseChangeCompare: return "용량 변경 전후 비교"
@@ -38,6 +40,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         switch self {
         case .pharmacyScan: return "Pharmacy bag scan"
         case .pillFinder: return "Find by pill appearance"
+        case .patternView: return "Pattern view"
         case .runOutForecast: return "Run-out forecast"
         case .hideNames: return "Hide medication names"
         case .doseChangeCompare: return "Dose change comparison"
@@ -67,9 +70,14 @@ public enum ProFeature: String, CaseIterable, Sendable {
     ///
     /// **App Store Connect 의 구독 설명도 이 목록과 같아야 한다.** 한쪽만 고치면
     /// 앱과 스토어가 서로 다른 약속을 하게 된다.
+    ///
+    /// 패턴 보기(2026-09-19 신설)를 더해 일곱이 됐다. ASC 구독 설명은 45자
+    /// 제한이라 일곱을 다 못 적어 전후 비교를 뺀 여섯만 적는다 - 설명이
+    /// 약속한 것이 실제 잠금의 부분집합이면 어긋남이 아니다(체크리스트 3.10).
     public static let launchHighlights: [ProFeature] = [
         .pharmacyScan,
         .pillFinder,
+        .patternView,
         .runOutForecast,
         .doseChangeCompare,
         .hideNames,
