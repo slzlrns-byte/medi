@@ -34,19 +34,14 @@
 
 ● 복약 기록은 탭 한 번
 - 아침, 점심, 저녁, 취침, 내가 정한 시간대까지 기록해요.
-- 필요할 때만 먹는 약은 따로 기록할 수 있어요.
+- 필요할 때만 먹는 약도 따로 기록해요.
 - 알림이 오면 잠금화면에서 '복용함'을 바로 눌러요.
 - 홈 화면과 잠금화면 위젯으로 다음 시간대를 확인해요.
 
 ● 빠트린 날도 찾아요
 - 남은 알약을 세어 기록과 맞춰 봐요.
-- 비어 있는 날짜는 하나씩 채워 넣어요.
 - 답하지 않고 지나간 시간대는 나중에 물어봐 드려요.
-
-● 잘못 적었어도 괜찮아요
-- 약 이름, 용량, 먹는 개수, 먹는 때를 언제든 고칠 수 있어요. 지난 기록은 그대로 남아요.
-- 지난 날의 기분과 메모도 달력에서 골라 고쳐요.
-- 잘못 눌린 복용 표시도 그날로 돌아가 바로잡아요.
+- 잘못 적었어도 괜찮아요. 약 정보도 지난 기록도 언제든 고칠 수 있어요.
 
 ● 마음도 함께 남겨요
 - 바쁜 날은 기분을 색깔로 골라요.
@@ -54,10 +49,9 @@
 
 ● 진료 준비는 한 장으로
 - 복약률, 한 달 기분 흐름, 남은 약 개수, 의사에게 물어볼 것을 정리해 둬요.
-- PDF 한 장으로 나와요. 필요하다면 진료실에서 그대로 보여주면 돼요.
+- PDF 한 장으로 나와요. 진료실에서 그대로 보여주면 돼요.
 - 내보내기는 무료예요. 짧은 광고를 보면 바로 만들어 드리고, Pro는 광고 없이 받아요.
 - 다음 진료까지 며칠 남았는지 늘 보여요.
-- 진료를 기록할 때 바뀐 용량을 함께 적으면 그 자리에서 반영돼요.
 
 ● Pro
 월간·연간 구독 또는 평생 이용권 한 번 결제로 열어요.
@@ -76,9 +70,8 @@
 패턴 보기는 최근 7일까지, 지난 진료 기록은 바로 이전 회차까지 무료로도 볼 수 있어요.
 
 ● 기록은 내 것
-- 서버가 없어요. 기록은 내 기기와 내 iCloud에만 저장돼요.
-- 개발자는 기록을 수집하지 않아요. 무료 화면의 광고는 기록을 보지 않고, 관심사 추적도 하지 않아요.
-- 보안을 위해 Face ID나 암호로 잠글 수 있어요.
+- 서버가 없어요. 기록은 내 기기와 내 iCloud에만 저장되고 개발자는 수집하지 않아요.
+- 무료 화면의 광고는 기록을 보지 않고 관심사 추적도 하지 않아요. Face ID나 암호로 잠글 수도 있어요.
 
 이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요.
 
@@ -132,13 +125,8 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 
 ● Find the days you missed
 - Count your remaining pills and compare with your records.
-- Fill in the blank days one by one.
 - Slots that went by unanswered come back and ask you later.
-
-● Mistakes are fixable
-- Change a medication's name, dose, count, or times whenever you like. Past records stay as they are.
-- Edit a past day's mood and notes straight from the calendar.
-- Fix a dose you marked by mistake, on the day it happened.
+- Mistakes are fixable. Edit a medication or a past entry whenever you like.
 
 ● Keep your mood too
 - On busy days, just pick a mood color.
@@ -149,7 +137,6 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 - It comes out as a single PDF you can show at the clinic.
 - Exporting is free — watch a short ad and it's ready right away, or skip the ad with Pro.
 - Always see how many days are left until your next visit.
-- Log a dose change while logging the visit, and it applies right away.
 
 ● Pro
 Open it with a monthly or yearly subscription, or a one-time lifetime purchase.
@@ -168,9 +155,8 @@ Open it with a monthly or yearly subscription, or a one-time lifetime purchase.
 Pattern view is free for the last 7 days, and visit history is free up to your previous visit.
 
 ● Your records are yours
-- No server. Records live only on your device and in your own iCloud.
-- The developer never collects your records. Ads on free screens don't read them and don't track you.
-- Lock the app with Face ID or a passcode.
+- No server. Records live only on your device and in your own iCloud, and the developer never collects them.
+- Ads on free screens don't read your records and don't track you. You can also lock the app with Face ID or a passcode.
 
 This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions.
 
