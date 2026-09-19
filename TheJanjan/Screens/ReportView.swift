@@ -117,8 +117,11 @@ struct ReportView: View {
 
     /// 가장 최근에 다녀온 진료. 요약 기간의 시작점이 된다 — 의사가 궁금한 것은
     /// 지난 4주가 아니라 마지막으로 본 뒤의 일이다(강점 결정서 1위).
+    /// 오늘 탭에서 일정만 잡은 기록(약·처방일수·메모 없음)은 실제 진료가 아니라
+    /// 여기서 세지 않는다(QA 2026-09-19).
     private var lastVisit: Date? {
         prescriptionRecords
+            .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
             .map(\.core.visitDate)
             .filter { $0 <= today }
             .max()

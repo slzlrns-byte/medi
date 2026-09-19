@@ -715,7 +715,9 @@ private struct NextVisitSheet: View {
                             DatePicker(
                                 t("다음 진료", "Next visit"),
                                 selection: $date,
-                                in: Date()...,
+                                // 하한은 시각이 아니라 오늘 0시 - 오늘 이른 시각으로
+                                // 잡힌 일정을 오후에 열어도 값이 범위 밖이 되지 않는다.
+                                in: Calendar.current.startOfDay(for: Date())...,
                                 displayedComponents: [.date, .hourAndMinute]
                             )
                             .janjanBody(15)
@@ -768,9 +770,25 @@ private struct NextVisitSheet: View {
         .presentationDetents([.medium])
     }
 
+    /// 약도 처방일수도 메모도 없는, 다음 진료 일정만 담은 기록인지.
+    /// 이런 기록은 리포트의 "지난 진료" 로 세지 않고, 미정이 되면 지운다.
+    private func isScheduleOnly(_ record: PrescriptionRecord) -> Bool {
+        record.medicationIDValues.isEmpty && record.daysSupplied == 0 && record.clinicNote.isEmpty
+    }
+
     private func save() {
-        if let record = prescriptionRecords.first(where: { $0.visitDate <= Date() }) ?? prescriptionRecords.first {
-            record.nextVisitDate = date
+        let now = Date()
+        if let existing,
+           let shown = prescriptionRecords.first(where: { $0.nextVisitDate == existing }) {
+            // 화면에 보여 준 바로 그 날짜를 든 기록을 고친다 - 기록이 여럿일 때
+            // 보이는 것과 저장이 어긋나면 안 된다(QA 2026-09-19).
+            shown.nextVisitDate = date
+            if isScheduleOnly(shown) { shown.visitDate = date }
+        } else if let latest = prescriptionRecords.first(where: { $0.visitDate <= now }) {
+            latest.nextVisitDate = date
+            // 지난 일정만 담은 기록이 남아 있었으면 새 일정으로 되살린다 -
+            // 지난 visitDate 를 그대로 두면 가짜 "지난 진료" 가 된다.
+            if isScheduleOnly(latest) { latest.visitDate = date }
         } else {
             context.insert(PrescriptionRecord(
                 visitDate: date,
@@ -785,12 +803,12 @@ private struct NextVisitSheet: View {
 
     private func clear() {
         let todayStart = Calendar.current.startOfDay(for: Date())
-        for record in prescriptionRecords where (record.nextVisitDate ?? .distantPast) >= todayStart {
-            // 일정만 담은 기록(약도 처방일수도 없는 것)은 미정이 되면 남길 이유가
-            // 없다 - 미래의 visitDate 가 지나며 가짜 "지난 진료" 가 되기 전에 지운다.
-            if record.medicationIDValues.isEmpty && record.daysSupplied == 0 && record.visitDate > Date() {
+        for record in prescriptionRecords {
+            // 일정만 담은 기록은 날짜가 지났든 아니든 남길 이유가 없다 -
+            // 남으면 지난 visitDate 가 가짜 "지난 진료" 가 된다(QA 2026-09-19).
+            if isScheduleOnly(record) {
                 context.delete(record)
-            } else {
+            } else if (record.nextVisitDate ?? .distantPast) >= todayStart {
                 record.nextVisitDate = nil
             }
         }
