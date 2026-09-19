@@ -12,7 +12,22 @@ import JanjanCore
 /// 만들지 않기 위해서다. SwiftData 가 바뀐 값을 그대로 써 준다.
 struct DiaryView: View {
 
+    /// 들여다보는 날. nil 이면 오늘이고, 그때만 탭 화면으로 동작한다.
+    ///
+    /// 지난 날의 기분과 메모를 고칠 길이 없었다(QA 2026-09-19). 어제 기분을
+    /// 잘못 눌렀거나 오타가 있어도 손댈 방법이 없었는데, 이것은 리포트에
+    /// 실려 진료실까지 나가는 값이다. 고치는 화면을 따로 만들지 않고 같은
+    /// 화면을 날짜만 바꿔 연다 - 두 벌로 나누면 한쪽만 고쳐지는 날이 온다.
+    private let day: Date?
+
+    init(day: Date? = nil) { self.day = day }
+
+    /// 지난 날을 고치러 열린 상태인가. 그날 것이 아닌 카드(오늘의 질문·
+    /// 이번 달의 흐름·지난 기록)는 이때 감춘다.
+    private var isDayEditor: Bool { day != nil }
+
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     @Query(sort: \CheckInRecord.date, order: .reverse) private var checkInRecords: [CheckInRecord]
     @Query(sort: \SymptomEntryRecord.startedAt, order: .reverse)
@@ -22,6 +37,14 @@ struct DiaryView: View {
     @State private var isShowingSymptomSheet = false
     @State private var pendingSymptomDeletion: SymptomEntryRecord?
     @State private var safetyReason: SafetyReason?
+    /// 고치러 여는 지난 날.
+    @State private var editingDay: EditingDay?
+
+    /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
+    private struct EditingDay: Identifiable {
+        let id = UUID()
+        let date: Date
+    }
     /// 글 칸 어디에든 커서가 있으면 참. 키보드 위 "완료" 가 이걸 꺼서
     /// 키보드를 내린다(사용자 요청 2026-09-19) - 여러 줄 칸은 리턴이
     /// 줄바꿈이라 달리 내릴 길이 없다.
@@ -33,19 +56,19 @@ struct DiaryView: View {
         let reason: SafetyTrigger.Reason
     }
 
-    private var today: Date { Date() }
+    private var viewedDay: Date { day ?? Date() }
     private var calendar: Calendar { .current }
 
-    private var todayRecord: CheckInRecord? {
+    private var dayRecord: CheckInRecord? {
         // 동기화 충돌로 같은 날 두 줄이 생겼어도 가장 나중에 손댄 줄을 편집한다.
         // first 로 고르면 어느 줄이 걸릴지 기기마다 달라진다.
         checkInRecords
-            .filter { calendar.isDate($0.date, inSameDayAs: today) }
+            .filter { calendar.isDate($0.date, inSameDayAs: viewedDay) }
             .max { $0.updatedAt < $1.updatedAt }
     }
 
-    private var todaysSymptoms: [SymptomEntryRecord] {
-        symptomRecords.filter { calendar.isDate($0.startedAt, inSameDayAs: today) }
+    private var daySymptoms: [SymptomEntryRecord] {
+        symptomRecords.filter { calendar.isDate($0.startedAt, inSameDayAs: viewedDay) }
     }
 
     var body: some View {
@@ -54,7 +77,7 @@ struct DiaryView: View {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                     moodCard
 
-                    if let record = todayRecord {
+                    if let record = dayRecord {
                         noteCard(record)
                         lifestyleCard(record)
                         expandButton
@@ -68,11 +91,15 @@ struct DiaryView: View {
                     }
 
                     symptomCard
-                    questionCard
-                    // 리포트에도 같은 카드가 있지만, 기분을 적는 자리에서 바로
-                    // 한 달을 돌아볼 수 있어야 한다. 계산은 MonthWave 한 곳이 한다.
-                    MonthWaveCard(checkIns: checkInRecords.map(\.core))
-                    historyCard
+                    // 오늘의 질문·한 달의 흐름·지난 기록은 그날 하나의 것이
+                    // 아니다. 지난 날을 고치러 들어온 화면에는 두지 않는다.
+                    if !isDayEditor {
+                        questionCard
+                        // 리포트에도 같은 카드가 있지만, 기분을 적는 자리에서 바로
+                        // 한 달을 돌아볼 수 있어야 한다. 계산은 MonthWave 한 곳이 한다.
+                        MonthWaveCard(checkIns: checkInRecords.map(\.core))
+                        historyCard
+                    }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
                 .padding(.bottom, CGFloat(JanjanSpacing.xxl))
@@ -83,12 +110,21 @@ struct DiaryView: View {
             // simultaneousGesture 라 버튼·칩 탭은 그대로 동작한다.
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(TapGesture().onEnded { isEditingText = false })
-            .navigationTitle(t("기록", "Journal"))
+            .navigationTitle(isDayEditor ? dayTitleText : t("기록", "Journal"))
+            .navigationBarTitleDisplayMode(isDayEditor ? .inline : .large)
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(t("완료", "Done")) { isEditingText = false }
                         .foregroundStyle(Color.ink)
+                }
+                if isDayEditor {
+                    // 저장 버튼은 없다 - 고친 것은 그때그때 저장된다.
+                    // 닫기만 있으면 된다(기록 화면과 같은 규칙).
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(t("닫기", "Close")) { dismiss() }
+                            .foregroundStyle(Color.ink)
+                    }
                 }
             }
             .sheet(isPresented: $isShowingSymptomSheet) {
@@ -98,6 +134,9 @@ struct DiaryView: View {
             }
             .sheet(item: $safetyReason) { _ in
                 SafetyCardView()
+            }
+            .sheet(item: $editingDay) { target in
+                DiaryView(day: target.date)
             }
             .confirmationDialog(
                 t("이 증상 기록을 지울까요?", "Delete this symptom entry?"),
@@ -119,13 +158,15 @@ struct DiaryView: View {
     private var moodCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("지금 기분은 어떠세요?", "How are you feeling right now?"))
+                Text(isDayEditor
+                     ? t("이날 기분은 어떠셨어요?", "How did this day feel?")
+                     : t("지금 기분은 어떠세요?", "How are you feeling right now?"))
                     .janjanDisplay(22)
                     .foregroundStyle(Color.ink)
 
-                MoodPickerRow(chosenScore: todayRecord?.moodScore) { saveMood($0) }
+                MoodPickerRow(chosenScore: dayRecord?.moodScore) { saveMood($0) }
 
-                if let record = todayRecord {
+                if let record = dayRecord {
                     Text(CheckIn.Mood(record.moodScore).label(JanjanLanguage.current))
                         .janjanBody(14, weight: .medium)
                         .foregroundStyle(Color.ink2)
@@ -406,12 +447,14 @@ struct DiaryView: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
-                if todaysSymptoms.isEmpty {
-                    Text(t("오늘 남긴 증상이 없어요.", "No symptoms logged today."))
+                if daySymptoms.isEmpty {
+                    Text(isDayEditor
+                         ? t("이날 남긴 증상이 없어요.", "No symptoms logged on this day.")
+                         : t("오늘 남긴 증상이 없어요.", "No symptoms logged today."))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 } else {
-                    ForEach(todaysSymptoms) { entry in
+                    ForEach(daySymptoms) { entry in
                         symptomRow(entry)
                     }
                 }
@@ -450,7 +493,7 @@ struct DiaryView: View {
     // MARK: - 질문과 지난 기록
 
     private var questionCard: some View {
-        let card = Catalogs.questions.card(for: today)
+        let card = Catalogs.questions.card(for: viewedDay)
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text(t("오늘의 질문", "Today's question"))
@@ -473,7 +516,7 @@ struct DiaryView: View {
     /// 지난 2주. 숫자도 그래프도 없이 점과 글자만 — 되돌아보기지 평가가 아니다.
     private var historyCard: some View {
         let past = checkInRecords
-            .filter { !calendar.isDate($0.date, inSameDayAs: today) }
+            .filter { !calendar.isDate($0.date, inSameDayAs: viewedDay) }
             .prefix(14)
 
         return JanjanCard {
@@ -488,7 +531,17 @@ struct DiaryView: View {
                         .foregroundStyle(Color.muted)
                 }
 
+                if !past.isEmpty {
+                    Text(t("한 줄을 누르면 그날 기록을 고칠 수 있어요.",
+                           "Tap a row to edit that day's entry."))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                }
+
                 ForEach(Array(past)) { record in
+                    Button {
+                        editingDay = EditingDay(date: record.date)
+                    } label: {
                     HStack(spacing: CGFloat(JanjanSpacing.s)) {
                         Circle()
                             .fill(Color.mood(record.moodScore))
@@ -502,7 +555,16 @@ struct DiaryView: View {
                             .foregroundStyle(Color.muted)
                             .lineLimit(1)
                         Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.muted)
                     }
+                    // 점과 글자만 있는 줄이라 그냥 두면 어디를 눌러야 할지
+                    // 모른다. 줄 전체가 손가락 자리가 되게 한다.
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -518,7 +580,7 @@ struct DiaryView: View {
     // MARK: - 저장
 
     private func saveMood(_ score: Int) {
-        let saved = CheckInRecorder.recordMood(score: score, on: today, in: context)
+        let saved = CheckInRecorder.recordMood(score: score, on: viewedDay, in: context)
         save()
 
         // 기분이 이어져 낮으면 카드를 조용히 올린다. 기록은 이미 저장됐다.
@@ -527,11 +589,12 @@ struct DiaryView: View {
         // 오늘 줄만 저장한 값으로 갈아 끼우고 센다. 그러지 않으면 사흘째 −3 을 고른
         // 바로 그 순간에는 카드가 안 뜨고 다음에 화면을 다시 열어야 뜬다.
         var checkIns = checkInRecords
-            .filter { !calendar.isDate($0.date, inSameDayAs: today) }
+            .filter { !calendar.isDate($0.date, inSameDayAs: viewedDay) }
             .map(\.core)
         checkIns.append(saved.core)
 
-        if let reason = SafetyTrigger.reason(forCheckIns: checkIns, endingAt: today) {
+        guard !isDayEditor else { return }
+        if let reason = SafetyTrigger.reason(forCheckIns: checkIns, endingAt: viewedDay) {
             safetyReason = SafetyReason(reason: reason)
         }
     }
@@ -541,16 +604,36 @@ struct DiaryView: View {
         let entry = SymptomEntry(
             symptomID: symptomID,
             severity: severity,
-            startedAt: Date(),
+            startedAt: symptomTimestamp,
             note: trimmed.isEmpty ? nil : trimmed,
             source: .phone
         )
         context.insert(SymptomEntryRecord.make(from: entry))
         save()
 
+        // 지난 날을 고치는 중에는 안전 카드를 올리지 않는다. 한 달 전 기록을
+        // 정리하다가 위기 안내가 튀어나오면 지금의 상태를 잘못 말하는 셈이다.
+        guard !isDayEditor else { return }
         if let reason = SafetyTrigger.reason(forSavedSymptomID: symptomID) {
             safetyReason = SafetyReason(reason: reason)
         }
+    }
+
+    /// 지난 날에 남기는 증상의 시각. 그날 정오에 둔다 - 몇 시였는지는 알 수
+    /// 없고, 자정에 두면 시간대에 따라 전날로 넘어간다.
+    private var symptomTimestamp: Date {
+        guard isDayEditor else { return Date() }
+        return calendar.date(
+            bySettingHour: 12, minute: 0, second: 0, of: viewedDay
+        ) ?? viewedDay
+    }
+
+    /// 고치기 화면의 제목. "9월 12일 금요일".
+    private var dayTitleText: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdEEE")
+        return formatter.string(from: viewedDay)
     }
 
     private func toggle(_ wordID: String, in record: CheckInRecord) {

@@ -76,12 +76,16 @@ enum JanjanAds {
 @MainActor
 final class BannerState: ObservableObject {
     @Published var isLoaded = false
+    /// 앱이 앞으로 돌아올 때마다 하나씩 오른다. 아직 못 붙은 배너를 다시 부른다.
+    @Published var reloadToken = 0
 }
 
 /// 탭 화면 아래에 붙는 띠. 무료에게만 보인다.
 struct JanjanBannerView: UIViewRepresentable {
 
+    /// GADAdSizeBanner 의 크기. 배너 자신은 늘 이 크기를 갖는다.
     static let height: CGFloat = 50
+    static let width: CGFloat = 320
 
     @ObservedObject var state: BannerState
 
@@ -102,22 +106,62 @@ struct JanjanBannerView: UIViewRepresentable {
         if view.rootViewController == nil {
             view.rootViewController = JanjanAds.rootViewController
         }
+        // 앞으로 돌아왔는데 아직 못 붙었으면 한 번 더 부른다.
+        if context.coordinator.consume(token: state.reloadToken), !state.isLoaded {
+            view.load(JanjanAds.request())
+        }
     }
 
-    /// 로드 성공·실패를 상태로 옮긴다. 네트워크가 없거나 채울 광고가 없는
-    /// 일은 드물지 않고, 그때 회색 띠만 남으면 고장처럼 보인다(QA 2026-09-19).
+    /// 로드 성공·실패를 상태로 옮기고, 실패하면 다시 물어본다.
+    ///
+    /// 네트워크가 없거나 채울 광고가 없는 일은 드물지 않고, 그때 회색 띠만
+    /// 남으면 고장처럼 보인다. 그래서 실패하면 자리를 접는데 — **한 번
+    /// 실패하면 그걸로 끝이었다**(QA 2026-09-19). 새로 낸 광고 단위는 처음
+    /// 하루쯤 아무것도 주지 않는 일이 흔한데, 그 사이에 켠 앱은 그 세션
+    /// 내내 빈 자리로 남고 사용자는 광고가 아예 없는 줄 안다. 간격을
+    /// 늘려 가며 다섯 번까지 다시 물어본다.
     final class Coordinator: NSObject, GADBannerViewDelegate {
 
         private let state: BannerState
+        private var retries = 0
+        private var lastToken = 0
+        private var retryTask: Task<Void, Never>?
 
         init(state: BannerState) { self.state = state }
 
+        deinit { retryTask?.cancel() }
+
+        /// 바깥에서 올린 다시 부르기 신호를 한 번만 받는다.
+        func consume(token: Int) -> Bool {
+            guard token != lastToken else { return false }
+            lastToken = token
+            retries = 0
+            return true
+        }
+
         func bannerViewDidReceiveAd(_ bannerView: GADBannerView) {
+            retries = 0
+            retryTask?.cancel()
+            retryTask = nil
             Task { @MainActor in state.isLoaded = true }
         }
 
         func bannerView(_ bannerView: GADBannerView, didFailToReceiveAdWithError error: Error) {
             Task { @MainActor in state.isLoaded = false }
+            scheduleRetry(for: bannerView)
+        }
+
+        private func scheduleRetry(for bannerView: GADBannerView) {
+            guard retries < 5 else { return }
+            retries += 1
+            // 30초, 1분, 2분, 4분, 5분. 재촉하지 않고 조용히 기다린다.
+            let seconds = min(30 << (retries - 1), 300)
+            retryTask?.cancel()
+            retryTask = Task { @MainActor [weak bannerView] in
+                try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
+                guard !Task.isCancelled, let bannerView else { return }
+                bannerView.load(JanjanAds.request())
+            }
         }
     }
 }
@@ -136,12 +180,24 @@ struct BannerSlot: ViewModifier {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !pro.isPro {
                     JanjanBannerView(state: state)
-                        // 광고가 안 붙었으면 자리를 접는다.
-                        .frame(height: state.isLoaded ? JanjanBannerView.height : 0)
+                        // **배너 자신은 늘 제 크기를 갖는다.** 높이 0 인 칸에
+                        // 넣어 두면 SDK 가 그릴 자리가 없다고 보고 실패하는데,
+                        // 접혀 있다는 이유로 실패하고 실패했다는 이유로 계속
+                        // 접혀 있게 된다(QA 2026-09-19). 접는 것은 바깥 칸이다.
+                        .frame(width: JanjanBannerView.width, height: JanjanBannerView.height)
+                        .frame(height: state.isLoaded ? JanjanBannerView.height : 0, alignment: .top)
                         .frame(maxWidth: .infinity)
                         .background(state.isLoaded ? Color.janjan(.surface2) : Color.clear)
                         .clipped()
                 }
+            }
+            // 앞으로 돌아올 때마다 아직 못 붙은 배너를 다시 부른다.
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIApplication.willEnterForegroundNotification
+                )
+            ) { _ in
+                state.reloadToken += 1
             }
             // 구독이 끝나 배너가 돌아올 때 레이아웃이 툭 튀지 않게 한다.
             .animation(.easeInOut(duration: 0.2), value: pro.isPro)

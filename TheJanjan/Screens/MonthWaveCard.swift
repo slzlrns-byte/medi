@@ -292,13 +292,16 @@ private struct MonthWaveShareView: View {
 
 /// 달력에서 누른 하루의 기록을 모아 보여 주는 시트 (사용자 요청 2026-09-19).
 ///
-/// 여기서는 보여 주기만 한다 - 고치는 것은 각 화면(기록·오늘)이 맡는다.
+/// 보여 주는 것이 먼저이고, 고치는 것은 한 겹 안에 있다 - "이날 기록 고치기"
+/// 가 기록 화면을 그 날짜로 연다(QA 2026-09-19. 그 전에는 보기 전용이라
+/// 어제 기분을 잘못 눌러도 손댈 방법이 없었다).
 /// 목록을 통째로 읽고 날짜로 거르는 것은 이 앱의 다른 화면과 같은 규칙이다.
 private struct DayRecordSheet: View {
 
     let date: Date
 
     @Environment(\.dismiss) private var dismiss
+    @State private var isEditing = false
 
     @Query private var checkInRecords: [CheckInRecord]
     @Query private var symptomRecords: [SymptomEntryRecord]
@@ -348,6 +351,17 @@ private struct DayRecordSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+
+                    // 기록이 없던 날도 여기서 뒤늦게 채울 수 있다.
+                    WhitePillButton(
+                        title: hasAnything
+                            ? t("이날 기록 고치기", "Edit this day")
+                            : t("이날 기록 남기기", "Log this day"),
+                        systemImage: "pencil"
+                    ) {
+                        isEditing = true
+                    }
+                    .padding(.top, CGFloat(JanjanSpacing.xs))
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
                 .padding(.top, CGFloat(JanjanSpacing.s))
@@ -365,6 +379,9 @@ private struct DayRecordSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .sheet(isPresented: $isEditing) {
+            DiaryView(day: date)
+        }
     }
 
     private var titleText: String {
