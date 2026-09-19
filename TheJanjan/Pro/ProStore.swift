@@ -30,7 +30,17 @@ final class ProStore: ObservableObject {
 
     /// Pro 권한. 화면은 이 값 하나만 본다.
     /// SwiftUI 밖(알림 예약)에서도 봐야 해서 UserDefaults 에 그림자를 남긴다.
-    @Published private(set) var isPro = janjanForcesPro {
+    ///
+    /// **시작값을 그림자에서 가져온다**(2026-09-19 광고 도입 때 발견).
+    /// `refreshEntitlements()` 는 StoreKit 을 기다리는 비동기라 첫 프레임에는
+    /// 아직 답이 없다. false 로 시작하면 돈을 낸 사람이 앱을 열 때마다 배너가
+    /// 깜빡였다가 사라진다 - 결제한 사람에게 광고를 보이는 것은 최악이다.
+    /// 지난번에 확인된 값에서 시작하고, 곧바로 도는 StoreKit 이 정정한다.
+    ///
+    /// 틀리는 방향도 안전한 쪽이다. 구독이 끝났는데 그림자가 남아 있으면
+    /// 잠깐 광고를 덜 보이는 것뿐이고(우리 손해), 그 반대는 일어나지 않는다 -
+    /// 이 값은 검증된 거래에서만 참이 된다.
+    @Published private(set) var isPro = janjanForcesPro || JanjanEntitlement.isPro {
         // 위젯은 별도 프로세스라 standard defaults 가 안 보인다.
         // 앱 그룹에도 같이 써야 홈 화면이 같은 값을 본다.
         didSet { JanjanEntitlement.store(isPro) }
