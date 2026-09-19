@@ -24,10 +24,17 @@ enum DemoSeed {
 
         for medication in SampleData.medications {
             let record = MedicationRecord.make(from: medication)
-            // 예시 기록은 지난 넉 주를 담는다. 등록 시각이 "지금" 이면 DayPlan 이
-            // 그 앞의 날들을 이 약이 없던 날로 보고 통째로 비운다 - 스크린샷의
-            // 복약 흐름과 패턴이 사라진다(2026-09-19).
-            record.createdAt = Calendar.current.date(byAdding: .day, value: -60, to: now) ?? now
+            // 예시 기록은 **지난 16일치**다(SampleData.doseEvents).
+            //
+            // 등록 시각이 "지금" 이면 DayPlan 이 그 앞의 날들을 이 약이 없던
+            // 날로 보고 통째로 비워, 스크린샷의 복약 흐름과 패턴이 사라진다.
+            // 반대로 너무 멀리 당기면 기록이 없는 앞쪽 보름이 전부 "빠트린
+            // 날" 로 채워져(UnrecordedBackfill) 복약률이 바닥으로 떨어지고
+            // "기록 없이 지나간 시간대" 가 서른 줄이 된다.
+            //
+            // 그래서 **첫 기록이 있는 날**에 맞춘다. 일부러 남겨 둔 어제·그제
+            // 아침의 빈자리만 빠트림으로 남는다.
+            record.createdAt = Calendar.current.date(byAdding: .day, value: -16, to: now) ?? now
             context.insert(record)
         }
         for schedule in SampleData.schedules {
