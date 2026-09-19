@@ -918,10 +918,12 @@ private struct SlotRecordSheet: View {
                     }
                 }
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    WhitePillButton(title: t("복용함", "Taken")) { onRecord(entry, .taken) }
-                    WhitePillButton(title: t("건너뜀", "Skipped")) { onRecord(entry, .skipped) }
-                }
+                // 흰 카드 위의 흰 알약은 보이지 않는다(QA 2026-09-19). 지나간
+                // 시간대에 답하는 줄과 같은 면·같은 폭을 쓴다.
+                AnswerPillRow(answers: [
+                    .init(t("복용함", "Taken")) { onRecord(entry, .taken) },
+                    .init(t("건너뜀", "Skipped")) { onRecord(entry, .skipped) }
+                ])
             }
         }
     }
@@ -931,6 +933,9 @@ private struct SlotRecordSheet: View {
 ///
 /// 어느 날 무슨 일이 있었는지는 사용자만 안다. 그래서 판단하지 않고 세 가지
 /// 답만 내놓는다 - 먹었다, 건너뛰었다, 기억나지 않는다. 셋 다 똑같이 유효한 답이다.
+///
+/// 셋은 늘 한 줄에 나란히 있다. 그리고 한 시간대에 약이 여럿이면 그중 일부만
+/// 먹었을 수도 있으므로, 약마다 따로 답하는 길을 한 겹 안에 둔다(2026-09-19).
 private struct UnrecordedSlotsSheet: View {
 
     let lines: [UnrecordedSlots.Line]
@@ -940,6 +945,9 @@ private struct UnrecordedSlotsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var pro: ProStore
 
+    /// 약마다 따로 답하려고 펼쳐 둔 줄. 답을 남겨 줄이 사라지면 자연히 잊힌다.
+    @State private var splitLineIDs: Set<String> = []
+
     private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
 
     var body: some View {
@@ -947,8 +955,8 @@ private struct UnrecordedSlotsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                     Text(t(
-                        "어느 날을 어떻게 하셨는지는 본인만 알 수 있어요. 기억나는 대로 답해 주시고, 기억나지 않으면 그대로 적어 두면 됩니다.",
-                        "Only you can know what happened on each day. Answer what you remember — and if you don't remember, that's a fine answer too."
+                        "어느 날을 어떻게 하셨는지는 본인만 알 수 있어요. 기억나는 대로 답해 주시고, 기억나지 않으면 그대로 적어 두면 됩니다. 여러 약 중 일부만 먹은 날은 약마다 따로 답할 수 있어요.",
+                        "Only you can know what happened on each day. Answer what you remember — and if you don't remember, that's a fine answer too. If you took only some of the meds in a slot, you can answer each one separately."
                     ))
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
@@ -983,33 +991,84 @@ private struct UnrecordedSlotsSheet: View {
     }
 
     private func lineCard(_ line: UnrecordedSlots.Line) -> some View {
-        JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+        // 한 시간대에 약이 여럿이면 그중 일부만 먹었을 수도 있다. 흔한 쪽(전부
+        // 같은 답)은 한 번에 끝내고, 나뉘는 쪽은 한 겹 안에 둔다 - 시간대 타일의
+        // 두 손잡이와 같은 규칙이다.
+        let hasMany = line.entries.count > 1
+        let isSplit = hasMany && splitLineIDs.contains(line.id)
+
+        return JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 Text(UnrecordedSlots.title(for: line, language: language))
                     .janjanBody(16, weight: .medium)
                     .foregroundStyle(Color.ink)
-                MaskedNameText(
-                    name: line.entries.map(\.medicationName).joined(separator: " · "),
-                    isMasked: masksNames
-                )
-                    .janjanBody(13)
-                    .foregroundStyle(Color.ink2)
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    WhitePillButton(title: t("먹었어요", "Took it")) {
-                        for entry in line.entries { onAnswer(line, entry, .taken) }
+                if isSplit {
+                    ForEach(line.entries) { entry in
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                            MaskedNameText(name: entry.medicationName, isMasked: masksNames)
+                                .janjanBody(14, weight: .medium)
+                                .foregroundStyle(Color.ink)
+                                .lineLimit(1)
+                            answerRow(for: line, entries: [entry], allAtOnce: false)
+                        }
                     }
-                    WhitePillButton(title: t("건너뛰었어요", "Skipped it")) {
-                        for entry in line.entries { onAnswer(line, entry, .skipped) }
-                    }
+                } else {
+                    MaskedNameText(
+                        name: line.entries.map(\.medicationName).joined(separator: " · "),
+                        isMasked: masksNames
+                    )
+                        .janjanBody(13)
+                        .foregroundStyle(Color.ink2)
+
+                    answerRow(for: line, entries: line.entries, allAtOnce: hasMany)
                 }
-                WhitePillButton(title: t("기억나지 않아요", "I don't remember")) {
-                    for entry in line.entries { onAnswer(line, entry, .unrecorded) }
+
+                if hasMany {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            if isSplit {
+                                splitLineIDs.remove(line.id)
+                            } else {
+                                splitLineIDs.insert(line.id)
+                            }
+                        }
+                    } label: {
+                        Text(isSplit
+                             ? t("한꺼번에 답하기", "Answer all at once")
+                             : t("약마다 따로 답하기", "Answer each medication"))
+                            .janjanBody(13, weight: .medium)
+                            .foregroundStyle(Color.ink2)
+                            .underline()
+                            .frame(minHeight: 44, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
+
+    /// 세 답을 늘 한 줄로 그린다. `allAtOnce` 는 이 한 번이 그 시간대의 약
+    /// 전부에 걸린다는 뜻이라, 문구에서도 "전부" 라고 말한다.
+    private func answerRow(
+        for line: UnrecordedSlots.Line,
+        entries: [DayPlan.Entry],
+        allAtOnce: Bool
+    ) -> some View {
+        AnswerPillRow(answers: [
+            .init(allAtOnce ? t("전부 먹었어요", "All taken") : t("먹었어요", "Took it")) {
+                for entry in entries { onAnswer(line, entry, .taken) }
+            },
+            .init(allAtOnce ? t("전부 건너뛰었어요", "All skipped") : t("건너뛰었어요", "Skipped it")) {
+                for entry in entries { onAnswer(line, entry, .skipped) }
+            },
+            .init(t("기억나지 않아요", "I don't remember")) {
+                for entry in entries { onAnswer(line, entry, .unrecorded) }
+            }
+        ])
+    }
 }
+
 
 #Preview {
     TodayView(isShowingSettings: .constant(false))

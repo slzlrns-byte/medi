@@ -137,6 +137,64 @@ struct WhitePillButton: View {
     }
 }
 
+/// 셋(또는 둘) 중 하나를 고르는 답 한 줄. 지나간 시간대에 답할 때 쓴다.
+///
+/// 두 가지를 고쳤다(QA 2026-09-19).
+///
+/// · **답이 늘 한 줄에 들어간다.** 알약이 글자 폭만큼만 넓어지면
+///   "기억나지 않아요" 가 폭을 넘겨 셋째 답이 아래로 떨어졌다. 주어진 폭을
+///   똑같이 나눠 갖게 하고, 글자는 칸 안에서 두 줄로 접히거나 조금 줄어든다 -
+///   기분 색 일곱 알약과 같은 약이다.
+///
+/// · **흰 알약을 쓰지 않는다.** 이 줄은 흰 카드 위에 놓이는데 WhitePillButton
+///   도 같은 surface 라 버튼이 배경에 묻혀 글자만 떠 보였다. 한 겹 어두운
+///   면(surface2)에 테두리를 둘러, 누를 수 있는 것임이 보이게 한다.
+struct AnswerPillRow: View {
+
+    struct Answer: Identifiable {
+        /// 한 줄 안에서 같은 문구가 두 번 나오지 않으므로 문구가 곧 식별자다.
+        var id: String { title }
+        let title: String
+        let action: () -> Void
+
+        init(_ title: String, action: @escaping () -> Void) {
+            self.title = title
+            self.action = action
+        }
+    }
+
+    let answers: [Answer]
+
+    var body: some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            ForEach(answers) { answer in
+                Button(action: answer.action) {
+                    Text(answer.title)
+                        .janjanBody(13, weight: .medium)
+                        .multilineTextAlignment(.center)
+                        // 두 줄까지 접히고, 그래도 넘치면 조금 줄어든다.
+                        // 큰 글자 설정에서도 한 줄을 지키는 마지막 보루다.
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .foregroundStyle(Color.ink)
+                        .padding(.horizontal, CGFloat(JanjanSpacing.xs))
+                        .padding(.vertical, CGFloat(JanjanSpacing.xs))
+                        // maxHeight 를 열어 두면 HStack 이 가장 높은 칸의 높이를
+                        // 셋 모두에게 제안한다 - 한 칸만 두 줄이어도 높이가 맞는다.
+                        .frame(maxWidth: .infinity, minHeight: 44, maxHeight: .infinity)
+                        .background(Capsule(style: .continuous).fill(Color.janjan(.surface2)))
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .strokeBorder(Color.janjan(.line2), lineWidth: 1)
+                        )
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
 /// 화면 폭을 다 쓰는 검은 알약 버튼. 검은 원 버튼과 같은 자리(화면당 하나)를 차지하므로,
 /// 결제처럼 되돌릴 수 없는 결정 하나에만 쓴다.
 struct BlackPillButton: View {

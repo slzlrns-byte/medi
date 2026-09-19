@@ -1247,18 +1247,13 @@ private struct StockRecountSheet: View {
                 .janjanBody(15)
                 .foregroundStyle(Color.ink2)
 
-            // 오늘 화면의 같은 세 답과 같은 크기(44pt 터치 타깃)를 쓴다.
-            FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
-                WhitePillButton(title: t("먹었어요", "Took it")) {
-                    respond(to: line, status: .taken)
-                }
-                WhitePillButton(title: t("건너뛰었어요", "Skipped it")) {
-                    respond(to: line, status: .skipped)
-                }
-                WhitePillButton(title: t("기억나지 않아요", "I don't remember")) {
-                    respond(to: line, status: .unrecorded)
-                }
-            }
+            // 오늘 화면의 같은 세 답과 같은 줄을 쓴다. 셋이 늘 한 줄이고,
+            // 흰 카드 위라 흰 알약 대신 한 겹 어두운 면을 쓴다.
+            AnswerPillRow(answers: [
+                .init(t("먹었어요", "Took it")) { respond(to: line, status: .taken) },
+                .init(t("건너뛰었어요", "Skipped it")) { respond(to: line, status: .skipped) },
+                .init(t("기억나지 않아요", "I don't remember")) { respond(to: line, status: .unrecorded) }
+            ])
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
     }
