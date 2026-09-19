@@ -114,12 +114,18 @@ struct VisitHistoryView: View {
                         .janjanBody(15, weight: .semibold)
                         .foregroundStyle(Color.ink)
                     Spacer(minLength: 0)
-                    if record.daysSupplied > 0 {
+                    // 잠긴 카드의 우상단은 비워 둔다 - proGated 의 Pro 배지가
+                    // 그 모서리에 얹히므로 칩과 겹친다(QA 2026-09-19).
+                    // 흐린 카드에서는 칩이 아래 흐린 내용으로 내려간다.
+                    if !isBlurred, record.daysSupplied > 0 {
                         PillChip(text: t("\(record.daysSupplied)일치", "\(record.daysSupplied) days"))
                     }
                 }
 
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                    if isBlurred, record.daysSupplied > 0 {
+                        PillChip(text: t("\(record.daysSupplied)일치", "\(record.daysSupplied) days"))
+                    }
                     medicationLine(record)
 
                     if !record.clinicNote.isEmpty {

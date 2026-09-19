@@ -394,13 +394,17 @@ struct PaywallView: View {
     private var alreadyProCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                Text(t("Pro 를 쓰고 있어요.", "You're using Pro."))
+                Text(pro.hasLifetime
+                     ? t("평생 이용권으로 Pro 를 쓰고 있어요.", "You're using Pro with the lifetime purchase.")
+                     : t("Pro 를 쓰고 있어요.", "You're using Pro."))
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
-                Text(t(
-                    "기간과 해지는 아래 \"구독 관리\" 에서 확인할 수 있어요.",
-                    "You can check the period and cancel below under \"Manage subscription.\""
-                ))
+                // 평생권에는 기간도 해지도 없다 - "구독 관리" 로 보내면 빈 화면을 만난다.
+                Text(pro.hasLifetime
+                     ? t("한 번 결제한 이용권이라 갱신도 해지도 없어요.",
+                         "It was a one-time purchase — nothing renews, nothing to cancel.")
+                     : t("기간과 해지는 아래 \"구독 관리\" 에서 확인할 수 있어요.",
+                         "You can check the period and cancel below under \"Manage subscription.\""))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)

@@ -37,6 +37,10 @@ final class ProStore: ObservableObject {
     /// 알림 예약처럼 ProStore 를 들 수 없는 곳이 읽는 그림자 값.
     static let cachedProKey = "janjan.pro.cached"
 
+    /// Pro 가 평생 이용권으로 열렸는지. 기능 잠금은 isPro 하나로 충분하지만,
+    /// 평생권 구매자에게 "구독 관리에서 해지" 라고 말하면 거짓말이 된다(QA 2026-09-19).
+    @Published private(set) var hasLifetime = false
+
     /// 연간 7일 무료 체험을 받을 수 있는지. 못 받는 계정에는 체험 문구를 아예 숨긴다(3.1.2(b)).
     @Published private(set) var isYearlyTrialEligible = false
 
@@ -131,6 +135,7 @@ final class ProStore: ObservableObject {
     @discardableResult
     func refreshEntitlements() async -> Bool {
         var entitled = janjanForcesPro
+        var lifetime = false
 
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -139,9 +144,13 @@ final class ProStore: ObservableObject {
             if ProProduct.allIDs.contains(transaction.productID) {
                 entitled = true
             }
+            if transaction.productID == ProProduct.lifetime {
+                lifetime = true
+            }
         }
 
         isPro = entitled
+        hasLifetime = lifetime
         return entitled
     }
 
@@ -204,8 +213,9 @@ final class ProStore: ObservableObject {
             try await AppStore.sync()
             await refreshEntitlements()
             if !isPro {
-                lastError = t("이 애플 계정에서 복원할 구독을 찾지 못했어요.",
-                              "Couldn't find a subscription to restore on this Apple account.")
+                // 구독만이 아니라 평생 이용권도 이 길로 복원된다 - "구매" 라고 말한다.
+                lastError = t("이 애플 계정에서 복원할 구매를 찾지 못했어요.",
+                              "Couldn't find a purchase to restore on this Apple account.")
             }
         } catch {
             lastError = t("복원을 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.",

@@ -254,7 +254,9 @@ struct MedicationsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                // HStack 이 아니라 FlowRow: 큰 글씨 설정에서 두 캡슐이 카드 폭을
+                // 넘으면 잘리는 대신 줄을 바꾼다(QA 2026-09-19).
+                FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     WhitePillButton(title: t("처방 기록하기", "Log a prescription"), systemImage: "doc.text") {
                         isShowingPrescription = true
                     }
