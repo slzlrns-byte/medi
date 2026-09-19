@@ -22,12 +22,23 @@ enum JanjanAds {
 
     // MARK: - 광고 단위
 
-    /// 지금은 구글이 공개한 **테스트 단위**다. AdMob 계정을 만들면 이 셋과
-    /// Info.plist 의 GADApplicationIdentifier 를 함께 바꾼다.
-    /// 실제 값이 아니면 광고가 안 나올 뿐 앱은 멀쩡히 돈다.
+    /// AdMob 광고 단위. 앱 ID 는 Info.plist 의 GADApplicationIdentifier 에
+    /// 있고 같은 계정이어야 한다(앞자리 8133411184190419).
+    ///
+    /// 비밀이 아니다 - 앱 바이너리에 그대로 실려 누구나 볼 수 있는 값이라
+    /// 저장소에 두어도 된다.
     enum Unit {
-        static let banner = "ca-app-pub-3940256099942544/2934735716"
+        /// 실제 단위 (2026-09-19 발급).
+        static let banner = "ca-app-pub-8133411184190419/8295274985"
+
+        /// **아직 구글 테스트 단위다.** 이것으로 출시하면 "Test Ad" 가 뜨고
+        /// 수익이 0 이다. 보상형 단위를 발급받으면 여기만 바꾸면 된다.
         static let rewarded = "ca-app-pub-3940256099942544/1712485313"
+
+        /// 보상형이 아직 테스트 값인지. 제출 전 확인용이다.
+        static var rewardedIsTestUnit: Bool {
+            rewarded.hasPrefix("ca-app-pub-3940256099942544")
+        }
     }
 
     // MARK: - 시작
