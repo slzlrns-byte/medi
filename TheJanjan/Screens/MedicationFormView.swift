@@ -2,18 +2,34 @@ import SwiftUI
 import SwiftData
 import JanjanCore
 
-/// 약 등록 폼 (설계 03절).
+/// 약 등록 폼 (설계 03절). **고치기도 같은 화면이 맡는다**(2026-09-19).
 ///
 /// 필수는 이름 하나뿐이다. 나머지는 비워 둬도 저장되고 나중에 채울 수 있다 —
 /// 등록 화면에서 막히면 앱을 아예 쓰지 않게 되기 때문이다.
 ///
 /// 시스템 `Form` 을 쓰지 않고 흰 카드로 짠다. 회색 그룹 목록은 이 앱의 시각 언어가 아니다.
+///
+/// 등록한 뒤에는 이름도 1회 개수도 먹는 때도 고칠 수 없었다(사용자 발견
+/// 2026-09-19 "약 용량 바뀐 건 어디서 바꿔?"). 정신과 처방은 용량이 자주
+/// 바뀌는데, 고칠 길이 없으면 약을 지우고 다시 넣는 수밖에 없고 그러면 그
+/// 약의 지난 복용 기록이 통째로 사라진다. 같은 폼을 수정 모드로 연다 —
+/// 두 벌로 나누면 한쪽만 고쳐지는 날이 반드시 온다.
 struct MedicationFormView: View {
+
+    /// 고칠 약을 열 때 넘기는 지금 값.
+    struct Existing {
+        let medication: Medication
+        let schedules: [Schedule]
+    }
 
     /// 저장이 끝난 뒤 바깥(약 추가 시트)까지 닫아 주는 손잡이.
     let onSaved: () -> Void
 
+    /// 고치는 중인 약. nil 이면 새로 만드는 것이다.
+    private let editingID: UUID?
+
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
     @State private var strength: String
@@ -35,9 +51,27 @@ struct MedicationFormView: View {
     ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
     init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
+        self.editingID = nil
         _name = State(initialValue: prefill?.name ?? "")
         _strength = State(initialValue: prefill?.strengthText ?? "")
     }
+
+    /// 등록한 약을 고치러 들어오는 길. 저장하면 스스로 닫고 상세 화면으로 돌아간다.
+    init(existing: Existing) {
+        self.onSaved = {}
+        self.editingID = existing.medication.id
+        _name = State(initialValue: existing.medication.name)
+        _strength = State(initialValue: existing.medication.strengthText)
+        _purpose = State(initialValue: existing.medication.purposeLine)
+        _form = State(initialValue: existing.medication.form)
+        _kind = State(initialValue: existing.medication.kind)
+        // 요일은 줄마다 따로 저장되지만 화면에서는 약 하나에 한 벌이다.
+        // 지금까지 만들어진 약은 줄들이 같은 요일을 갖고 있으므로 첫 줄을 쓴다.
+        _weekdays = State(initialValue: existing.schedules.first?.weekdays ?? Weekday.everyday)
+        _drafts = State(initialValue: SlotDraft.from(existing.schedules))
+    }
+
+    private var isEditing: Bool { editingID != nil }
 
     /// 시간대 한 줄의 초안. 켜진 것만 스케줄이 된다.
     ///
@@ -75,6 +109,33 @@ struct MedicationFormView: View {
         static func custom() -> SlotDraft {
             SlotDraft(preset: nil, isOn: true, time: Date(), dose: 1)
         }
+
+        /// 저장된 스케줄을 폼의 줄로 되돌린다.
+        ///
+        /// 아침·점심·저녁·취침은 늘 같은 자리에 있어야 하므로 프리셋 네 줄을
+        /// 먼저 깔고 그 위에 켠다. 직접 넣었던 시각은 뒤에 이어 붙인다 -
+        /// 없어지면 사용자가 만든 시간대가 고치기 한 번에 조용히 사라진다.
+        static func from(_ schedules: [Schedule], on day: Date = Date()) -> [SlotDraft] {
+            var rows = presets()
+            var extras: [SlotDraft] = []
+
+            for schedule in schedules.sorted(by: { $0.timeOfDay < $1.timeOfDay }) {
+                let time = schedule.timeOfDay.date(on: day)
+                if let index = rows.firstIndex(where: { $0.preset == schedule.slot }) {
+                    rows[index].isOn = true
+                    rows[index].time = time
+                    rows[index].dose = schedule.dosePerIntake
+                } else {
+                    extras.append(SlotDraft(
+                        preset: nil,
+                        isOn: true,
+                        time: time,
+                        dose: schedule.dosePerIntake
+                    ))
+                }
+            }
+            return rows + extras
+        }
     }
 
     var body: some View {
@@ -86,7 +147,15 @@ struct MedicationFormView: View {
                     slotCard
                     weekdayCard
                 }
-                stockCard
+                // 재고는 "세어 본 사건" 이 쌓여 만들어지는 값이라 고치기에서
+                // 숫자 하나로 덮으면 기준점이 끊긴다. 다시 세는 일은 상세
+                // 화면의 "다시 세기" 가 맡는다.
+                if !isEditing {
+                    stockCard
+                }
+                if isEditing {
+                    editingNoteCard
+                }
 
                 BlackPillButton(title: t("저장", "Save"), isBusy: isSaving, isEnabled: canSave) {
                     save()
@@ -103,7 +172,7 @@ struct MedicationFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle(t("직접 입력", "Enter manually"))
+        .navigationTitle(isEditing ? t("약 고치기", "Edit medication") : t("직접 입력", "Enter manually"))
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $isAskingNotification) {
             NotificationPermissionView {
@@ -285,6 +354,29 @@ struct MedicationFormView: View {
         }
     }
 
+    /// 고치기에서만 보이는 한 줄. 무엇이 남고 무엇이 바뀌는지 미리 말한다 -
+    /// 지난 기록이 지워질까 봐 손을 못 대는 것이 제일 나쁘다.
+    private var editingNoteCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                Text(t(
+                    "지난 복용 기록과 남은 개수는 그대로 남아요.",
+                    "Your past doses and pills on hand stay as they are."
+                ))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(t(
+                    "먹는 때를 바꾸면 앞으로의 알림과 오늘 화면이 새 시각을 따라요. 남은 개수를 다시 세는 건 약 화면의 '다시 세기' 에서 해요.",
+                    "Changing the times moves future reminders and the Today screen. To recount your pills, use 'Count again' on the medication screen."
+                ))
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var stockCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
@@ -342,9 +434,27 @@ struct MedicationFormView: View {
 
     // MARK: - 저장
 
+    /// 켜 둔 줄만 스케줄이 된다. 필요시 약은 시간대를 갖지 않는다.
+    private func makeSchedules(for medicationID: UUID) -> [Schedule] {
+        (kind == .scheduled ? drafts.filter(\.isOn) : []).map { draft in
+            Schedule(
+                medicationID: medicationID,
+                slot: draft.slot,
+                timeOfDay: draft.timeOfDay,
+                weekdays: weekdays,
+                dosePerIntake: draft.dose
+            )
+        }
+    }
+
     private func save() {
         guard canSave, !isSaving else { return }
         isSaving = true
+
+        if let editingID {
+            saveEdit(to: editingID)
+            return
+        }
 
         let medication = Medication(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -354,15 +464,7 @@ struct MedicationFormView: View {
             purposeLine: purpose.trimmingCharacters(in: .whitespacesAndNewlines)
         )
 
-        let schedules: [Schedule] = (kind == .scheduled ? drafts.filter(\.isOn) : []).map { draft in
-            Schedule(
-                medicationID: medication.id,
-                slot: draft.slot,
-                timeOfDay: draft.timeOfDay,
-                weekdays: weekdays,
-                dosePerIntake: draft.dose
-            )
-        }
+        let schedules = makeSchedules(for: medication.id)
 
         MedicationStore.add(
             MedicationStore.Draft(
@@ -388,6 +490,30 @@ struct MedicationFormView: View {
             // 닫는 일은 바깥에 맡긴다. 폼이 스스로 pop 하면서 시트까지 닫으면
             // 화면이 두 번 사라지며 애니메이션이 엉킨다.
             onSaved()
+        }
+    }
+
+    /// 고치기는 밀려 올라온 화면이라 스스로 닫고 상세로 돌아간다.
+    /// 알림 권한은 묻지 않는다 - 이미 쓰고 있던 약이라 물을 자리가 아니다.
+    private func saveEdit(to medicationID: UUID) {
+        MedicationStore.update(
+            MedicationStore.Edit(
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                strengthText: strength.trimmingCharacters(in: .whitespacesAndNewlines),
+                form: form,
+                kind: kind,
+                purposeLine: purpose.trimmingCharacters(in: .whitespacesAndNewlines),
+                schedules: makeSchedules(for: medicationID)
+            ),
+            for: medicationID,
+            in: context
+        )
+
+        Task {
+            await ReminderPlanner.reschedule(using: context)
+            AppServices.shared.pushWatchSnapshot()
+            isSaving = false
+            dismiss()
         }
     }
 }

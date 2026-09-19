@@ -94,8 +94,8 @@ struct VisitHistoryView: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(t(
-                    "약 탭의 \"처방 기록하기\" 로 남긴 진료가 여기 회차별로 쌓여요.",
-                    "Visits you log with \"Log a prescription\" on the Meds tab stack up here."
+                    "약 탭의 \"진료 기록하기\" 로 남긴 진료가 여기 회차별로 쌓여요.",
+                    "Visits you log with \"Log a visit\" on the Meds tab stack up here."
                 ))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)

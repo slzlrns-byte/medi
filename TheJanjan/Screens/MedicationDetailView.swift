@@ -47,6 +47,14 @@ struct MedicationDetailView: View {
         noteRecords.filter { $0.medicationID == medicationID }
     }
 
+    /// 이 약의 시간대. 고치기 화면이 지금 값을 그대로 들고 열리게 한다.
+    private var mySchedules: [Schedule] {
+        scheduleRecords
+            .filter { $0.medicationID == medicationID }
+            .map(\.core)
+            .sorted { $0.timeOfDay < $1.timeOfDay }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
@@ -83,6 +91,24 @@ struct MedicationDetailView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle(masksNames ? t("약", "Medication") : (medication?.name ?? t("약", "Medication")))
         .navigationBarTitleDisplayMode(.inline)
+        // 등록한 뒤에는 이름도 1회 개수도 먹는 때도 고칠 길이 없었다
+        // (사용자 발견 2026-09-19). 상세 화면이 그 약에 대해 할 수 있는 일이
+        // 모이는 자리이므로 손잡이도 여기 제목 줄에 둔다.
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let medication {
+                    NavigationLink {
+                        MedicationFormView(existing: MedicationFormView.Existing(
+                            medication: medication,
+                            schedules: mySchedules
+                        ))
+                    } label: {
+                        Text(t("고치기", "Edit"))
+                            .foregroundStyle(Color.ink)
+                    }
+                }
+            }
+        }
         .sheet(item: $composing) { kind in
             MedicationNoteComposer(kind: kind) { text, symptomID in
                 addNote(kind: kind, text: text, symptomID: symptomID)

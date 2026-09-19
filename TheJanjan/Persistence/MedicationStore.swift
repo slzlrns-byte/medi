@@ -46,6 +46,117 @@ enum MedicationStore {
         return draft.medication.id
     }
 
+    /// 등록한 약을 고칠 때 넘기는 값.
+    ///
+    /// 재고는 여기 없다. 재고는 "세어 본 사건" 이 쌓여 만들어지는 값이라
+    /// (설계 05절) 폼의 숫자 하나로 덮으면 기준점이 끊긴다. 다시 세는 일은
+    /// 상세 화면의 "다시 세기" 가 맡는다.
+    struct Edit {
+        var name: String
+        var strengthText: String
+        var form: Medication.Form
+        var kind: Medication.Kind
+        var purposeLine: String
+        var schedules: [Schedule]
+    }
+
+    /// 등록한 약을 **제자리에서** 고친다.
+    ///
+    /// 약 기록을 지우고 새로 만들지 않는다. id 가 그대로라야 지난 복용·재고·
+    /// 메모·처방이 이 약에 계속 붙어 있는다 - 관계 없는 스키마라(위 주석)
+    /// 아무도 대신 이어 주지 않고, 새 id 로 갈아 끼우면 그 약의 과거가 통째로
+    /// 주인을 잃는다.
+    ///
+    /// 시간대는 통째로 다시 깐다. 복용 기록은 스케줄 id 가 아니라 약 id 와
+    /// 시각으로 매여 있어(DoseEvent), 줄을 새로 깔아도 지난 기록은 그대로다.
+    static func update(_ edit: Edit, for medicationID: UUID, in context: ModelContext) {
+        guard let record = medicationRecord(medicationID, in: context) else {
+            logger.error("없는 약을 고치려 했습니다.")
+            return
+        }
+
+        record.name = edit.name
+        record.strengthText = edit.strengthText
+        record.formRaw = edit.form.rawValue
+        record.kindRaw = edit.kind.rawValue
+        record.purposeLine = edit.purposeLine
+
+        // 이미 잠금화면에 떠 있는 알림은 고치기 전의 이름과 시각을 말하고 있다.
+        // 남겨 두면 옛 이름이 계속 보이고, 거기서 누른 답이 옛 시간대로 들어간다.
+        NotificationManager.shared.removeDeliveredNotifications(for: medicationID)
+
+        delete(FetchDescriptor<ScheduleRecord>(
+            predicate: #Predicate { $0.medicationID == medicationID }
+        ), in: context)
+
+        for schedule in edit.schedules {
+            context.insert(ScheduleRecord.make(from: schedule))
+        }
+
+        save("약 수정", in: context)
+    }
+
+    /// 진료에서 들은 용량 변경을 **적어 두고 동시에 적용한다.**
+    ///
+    /// 용량 변경은 지금까지 적어 두기만 했다(강점 결정서 D12). 그것은 앱이
+    /// 해석을 하지 않는다는 뜻이지, 옛 숫자로 계속 계산한다는 뜻이 아니었다 -
+    /// 1회 개수가 1정에서 2정이 되면 재고도 소진 예측도 그때부터 달라져야 한다.
+    /// 그래서 사건은 그대로 남기고(DoseChange), 약의 현재 값도 함께 옮긴다.
+    ///
+    /// - Parameters:
+    ///   - newStrengthText: 비었거나 nil 이면 표기는 건드리지 않는다.
+    ///   - newDosePerIntake: nil 이면 개수는 건드리지 않는다. 값이 오면 이 약의
+    ///     **모든 시간대**에 같은 개수를 넣는다 - 시간대마다 개수가 다른 약은
+    ///     화면에서 이 길을 막고 "약 고치기" 로 보낸다.
+    /// - Returns: 이력에 남긴 사건. 표기가 그대로면 nil 이다(개수만 바뀐 경우
+    ///   "10mg → 10mg" 이라는 빈 화살표가 이력에 쌓이지 않게 한다).
+    @discardableResult
+    static func applyDoseChange(
+        medicationID: UUID,
+        newStrengthText: String?,
+        newDosePerIntake: Decimal?,
+        changedAt: Date,
+        note: String? = nil,
+        in context: ModelContext
+    ) -> DoseChange? {
+        guard let record = medicationRecord(medicationID, in: context) else {
+            logger.error("없는 약의 용량을 바꾸려 했습니다.")
+            return nil
+        }
+
+        let fromText = record.strengthText
+        let trimmed = newStrengthText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let toText = trimmed.isEmpty ? nil : trimmed
+
+        if let toText { record.strengthText = toText }
+
+        if let dose = newDosePerIntake {
+            let descriptor = FetchDescriptor<ScheduleRecord>(
+                predicate: #Predicate { $0.medicationID == medicationID }
+            )
+            for schedule in (try? context.fetch(descriptor)) ?? [] {
+                schedule.dosePerIntake = DecimalQuantity.snapToQuarter(dose)
+            }
+        }
+
+        guard let toText, toText != fromText else {
+            save("용량 적용", in: context)
+            return nil
+        }
+
+        let change = DoseChange(
+            medicationID: medicationID,
+            // 저장 규칙은 화면에 기대지 않는다 - 아직 오지 않은 날의 용량은 모른다.
+            changedAt: min(changedAt, Date()),
+            fromText: fromText,
+            toText: toText,
+            note: note
+        )
+        context.insert(DoseChangeRecord.make(from: change))
+        save("용량 변경 적용", in: context)
+        return change
+    }
+
     /// 한 번의 진료로 받아 온 처방과, 그때 채운 약들을 함께 저장한다.
     ///
     /// 보충은 **정정이 아니라 refill** 이다. 정정은 기준점을 새로 세워 그 이전을 지워 버리지만,

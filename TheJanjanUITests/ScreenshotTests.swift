@@ -102,7 +102,7 @@ final class ScreenshotTests: XCTestCase {
         // 못 닫아도 뒤가 없으므로 잃는 것이 없다.
 
         // 처방 기록. 다음 진료 D- 와 소진 예측이 여기서 살아난다.
-        let prescription = app.buttons["처방 기록하기"]
+        let prescription = app.buttons["진료 기록하기"]
         if prescription.waitForExistence(timeout: 10) {
             prescription.tap()
             settle()

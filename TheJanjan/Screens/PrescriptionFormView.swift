@@ -2,10 +2,14 @@ import SwiftUI
 import SwiftData
 import JanjanCore
 
-/// 처방 기록 (설계 03절 · 05절).
+/// 진료 기록 (설계 03절 · 05절). 화면 이름은 "처방 기록" 이었는데
+/// "이번 진료 내용을 기록할 수 있어야 할 것 같은데" 라는 말에 바꿨다
+/// (2026-09-19) - 사용자는 이 일을 처방이 아니라 진료로 부른다. "지난 진료"
+/// 화면과도 짝이 맞는다.
 ///
 /// 이 화면 하나가 "다음 진료 D-" 와 "진료 전에 모자라는 약" 을 살린다.
 /// 둘 다 진료일과 받아 온 개수를 알아야 계산할 수 있기 때문이다.
+/// 여기서 들은 용량 변경은 적어 두는 데 그치지 않고 약에 바로 적용된다.
 ///
 /// 개수는 **제안일 뿐 강요가 아니다.** 처방일수 × 하루 예정 개수로 초안을 채워 두고
 /// 사용자가 실제로 받아 온 수로 고칠 수 있게 한다. 봉투에 적힌 수와 손에 쥔 수는 자주 다르다.
@@ -35,6 +39,17 @@ struct PrescriptionFormView: View {
     @State private var edited: Set<UUID> = []
     /// 이번 진료에서 처음 받은 약을 그 자리에서 등록하는 시트.
     @State private var isShowingNewMedication = false
+    /// 이번 진료에서 용량이 바뀐 약. 손잡이를 켠 약만 여기 있다.
+    @State private var doseEdits: [UUID: DoseEdit] = [:]
+
+    /// 진료에서 들은 용량 변경 하나. 표기와 1회 개수를 따로 든다 —
+    /// "10mg 에서 15mg" 과 "아침 1정에서 2정" 은 둘 다 "용량이 바뀌었다" 이고,
+    /// 둘 중 하나만 바뀌는 날이 더 흔하다.
+    private struct DoseEdit {
+        var strengthText: String
+        /// nil 이면 개수는 건드리지 않는다. 시간대마다 개수가 다른 약도 nil 이다.
+        var perIntake: Decimal?
+    }
 
     init(onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
@@ -88,7 +103,7 @@ struct PrescriptionFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
-        .navigationTitle(t("처방 기록", "Log a prescription"))
+        .navigationTitle(t("진료 기록", "Log a visit"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -235,9 +250,85 @@ struct PrescriptionFormView: View {
                         leftovers[medication.id] = 0
                     }
                 }
+
+                doseChangeSection(medication)
             }
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
+    }
+
+    /// 진료에서 용량이 바뀌었을 때. **적어 두기만 하지 않고 그 자리에서 적용한다**
+    /// (사용자 요청 2026-09-19). 적어 두기만 하면 재고와 소진 예측이 옛 개수로
+    /// 계속 세고, 사용자는 앱이 틀린 숫자를 말한다고 느낀다.
+    @ViewBuilder
+    private func doseChangeSection(_ medication: Medication) -> some View {
+        if let edit = doseEdits[medication.id] {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                JanjanField(
+                    label: t("바뀐 용량", "New dose"),
+                    placeholder: medication.strengthText.isEmpty
+                        ? t("예: 15mg", "e.g. 15mg")
+                        : medication.strengthText,
+                    text: Binding(
+                        get: { doseEdits[medication.id]?.strengthText ?? "" },
+                        set: { doseEdits[medication.id]?.strengthText = $0 }
+                    )
+                )
+
+                if let perIntake = edit.perIntake {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        Text(t("한 번에 먹는 개수", "Pills per dose"))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.muted)
+                        CountStepper(
+                            text: t("\(DecimalQuantity.display(perIntake))정", pillsEn(perIntake)),
+                            decreaseLabelKo: t("1회 개수 줄이기", "Decrease pills per dose"),
+                            increaseLabelKo: t("1회 개수 늘리기", "Increase pills per dose"),
+                            onDecrease: { adjustPerIntake(medication, by: -1) },
+                            onIncrease: { adjustPerIntake(medication, by: 1) }
+                        )
+                    }
+                } else if hasMixedDoses(medication) {
+                    // 시간대마다 개수가 다른 약에 한 숫자를 밀어 넣으면 아침 2정
+                    // 저녁 1정이 조용히 2정 2정이 된다. 그 경우는 막고 보낸다.
+                    Text(t(
+                        "시간대마다 개수가 달라요. 개수는 약 화면의 '고치기' 에서 바꿔 주세요.",
+                        "The count differs by time slot. Change it with 'Edit' on the medication screen."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text(t(
+                    "저장하면 이 약의 용량이 바로 바뀌고, 용량 변경 이력에도 남아요.",
+                    "Saving changes this medication's dose right away and records it in the dose change history."
+                ))
+                    .janjanBody(11)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                WhitePillButton(title: t("용량 변경 취소", "Cancel dose change"), systemImage: "arrow.uturn.backward") {
+                    doseEdits[medication.id] = nil
+                    refreshSuggestions()
+                }
+                .overlay(
+                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                )
+            }
+            .padding(.top, CGFloat(JanjanSpacing.xxs))
+        } else {
+            WhitePillButton(title: t("용량이 바뀌었어요", "The dose changed"), systemImage: "arrow.left.arrow.right") {
+                doseEdits[medication.id] = DoseEdit(
+                    strengthText: medication.strengthText,
+                    perIntake: commonDose(medication)
+                )
+            }
+            .overlay(
+                Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+            )
+            .padding(.top, CGFloat(JanjanSpacing.xxs))
+        }
     }
 
     /// 이 알약은 눌러서 이번 처방에 포함시키는 손잡이다 - 이름 자리에 따로 탭을
@@ -323,6 +414,9 @@ struct PrescriptionFormView: View {
         if refills[medication.id] != nil {
             refills[medication.id] = nil
             leftovers[medication.id] = nil
+            // 이번 처방에서 뺀 약의 용량 변경까지 들고 있으면, 화면에 보이지도
+            // 않는 것이 저장될 때 적용된다.
+            doseEdits[medication.id] = nil
             edited.remove(medication.id)
         } else {
             refills[medication.id] = suggestedQuantity(for: medication)
@@ -340,9 +434,44 @@ struct PrescriptionFormView: View {
         leftovers[medication.id] = max(current + delta, 0)
     }
 
+    private func mySchedules(_ medication: Medication) -> [Schedule] {
+        schedules.filter { $0.medicationID == medication.id }
+    }
+
+    /// 모든 시간대가 같은 개수일 때 그 값. 시간대가 없거나 서로 다르면 nil.
+    private func commonDose(_ medication: Medication) -> Decimal? {
+        let doses = Set(mySchedules(medication).map(\.dosePerIntake))
+        return doses.count == 1 ? doses.first : nil
+    }
+
+    private func hasMixedDoses(_ medication: Medication) -> Bool {
+        Set(mySchedules(medication).map(\.dosePerIntake)).count > 1
+    }
+
+    private func adjustPerIntake(_ medication: Medication, by direction: Int) {
+        guard var edit = doseEdits[medication.id], let current = edit.perIntake else { return }
+        // 쪼갤 수 없는 제형은 1정 단위로만 센다(등록 폼과 같은 규칙).
+        let step: Decimal = medication.form.isSplittable ? DecimalQuantity.step * 2 : 1
+        let next = DecimalQuantity.snapToQuarter(current + (direction > 0 ? step : -step))
+        edit.perIntake = max(next, step)
+        doseEdits[medication.id] = edit
+        // 하루치가 바뀌었으니 받아 온 개수 제안도 새 개수를 따라가야 말이 맞는다.
+        refreshSuggestions()
+    }
+
     /// 처방일수 × 하루 예정 개수. 스케줄이 없으면 하루 1정으로 본다.
+    ///
+    /// 이번 진료에서 1회 개수를 바꿨다면 **새 개수로 센다.** 저장한 뒤의 하루치는
+    /// 이미 새 개수이므로, 제안만 옛 개수를 따르면 받아 온 양이 늘 어긋난다.
     private func suggestedQuantity(for medication: Medication) -> Decimal {
-        let mine = schedules.filter { $0.medicationID == medication.id }
+        var mine = mySchedules(medication)
+        if let pending = doseEdits[medication.id]?.perIntake {
+            mine = mine.map { schedule in
+                var changed = schedule
+                changed.dosePerIntake = pending
+                return changed
+            }
+        }
         let daily = mine.dailyScheduledQuantity()
         let perDay = daily > 0 ? daily : 1
         return DecimalQuantity.snapToQuarter(Decimal(daysSupplied) * perDay)
@@ -385,13 +514,44 @@ struct PrescriptionFormView: View {
             in: context
         )
 
+        applyDoseChanges()
+
         AppServices.shared.pushWatchSnapshot()
 
-        // 다음 진료일이 바뀌었으니 진료 알림도 다시 깐다.
+        // 다음 진료일이 바뀌었고, 1회 개수가 바뀐 약이 있으면 알림에 뜨는
+        // 개수도 달라진다. 진료 알림과 복약 알림을 함께 다시 깐다.
         Task {
             await ReminderPlanner.rescheduleAppointments(using: context)
+            await ReminderPlanner.reschedule(using: context)
             isSaving = false
             onSaved()
+        }
+    }
+
+    /// 진료에서 들은 용량 변경을 약에 실제로 옮긴다.
+    ///
+    /// 바뀐 것이 없는 줄은 건너뛴다 - 손잡이만 켰다가 아무것도 고치지 않은
+    /// 경우에 "10mg → 10mg" 이 이력에 쌓이면 안 된다. 날짜는 오늘이 아니라
+    /// **진료일**이다. 전후 비교가 그 날을 축으로 그린다.
+    private func applyDoseChanges() {
+        for (medicationID, edit) in doseEdits {
+            guard let medication = activeMedications.first(where: { $0.id == medicationID }) else { continue }
+
+            let newText = edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let textChanged = !newText.isEmpty && newText != medication.strengthText
+            let doseChanged = edit.perIntake != nil && edit.perIntake != commonDose(medication)
+            guard textChanged || doseChanged else { continue }
+
+            MedicationStore.applyDoseChange(
+                medicationID: medicationID,
+                newStrengthText: textChanged ? newText : nil,
+                newDosePerIntake: doseChanged ? edit.perIntake : nil,
+                changedAt: visitDate,
+                note: clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? nil
+                    : clinicNote.trimmingCharacters(in: .whitespacesAndNewlines),
+                in: context
+            )
         }
     }
 }
