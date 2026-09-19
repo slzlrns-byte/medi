@@ -61,25 +61,28 @@
 
 ● Pro
 월간·연간 구독 또는 평생 이용권 한 번 결제로 열어요.
-- 광고 없이: 화면 아래 배너와 내보내기 광고가 사라져요.
-- 똑똑한 재알림: 기록이 없으면 정한 간격으로 다시 물어봐요.
-- 소진 예측: 진료 전에 약이 모자라는지 미리 알 수 있어요.
-- Apple Watch: 손목에서 기록하고 알림에 바로 응답해요.
-- 위젯에서 바로 기록: 앱을 열지 않고 위젯에서 눌러 기록해요.
-- 패턴 보기: 최근 4주의 기분, 복약, 수면을 같은 눈금에 놓고 봐요. 최근 7일은 무료로도 보여요.
-- 용량 변경 전후 비교: 바뀐 앞뒤 2주와 바꾼 뒤의 흐름을 나란히 봐요.
-- 지난 진료 기록: 회차별 처방 이력을 모두 봐요. 바로 이전 회차까지는 무료예요.
-- 약봉투 스캔: 사진 한 장으로 약 이름을 읽어 등록해요.
-- 약 모양으로 찾기: 모양, 색, 각인으로 검색해요. 식약처 낱알식별 정보 기준이에요.
-- 약 이름 가리기: 필요한 경우 가려 두고 필요할 때만 눌러서 볼 수 있어요.
-- Pro 테마: 두 가지 색을 더 골라요.
+- 광고 없이
+- 똑똑한 재알림
+- 소진 예측
+- Apple Watch
+- 위젯에서 바로 기록
+- 패턴 보기
+- 용량 변경 전후 비교
+- 지난 진료 기록
+- 약봉투 스캔
+- 약 모양으로 찾기
+- 약 이름 가리기
+- Pro 테마
+패턴 보기는 최근 7일까지, 지난 진료 기록은 바로 이전 회차까지 무료로도 볼 수 있어요.
 
 ● 기록은 내 것
 - 서버가 없어요. 기록은 내 기기와 내 iCloud에만 저장돼요.
 - 개발자는 기록을 수집하지 않아요. 무료 화면의 광고는 기록을 보지 않고, 관심사 추적도 하지 않아요.
 - 보안을 위해 Face ID나 암호로 잠글 수 있어요.
 
-이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독(월간 또는 연간, 연간은 7일 무료 체험) 또는 평생 이용권(한 번 결제, 자동 갱신 없음)으로 열 수 있습니다. 구독 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
+이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요.
+
+Pro 연간 ₩19,900(7일 무료 체험) · 월간 ₩2,900 · 평생 이용권 ₩49,000(한 번 결제, 자동 갱신 없음). 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되며, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
 ```
 
 ### 키워드 (100자 제한, 아래 85자)
@@ -150,25 +153,28 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 
 ● Pro
 Open it with a monthly or yearly subscription, or a one-time lifetime purchase.
-- No ads: the bottom banner and the export ad go away.
-- Smart re-reminders: if nothing is logged, it asks again at the interval you choose.
-- Run-out forecast: know ahead whether your meds will last until the next visit.
-- Apple Watch: log and respond to reminders from your wrist.
-- Log from the widget: tap to log without opening the app.
-- Pattern view: mood, doses, and sleep from the past 4 weeks on one scale. The last 7 days are free.
-- Dose change comparison: the two weeks before and after, and the flow since, side by side.
-- Visit history: every past prescription by visit. The most recent two stay free.
-- Pharmacy bag scan: register meds from one photo.
-- Find by pill appearance: search by shape, color, and imprint, based on Korean MFDS pill identification data.
-- Hide medication names: keep them covered, reveal only when needed.
-- Pro themes: two more colors to choose from.
+- No ads
+- Smart re-reminders
+- Run-out forecast
+- Apple Watch
+- Log from the widget
+- Pattern view
+- Dose change comparison
+- Visit history
+- Pharmacy bag scan
+- Find by pill appearance
+- Hide medication names
+- Pro themes
+Pattern view is free for the last 7 days, and visit history is free up to your previous visit.
 
 ● Your records are yours
 - No server. Records live only on your device and in your own iCloud.
 - The developer never collects your records. Ads on free screens don't read them and don't track you.
 - Lock the app with Face ID or a passcode.
 
-This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions. Pro opens with an auto-renewing subscription (monthly or yearly, with a 7-day free trial on yearly) or a lifetime purchase (one-time, nothing auto-renews). Subscription payment is charged to your Apple Account, renews automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
+This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions.
+
+Pro: KRW 19,900/year (7-day free trial) · KRW 2,900/month · KRW 49,000 lifetime (one-time, nothing auto-renews). Subscriptions renew automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
 ```
 
 ### Keywords (100, 아래 97자)
