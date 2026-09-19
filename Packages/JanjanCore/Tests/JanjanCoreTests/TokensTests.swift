@@ -22,7 +22,9 @@ final class TokensTests: XCTestCase {
             }
         }
         XCTAssertEqual(JanjanColor.allCases.count, 23)
-        XCTAssertEqual(JanjanTheme.allCases.count, 3)
+        // 무료 3 + Pro 2 (밤 라일락·깊은 바다, 2026-09-19).
+        XCTAssertEqual(JanjanTheme.allCases.count, 5)
+        XCTAssertEqual(JanjanTheme.proOnly, [.dawn, .sea])
     }
 
     func testCoreBrandColorsMatchTheDesignDocument() {
