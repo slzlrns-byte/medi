@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UIKit
 import JanjanCore
 
@@ -17,10 +18,17 @@ struct MonthWaveCard: View {
     /// 보고 있는 달. 지난달로 넘겨 볼 수 있다.
     @State private var shownMonth = Date()
     @State private var exportImage: ExportImage?
+    /// 누른 날. 그날의 기록을 시트로 보여 준다(사용자 요청 2026-09-19).
+    @State private var selectedDay: SelectedDay?
 
     private struct ExportImage: Identifiable {
         let image: UIImage
         let id = UUID()
+    }
+
+    private struct SelectedDay: Identifiable {
+        let date: Date
+        var id: Date { date }
     }
 
     private var calendar: Calendar { .current }
@@ -37,12 +45,23 @@ struct MonthWaveCard: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                 header
-                MonthWaveGrid(wave: wave, today: Date(), calendar: calendar)
+                MonthWaveGrid(wave: wave, today: Date(), calendar: calendar) { day in
+                    var components = DateComponents()
+                    components.year = wave.year
+                    components.month = wave.month
+                    components.day = day
+                    if let date = calendar.date(from: components) {
+                        selectedDay = SelectedDay(date: date)
+                    }
+                }
                 footer
             }
         }
         .sheet(item: $exportImage) { file in
             ShareSheet(items: [file.image])
+        }
+        .sheet(item: $selectedDay) { selected in
+            DayRecordSheet(date: selected.date)
         }
     }
 
@@ -121,6 +140,8 @@ private struct MonthWaveGrid: View {
     let wave: MonthWave
     let today: Date
     let calendar: Calendar
+    /// 지나간(또는 오늘) 날짜를 누르면 불린다. 내보내는 그림에서는 nil 이다.
+    var onSelectDay: ((Int) -> Void)? = nil
 
     private let spacing: CGFloat = 6
 
@@ -163,7 +184,7 @@ private struct MonthWaveGrid: View {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Group {
             if let cell {
-                ZStack(alignment: .topTrailing) {
+                let body = ZStack(alignment: .topTrailing) {
                     if let score = cell.moodScore {
                         shape.fill(Color.mood(score))
                     } else if isFuture(cell.day) {
@@ -182,6 +203,19 @@ private struct MonthWaveGrid: View {
                         .padding(5)
                 }
                 .accessibilityLabel(Text(accessibilityText(cell)))
+
+                // 지나간 날은 눌러서 그날 기록을 본다. 미래 칸은 볼 것이 없다.
+                if let onSelectDay, !isFuture(cell.day) {
+                    Button {
+                        onSelectDay(cell.day)
+                    } label: {
+                        body.contentShape(shape)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text(t("이날의 기록을 봐요.", "See this day's records.")))
+                } else {
+                    body
+                }
             } else {
                 Color.clear
             }
@@ -214,8 +248,7 @@ private struct MonthWaveGrid: View {
     }
 }
 
-/// 달과 해를 한 줄로. 화면 헤더와 내보내는 그림이 같은 것을 쓴다.
-private func monthWaveYearMonthText(_ wave: MonthWave) -> String {
+/// 달과 해를 한 줄로. 화면 헤더와 내보내는 그림이 같은 것을 쓴다.private func monthWaveYearMonthText(_ wave: MonthWave) -> String {
     guard JanjanLanguage.current == .english else {
         return "\(String(wave.year))년 \(wave.month)월"
     }
@@ -253,5 +286,189 @@ private struct MonthWaveShareView: View {
         }
         .padding(CGFloat(JanjanSpacing.xl))
         .background(Color.janjan(.fog))
+    }
+}
+
+/// 달력에서 누른 하루의 기록을 모아 보여 주는 시트 (사용자 요청 2026-09-19).
+///
+/// 여기서는 보여 주기만 한다 - 고치는 것은 각 화면(기록·오늘)이 맡는다.
+/// 목록을 통째로 읽고 날짜로 거르는 것은 이 앱의 다른 화면과 같은 규칙이다.
+private struct DayRecordSheet: View {
+
+    let date: Date
+
+    @Environment(\.dismiss) private var dismiss
+
+    @Query private var checkInRecords: [CheckInRecord]
+    @Query private var symptomRecords: [SymptomEntryRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+
+    private var calendar: Calendar { .current }
+    private var lang: JanjanLanguage { .current }
+
+    private var checkIn: CheckInRecord? {
+        checkInRecords
+            .filter { calendar.isDate($0.date, inSameDayAs: date) }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
+    private var symptoms: [SymptomEntryRecord] {
+        symptomRecords
+            .filter { calendar.isDate($0.startedAt, inSameDayAs: date) }
+            .sorted { $0.startedAt < $1.startedAt }
+    }
+
+    private var doses: [DoseEventRecord] {
+        doseRecords.filter { calendar.isDate($0.scheduledAt, inSameDayAs: date) }
+    }
+
+    private var hasAnything: Bool {
+        checkIn != nil || !symptoms.isEmpty || !doses.isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                    if let checkIn {
+                        moodCard(checkIn)
+                    }
+                    if !doses.isEmpty {
+                        doseCard
+                    }
+                    if !symptoms.isEmpty {
+                        symptomsCard
+                    }
+                    if !hasAnything {
+                        JanjanCard {
+                            Text(t("이날은 남긴 기록이 없어요.", "Nothing was logged on this day."))
+                                .janjanBody(14)
+                                .foregroundStyle(Color.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(titleText)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var titleText: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: lang.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdEEE")
+        return formatter.string(from: date)
+    }
+
+    private func moodCard(_ record: CheckInRecord) -> some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Circle()
+                        .fill(Color.mood(record.moodScore))
+                        .frame(width: 18, height: 18)
+                    Text(CheckIn.Mood(record.moodScore).label(lang))
+                        .janjanBody(15, weight: .medium)
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: 0)
+                    if let minutes = record.sleepMinutes {
+                        PillChip(text: sleepText(minutes))
+                    }
+                }
+
+                if let note = record.note, !note.isEmpty {
+                    Text(note)
+                        .janjanBody(14)
+                        .foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !record.emotionWords.isEmpty {
+                    Text(record.emotionWords
+                        .map { Catalogs.emotions.word(id: $0)?.name(lang) ?? $0 }
+                        .joined(separator: " · "))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !record.activities.isEmpty {
+                    Text(record.activities
+                        .map { ActivityTag.name(forID: $0, language: lang) }
+                        .joined(separator: " · "))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let dream = record.dreamNote, !dream.isEmpty {
+                    Text(t("꿈 - \(dream)", "Dream - \(dream)"))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// 복약은 개수로만 말한다 - 이름 가리기와 무관하게 안전한 요약이다.
+    private var doseCard: some View {
+        let taken = doses.filter { $0.statusRaw == DoseEvent.Status.taken.rawValue }
+        let skipped = doses.filter { $0.statusRaw == DoseEvent.Status.skipped.rawValue }
+        let rescue = taken.filter { $0.kindRaw == DoseEvent.Kind.asNeeded.rawValue }
+
+        return JanjanCard {
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                PillChip(text: t("복용 \(taken.count - rescue.count)", "Taken \(taken.count - rescue.count)"))
+                if !skipped.isEmpty {
+                    PillChip(text: t("건너뜀 \(skipped.count)", "Skipped \(skipped.count)"))
+                }
+                if !rescue.isEmpty {
+                    PillChip(text: t("비상약 \(rescue.count)", "Rescue \(rescue.count)"))
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var symptomsCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(t("증상", "Symptoms"))
+                    .janjanBody(13, weight: .medium)
+                    .foregroundStyle(Color.muted)
+                ForEach(symptoms) { entry in
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        Text(Catalogs.symptoms.symptom(id: entry.symptomID)?.name(lang) ?? entry.symptomID)
+                            .janjanBody(14)
+                            .foregroundStyle(Color.ink2)
+                        PillChip(text: t("세기 \(entry.severity)", "Severity \(entry.severity)"))
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+
+    private func sleepText(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let rest = minutes % 60
+        if lang == .english {
+            return rest == 0 ? "\(hours)h sleep" : "\(hours)h \(rest)m sleep"
+        }
+        return rest == 0 ? "수면 \(hours)시간" : "수면 \(hours)시간 \(rest)분"
     }
 }

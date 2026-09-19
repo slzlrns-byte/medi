@@ -22,6 +22,10 @@ struct DiaryView: View {
     @State private var isShowingSymptomSheet = false
     @State private var pendingSymptomDeletion: SymptomEntryRecord?
     @State private var safetyReason: SafetyReason?
+    /// 글 칸 어디에든 커서가 있으면 참. 키보드 위 "완료" 가 이걸 꺼서
+    /// 키보드를 내린다(사용자 요청 2026-09-19) - 여러 줄 칸은 리턴이
+    /// 줄바꿈이라 달리 내릴 길이 없다.
+    @FocusState private var isEditingText: Bool
 
     /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
     private struct SafetyReason: Identifiable {
@@ -76,6 +80,13 @@ struct DiaryView: View {
             .fogBackground()
             .scrollContentBackground(.hidden)
             .navigationTitle(t("기록", "Journal"))
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(t("완료", "Done")) { isEditingText = false }
+                        .foregroundStyle(Color.ink)
+                }
+            }
             .sheet(isPresented: $isShowingSymptomSheet) {
                 SymptomEntrySheet { symptomID, severity, note in
                     saveSymptom(symptomID: symptomID, severity: severity, note: note)
@@ -130,6 +141,7 @@ struct DiaryView: View {
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 TextField("", text: text(record, \.note), axis: .vertical)
+                    .focused($isEditingText)
                     .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1...4)
@@ -289,6 +301,7 @@ struct DiaryView: View {
                     dreamScaleRow(t("기억", "Recall"), value: optionalInt(record, \.dreamRecall))
 
                     TextField(t("꿈 한 줄 (선택)", "A line about the dream (optional)"), text: text(record, \.dreamNote), axis: .vertical)
+                        .focused($isEditingText)
                         .janjanBody(15)
                         .foregroundStyle(Color.ink)
                         .lineLimit(1...4)
@@ -362,6 +375,7 @@ struct DiaryView: View {
                     .foregroundStyle(Color.ink)
 
                 TextEditor(text: text(record, \.longText))
+                    .focused($isEditingText)
                     .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .scrollContentBackground(.hidden)
@@ -615,18 +629,20 @@ struct DiaryView: View {
     }
 }
 
-/// 증상 하나를 고르고 세기를 정하는 시트.
+/// 증상을 골라 세기를 정하는 시트.
 ///
 /// 진단하지 않는다. 카탈로그의 일상어 항목과 0–10 세기만 받는다(설계 12절).
+/// 한 번에 여러 증상을 골라 같은 세기로 저장할 수 있다(사용자 요청 2026-09-19).
 private struct SymptomEntrySheet: View {
 
     let onSave: (String, Int, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedID: String?
+    @State private var selectedIDs: Set<String> = []
     @State private var severity = 5
     @State private var note = ""
+    @FocusState private var isEditingNote: Bool
 
     var body: some View {
         NavigationStack {
@@ -636,7 +652,7 @@ private struct SymptomEntrySheet: View {
                         groupCard(group)
                     }
 
-                    if selectedID != nil {
+                    if !selectedIDs.isEmpty {
                         severityCard
                     }
 
@@ -657,15 +673,24 @@ private struct SymptomEntrySheet: View {
                     Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(t("완료", "Done")) { isEditingNote = false }
+                        .foregroundStyle(Color.ink)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(t("저장", "Save")) {
-                        if let selectedID {
-                            onSave(selectedID, severity, note)
+                        // 카탈로그 순서대로 저장해 목록 순서가 화면 순서와 같게 한다.
+                        for group in Catalogs.symptoms.groups {
+                            for item in Catalogs.symptoms.symptoms(inGroup: group.id)
+                            where selectedIDs.contains(item.id) {
+                                onSave(item.id, severity, note)
+                            }
                         }
                         dismiss()
                     }
-                    .foregroundStyle(selectedID == nil ? Color.muted : Color.ink)
-                    .disabled(selectedID == nil)
+                    .foregroundStyle(selectedIDs.isEmpty ? Color.muted : Color.ink)
+                    .disabled(selectedIDs.isEmpty)
                 }
             }
         }
@@ -680,9 +705,13 @@ private struct SymptomEntrySheet: View {
 
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(Catalogs.symptoms.symptoms(inGroup: group.id)) { item in
-                        let isOn = selectedID == item.id
+                        let isOn = selectedIDs.contains(item.id)
                         Button {
-                            selectedID = isOn ? nil : item.id
+                            if isOn {
+                                selectedIDs.remove(item.id)
+                            } else {
+                                selectedIDs.insert(item.id)
+                            }
                         } label: {
                             PillChip(
                                 text: item.name(JanjanLanguage.current),
@@ -705,6 +734,16 @@ private struct SymptomEntrySheet: View {
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
 
+                if selectedIDs.count > 1 {
+                    Text(t(
+                        "고른 증상 \(selectedIDs.count)개가 모두 이 세기로 저장돼요. 하나만 다르면 저장 후 따로 남겨 주세요.",
+                        "All \(selectedIDs.count) selected symptoms are saved with this severity. Log one separately if it differs."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 CountStepper(
                     text: t(
                         "세기 \(severity) / \(SymptomEntry.severityRange.upperBound)",
@@ -717,6 +756,7 @@ private struct SymptomEntrySheet: View {
                 )
 
                 TextField(t("덧붙일 말 (선택)", "Add a note (optional)"), text: $note, axis: .vertical)
+                    .focused($isEditingNote)
                     .janjanBody(15)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1...4)

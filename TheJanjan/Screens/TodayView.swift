@@ -27,6 +27,7 @@ struct TodayView: View {
     @State private var openSlot: SlotSelection?
     @State private var safetyReason: SafetyReason?
     @State private var isShowingUnrecordedSheet = false
+    @State private var isShowingNextVisitSheet = false
     #if DEBUG
     /// 화면 찍기 전용: `-JanjanShowUnrecorded` 인자가 있으면 뜨자마자 살펴보기
     /// 시트를 연다. simctl 로만 띄우는 영어 캡처가 버튼을 누를 수 없어서다.
@@ -185,6 +186,9 @@ struct TodayView: View {
                 UnrecordedSlotsSheet(lines: unrecordedLines, language: lang) { line, entry, status in
                     recordUnrecorded(entry, in: line, as: status)
                 }
+            }
+            .sheet(isPresented: $isShowingNextVisitSheet) {
+                NextVisitSheet()
             }
             #if DEBUG
             .onAppear {
@@ -548,7 +552,15 @@ struct TodayView: View {
                     .foregroundStyle(Color.ink)
 
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                    PillChip(text: nextVisitText, tint: .surface2)
+                    // 눌러서 다음 진료 일정을 바로 잡는다(사용자 요청 2026-09-19).
+                    // 미정일 때만이 아니라 잡힌 날짜를 고칠 때도 같은 입구다.
+                    Button {
+                        isShowingNextVisitSheet = true
+                    } label: {
+                        PillChip(text: nextVisitText, tint: .surface2)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text(t("다음 진료 일정을 정해요.", "Set the next visit date.")))
                     // 소진 예측은 Pro. 무료에서는 자리만 비우고 조르지 않는다 —
                     // 유도 지점은 설계가 정한 세 곳뿐이고 여기는 그 중 하나가 아니다.
                     if pro.isPro, let text = shortfallText {
@@ -666,6 +678,129 @@ struct TodayView: View {
         try? context.save()
         // 폰에서 기록했으니 워치 화면도 따라오게 한다.
         AppServices.shared.pushWatchSnapshot()
+    }
+}
+
+/// 다음 진료 일정을 이 자리에서 잡는 시트 (사용자 요청 2026-09-19).
+///
+/// 처방 기록이 있으면 가장 최근 기록의 다음 진료일을 고치고, 하나도 없으면
+/// 일정만 담은 기록을 만든다. 그 기록의 visitDate 를 미래(그 진료일)로 두는
+/// 이유: 리포트의 "지난 진료" 앵커는 오늘 이전의 visitDate 만 보므로 오늘의
+/// 리포트가 흔들리지 않고, 진료일이 지나면 자연히 마지막 진료가 된다.
+private struct NextVisitSheet: View {
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+
+    @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
+    private var prescriptionRecords: [PrescriptionRecord]
+
+    @State private var date = Date()
+    @State private var didLoad = false
+
+    /// 이미 잡혀 있는 가장 가까운 다음 진료.
+    private var existing: Date? {
+        prescriptionRecords
+            .compactMap(\.nextVisitDate)
+            .filter { $0 >= Calendar.current.startOfDay(for: Date()) }
+            .min()
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+                    JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                            DatePicker(
+                                t("다음 진료", "Next visit"),
+                                selection: $date,
+                                in: Date()...,
+                                displayedComponents: [.date, .hourAndMinute]
+                            )
+                            .janjanBody(15)
+                            .tint(Color.ink)
+
+                            Text(t(
+                                "저장하면 진료 알림이 이 시각에 맞춰지고, 소진 예측도 이 날을 기준으로 계산돼요.",
+                                "Saving sets the visit reminder to this time and anchors running-low forecasts to this date."
+                            ))
+                                .janjanBody(12)
+                                .foregroundStyle(Color.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    BlackPillButton(title: t("저장", "Save")) { save() }
+
+                    if existing != nil {
+                        WhitePillButton(title: t("미정으로 되돌리기", "Clear the date")) { clear() }
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("다음 진료", "Next visit"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+            .onAppear {
+                guard !didLoad else { return }
+                didLoad = true
+                // 잡힌 날짜가 있으면 그걸 고치는 것부터. 없으면 2주 뒤 오전 10시 —
+                // 어차피 고를 값이지만 자정보다 진료 시간에 가깝다.
+                if let existing {
+                    date = existing
+                } else {
+                    let calendar = Calendar.current
+                    let base = calendar.date(byAdding: .day, value: 14, to: calendar.startOfDay(for: Date())) ?? Date()
+                    date = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: base) ?? base
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func save() {
+        if let record = prescriptionRecords.first(where: { $0.visitDate <= Date() }) ?? prescriptionRecords.first {
+            record.nextVisitDate = date
+        } else {
+            context.insert(PrescriptionRecord(
+                visitDate: date,
+                daysSupplied: 0,
+                nextVisitDate: date,
+                clinicNote: "",
+                medicationIDValues: []
+            ))
+        }
+        finish()
+    }
+
+    private func clear() {
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        for record in prescriptionRecords where (record.nextVisitDate ?? .distantPast) >= todayStart {
+            // 일정만 담은 기록(약도 처방일수도 없는 것)은 미정이 되면 남길 이유가
+            // 없다 - 미래의 visitDate 가 지나며 가짜 "지난 진료" 가 되기 전에 지운다.
+            if record.medicationIDValues.isEmpty && record.daysSupplied == 0 && record.visitDate > Date() {
+                context.delete(record)
+            } else {
+                record.nextVisitDate = nil
+            }
+        }
+        finish()
+    }
+
+    private func finish() {
+        try? context.save()
+        Task { await ReminderPlanner.rescheduleAppointments(using: context) }
+        dismiss()
     }
 }
 

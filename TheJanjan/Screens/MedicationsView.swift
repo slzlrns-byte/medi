@@ -279,9 +279,20 @@ struct MedicationsView: View {
                 Text(t("첫 약을 등록해 볼까요", "Let's add your first medication"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text(t("오른쪽 아래 + 를 누르면 이름과 시간만으로 시작할 수 있어요.", "Tap the + in the bottom right — a name and a time is all it takes to start."))
+                Text(t("이름과 시간만으로 시작할 수 있어요.", "A name and a time is all it takes to start."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
+
+                // 손이 문구 바로 아래로 가게 등록 입구를 카드 안에 둔다
+                // (사용자 요청 2026-09-19 - 이전 문구는 "오른쪽 아래 +" 라고
+                // 안내했는데 실제 + 는 오른쪽 위에 있었다).
+                WhitePillButton(title: t("약 등록하기", "Add a medication"), systemImage: "plus") {
+                    isShowingAddFlow = true
+                }
+                .overlay(
+                    Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
+                )
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
         }
         .padding(.top, CGFloat(JanjanSpacing.s))

@@ -32,6 +32,8 @@ struct ReportView: View {
 
     @State private var exportURL: ExportedFile?
     @State private var isExporting = false
+    /// 질문 칸의 키보드를 "완료" 로 내리기 위한 초점(사용자 요청 2026-09-19).
+    @FocusState private var isEditingQuestions: Bool
 
     private struct ExportedFile: Identifiable {
         let url: URL
@@ -267,6 +269,14 @@ struct ReportView: View {
                     .foregroundStyle(Color.ink)
 
                 TextEditor(text: $questions)
+                    .focused($isEditingQuestions)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button(t("완료", "Done")) { isEditingQuestions = false }
+                                .foregroundStyle(Color.ink)
+                        }
+                    }
                     .janjanBody(14)
                     .foregroundStyle(Color.ink)
                     .scrollContentBackground(.hidden)

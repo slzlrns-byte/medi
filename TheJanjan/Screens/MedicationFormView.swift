@@ -20,7 +20,9 @@ struct MedicationFormView: View {
     @State private var purpose = ""
     @State private var form: Medication.Form = .tablet
     @State private var kind: Medication.Kind = .scheduled
-    @State private var weekdays: Set<Weekday> = Weekday.everyday
+    /// 기본은 아무 요일도 고르지 않은 상태 - 직접 눌러 고른다
+    /// (사용자 요청 2026-09-19. 전에는 매일이 기본이라 지나치기 쉬웠다).
+    @State private var weekdays: Set<Weekday> = []
     @State private var stockText = ""
     @State private var drafts: [SlotDraft] = SlotDraft.presets()
     @State private var isSaving = false
@@ -244,9 +246,20 @@ struct MedicationFormView: View {
     private var weekdayCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("무슨 요일에", "On which days"))
-                    .janjanBody(12, weight: .medium)
-                    .foregroundStyle(Color.muted)
+                HStack {
+                    Text(t("무슨 요일에", "On which days"))
+                        .janjanBody(12, weight: .medium)
+                        .foregroundStyle(Color.muted)
+                    Spacer(minLength: 0)
+                    // 매일 먹는 약이 대부분이라 한 번에 켜는 손잡이를 둔다.
+                    // 다 켜진 상태에서 다시 누르면 전부 꺼진다 - 같은 자리가 되돌리기다.
+                    TogglePill(
+                        text: t("모든 요일", "Every day"),
+                        isOn: weekdays == Weekday.everyday
+                    ) {
+                        weekdays = weekdays == Weekday.everyday ? [] : Weekday.everyday
+                    }
+                }
 
                 // 일곱 개가 화면 폭을 고르게 나눠 가진다. 최소 폭 40 을 그대로
                 // 두면 일곱 개가 472pt 라 아이폰 어느 기기에도 들어가지 않는다.
