@@ -39,6 +39,9 @@ struct DiaryView: View {
     @State private var safetyReason: SafetyReason?
     /// 고치러 여는 지난 날.
     @State private var editingDay: EditingDay?
+    /// 고치기 전에 한 번 묻는 자리. 지난 기록은 이미 리포트에 실린 값이라
+    /// 무심코 눌러서 바뀌면 안 된다(사용자 요청 2026-09-19).
+    @State private var pendingEditDay: EditingDay?
 
     /// 시트에 넘길 때 Identifiable 이 필요해 감싼다.
     private struct EditingDay: Identifiable {
@@ -137,6 +140,28 @@ struct DiaryView: View {
             }
             .sheet(item: $editingDay) { target in
                 DiaryView(day: target.date)
+            }
+            // 지난 기록은 이미 지나간 날의 사실이고 리포트에도 실린다.
+            // 고치는 일 자체를 막지는 않되, 한 번은 묻고 들어간다.
+            .confirmationDialog(
+                t("정말 고치시겠습니까?", "Edit this past entry?"),
+                isPresented: Binding(
+                    get: { pendingEditDay != nil },
+                    set: { if !$0 { pendingEditDay = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingEditDay
+            ) { target in
+                Button(t("고치기", "Edit")) {
+                    pendingEditDay = nil
+                    editingDay = target
+                }
+                Button(t("취소", "Cancel"), role: .cancel) { pendingEditDay = nil }
+            } message: { _ in
+                Text(t(
+                    "지난 기록을 고치면 리포트와 한 달의 흐름에도 새 값으로 나와요.",
+                    "Editing a past entry changes what your report and monthly flow show."
+                ))
             }
             .confirmationDialog(
                 t("이 증상 기록을 지울까요?", "Delete this symptom entry?"),
@@ -540,7 +565,7 @@ struct DiaryView: View {
 
                 ForEach(Array(past)) { record in
                     Button {
-                        editingDay = EditingDay(date: record.date)
+                        pendingEditDay = EditingDay(date: record.date)
                     } label: {
                     HStack(spacing: CGFloat(JanjanSpacing.s)) {
                         Circle()

@@ -44,9 +44,7 @@ struct MedicationFormView: View {
     @State private var isSaving = false
     /// 알림 권한을 묻는 화면. 시간이 있는 약을 저장한 직후에만 올라온다.
     @State private var isAskingNotification = false
-    /// 고치기 저장 직전의 확인. 새로 만들 때는 묻지 않는다 - 없던 것이
-    /// 생기는 일에는 되돌릴 것이 없고, 이미 쓰고 있던 약을 바꾸는 일에는 있다.
-    @State private var isConfirmingEdit = false
+
 
     private var lang: JanjanLanguage { .current }
 
@@ -180,11 +178,7 @@ struct MedicationFormView: View {
                     isBusy: isSaving,
                     isEnabled: canSave
                 ) {
-                    if isEditing {
-                        isConfirmingEdit = true
-                    } else {
-                        save()
-                    }
+                    save()
                 }
                 .padding(.top, CGFloat(JanjanSpacing.s))
 
@@ -200,22 +194,7 @@ struct MedicationFormView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle(isEditing ? t("약 고치기", "Edit medication") : t("직접 입력", "Enter manually"))
         .navigationBarTitleDisplayMode(.inline)
-        // 이미 쓰고 있던 약을 바꾸는 일이라 한 번 묻는다(사용자 요청 2026-09-19).
-        // 무엇이 바뀌고 무엇이 남는지를 묻는 자리에서 다시 말한다 - 확인창은
-        // 겁을 주는 자리가 아니라 마지막으로 알려 주는 자리다.
-        .confirmationDialog(
-            t("정말 고치시겠습니까?", "Save these changes?"),
-            isPresented: $isConfirmingEdit,
-            titleVisibility: .visible
-        ) {
-            Button(t("고치기", "Save changes")) { save() }
-            Button(t("취소", "Cancel"), role: .cancel) { isConfirmingEdit = false }
-        } message: {
-            Text(t(
-                "바꾼 내용이 앞으로의 알림과 오늘 화면에 바로 반영돼요. 지난 복용 기록과 남은 개수는 그대로 남아요.",
-                "Your changes apply to future reminders and the Today screen right away. Past doses and pills on hand stay as they are."
-            ))
-        }
+
         .fullScreenCover(isPresented: $isAskingNotification) {
             NotificationPermissionView {
                 NotificationPermissionGate.hasAsked = true

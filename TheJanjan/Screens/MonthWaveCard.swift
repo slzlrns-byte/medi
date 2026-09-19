@@ -302,6 +302,10 @@ private struct DayRecordSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
+    /// 이미 남아 있는 기록을 고치러 들어가기 전에 한 번 묻는다. 비어 있던
+    /// 날을 뒤늦게 채우는 것은 묻지 않는다 - 없던 것이 생기는 일에는
+    /// 되돌릴 것이 없다(사용자 요청 2026-09-19).
+    @State private var isConfirmingEdit = false
 
     @Query private var checkInRecords: [CheckInRecord]
     @Query private var symptomRecords: [SymptomEntryRecord]
@@ -359,7 +363,11 @@ private struct DayRecordSheet: View {
                             : t("이날 기록 남기기", "Log this day"),
                         systemImage: "pencil"
                     ) {
-                        isEditing = true
+                        if hasAnything {
+                            isConfirmingEdit = true
+                        } else {
+                            isEditing = true
+                        }
                     }
                     .padding(.top, CGFloat(JanjanSpacing.xs))
                 }
@@ -381,6 +389,19 @@ private struct DayRecordSheet: View {
         .presentationDetents([.medium, .large])
         .sheet(isPresented: $isEditing) {
             DiaryView(day: date)
+        }
+        .confirmationDialog(
+            t("정말 고치시겠습니까?", "Edit this past entry?"),
+            isPresented: $isConfirmingEdit,
+            titleVisibility: .visible
+        ) {
+            Button(t("고치기", "Edit")) { isEditing = true }
+            Button(t("취소", "Cancel"), role: .cancel) { isConfirmingEdit = false }
+        } message: {
+            Text(t(
+                "지난 기록을 고치면 리포트와 한 달의 흐름에도 새 값으로 나와요.",
+                "Editing a past entry changes what your report and monthly flow show."
+            ))
         }
     }
 
