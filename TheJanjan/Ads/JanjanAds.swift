@@ -39,8 +39,12 @@ enum JanjanAds {
 
     private static var didStart = false
 
-    /// 무료 사용자가 광고를 처음 만나기 직전에만 깨운다.
-    /// Pro 로 시작한 사람의 기기에서는 SDK 가 영영 켜지지 않는다.
+    /// 무료 사용자에게만 SDK 를 깨운다. Pro 로 시작한 사람의 기기에서는
+    /// 영영 켜지지 않는다.
+    ///
+    /// **앱이 뜰 때 한 번 미리 부른다**(QA 2026-09-19). 배너가 붙는 순간에
+    /// 처음 깨우면 시동과 첫 요청이 겹치는데, SDK 는 시동이 끝나기 전의
+    /// 요청을 흘려보낼 수 있다. 그러면 첫 화면에서는 늘 빈자리가 된다.
     @MainActor
     static func startIfNeeded() {
         guard !didStart else { return }
@@ -164,6 +168,11 @@ struct JanjanBannerView: UIViewRepresentable {
             retryTask = Task { @MainActor [weak bannerView] in
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
                 guard !Task.isCancelled, let bannerView else { return }
+                // 처음 붙을 때 창이 아직 없어 실패했을 수도 있다. 다시 챙긴다 -
+                // 화면이 없으면 SDK 는 요청 자체를 거절한다.
+                if bannerView.rootViewController == nil {
+                    bannerView.rootViewController = JanjanAds.rootViewController
+                }
                 bannerView.load(JanjanAds.request())
             }
         }

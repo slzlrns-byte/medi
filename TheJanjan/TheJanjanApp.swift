@@ -55,6 +55,12 @@ struct TheJanjanApp: App {
                     // 돈다(체크리스트 3.6).
                     await proStore.reload()
                     AppServices.shared.updatePro(proStore.isPro)
+
+                    // 광고 SDK 는 무료 사용자에게만, 그리고 배너가 붙기 전에
+                    // 미리 깨운다. 붙는 순간에 깨우면 시동과 첫 요청이 겹쳐
+                    // 첫 화면이 늘 빈자리가 된다(QA 2026-09-19).
+                    // 구독 판정이 끝난 뒤라, Pro 인 사람의 기기에서는 켜지지 않는다.
+                    if !proStore.isPro { JanjanAds.startIfNeeded() }
                     await AppServices.shared.start(container: modelContainer)
                 }
                 // 시트가 아니라 fullScreenCover 로 덮는다.
