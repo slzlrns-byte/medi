@@ -59,7 +59,8 @@ struct DiaryView: View {
         let reason: SafetyTrigger.Reason
     }
 
-    private var viewedDay: Date { day ?? Date() }
+    @ObservedObject private var clock = JanjanClock.shared
+    private var viewedDay: Date { day ?? clock.today }
     private var calendar: Calendar { .current }
 
     private var dayRecord: CheckInRecord? {

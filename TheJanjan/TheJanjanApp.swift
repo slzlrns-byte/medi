@@ -13,6 +13,12 @@ struct TheJanjanApp: App {
     private let modelContainer: ModelContainer
 
     init() {
+        // **AppLockManager 보다 먼저다.** 그 객체는 만들어지는 순간
+        // 키체인에 번호가 있는지를 읽어 잠금 상태를 정한다. 앱을 지웠다
+        // 다시 깐 기기에는 옛 번호가 남아 있어, 걷어 내지 않으면 기록이
+        // 하나도 없는 새 앱이 네 자리를 묻는 화면부터 띄운다.
+        PasscodeStore.clearIfReinstalled()
+
         modelContainer = JanjanModelContainer.make()
 
         // 화면을 찍기 위한 예시 기록. 실행 인자가 있을 때만, 그리고 DEBUG 에서만 돈다.
@@ -101,6 +107,20 @@ struct TheJanjanApp: App {
                             // 그대로 물어본다 - 채우는 것은 답이 아니다.
                             UnrecordedBackfill.run(in: modelContainer.mainContext)
                         }
+                    }
+                }
+                // 앞으로 나올 때만 날을 새로 읽으면, 앱을 한 번도 안 내린
+                // 사람에게는 영영 어제다(QA 2026-09-19). 자정 자체를 듣는다.
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                    Task {
+                        UnrecordedBackfill.run(in: modelContainer.mainContext)
+                        // 되물음은 하루치만 걸려 있다. 날이 바뀌었으니 오늘치를 깐다.
+                        await ReminderPlanner.reschedule(using: modelContainer.mainContext)
+                        // 밤사이 끝난 구독은 새 거래가 없어 Transaction.updates 가
+                        // 울리지 않는다. 날이 바뀔 때 한 번 확인한다.
+                        _ = await proStore.refreshEntitlements()
+                        // 워치도 어제 계획을 들고 있다.
+                        AppServices.shared.pushWatchSnapshot()
                     }
                 }
         }

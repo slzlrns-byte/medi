@@ -20,7 +20,9 @@ struct VisitHistoryView: View {
     /// 무료로 선명하게 보이는 최근 회차 수: 이번 진료 + 바로 이전 회차.
     static let freeClearVisits = 2
 
-    private var today: Date { Date() }
+    /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
+    @ObservedObject private var clock = JanjanClock.shared
+    private var today: Date { clock.today }
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.

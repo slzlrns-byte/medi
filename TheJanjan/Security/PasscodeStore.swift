@@ -88,6 +88,23 @@ enum PasscodeStore {
         return true
     }
 
+    /// 앱을 새로 깐 기기에서 남아 있는 옛 잠금 번호를 걷는다.
+    ///
+    /// 키체인 항목은 **앱을 지워도 남는다.** 잠금을 켜 둔 채 홈 화면에서
+    /// 앱을 지우고 다시 깔면, 기록은 하나도 없는데 네 자리를 묻는 화면부터
+    /// 만난다 - "방금 새로 깐 앱인데 왜 비밀번호를 묻지" (QA 2026-09-19).
+    ///
+    /// UserDefaults 는 앱과 함께 지워지므로, 깃발이 없는데 키체인에 번호가
+    /// 있으면 그것은 지워진 설치가 남긴 것이다. 기기 암호로 되찾을 길이
+    /// 있긴 하지만, 그 길을 쓰게 만드는 것 자체가 잘못이다.
+    static func clearIfReinstalled() {
+        let flag = "janjan.lock.installed"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: flag) else { return }
+        defaults.set(true, forKey: flag)
+        if isSet { remove() }
+    }
+
     /// 잠금을 끈다. 저장된 것이 없어도 조용히 넘어간다.
     static func remove() {
         let query: [String: Any] = [

@@ -31,7 +31,9 @@ struct MedicationDetailView: View {
     @State private var isShowingRecountSheet = false
     @State private var comparingChange: DoseChangeRecord?
 
-    private var today: Date { Date() }
+    /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
+    @ObservedObject private var clock = JanjanClock.shared
+    private var today: Date { clock.today }
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
@@ -206,10 +208,24 @@ struct MedicationDetailView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
                 if hasStock {
-                    Text(t("\(DecimalQuantity.display(snapshot.remaining))정", pillsEn(snapshot.remaining)))
+                    // 기록상 소비가 보충보다 많으면 계산이 음수로 떨어진다.
+                    // 목록 화면은 0 으로 잡고 "다시 세어 주세요" 를 띄우는데
+                    // 여기만 "-4정" 을 그대로 보였다 - 두 화면이 서로 다른
+                    // 말을 하면 어느 쪽도 못 믿는다(QA 2026-09-19).
+                    let shown = max(snapshot.remaining, 0)
+                    Text(t("\(DecimalQuantity.display(shown))정", pillsEn(shown)))
                         .janjanDisplay(28)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
+                    if snapshot.remaining < 0 {
+                        Text(t(
+                            "기록보다 실제로 더 남아 있을 수 있어요. 다시 세어 주세요.",
+                            "You may have more left than the records show. Please recount."
+                        ))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if let refill = StockEvent.lastRefillQuantity(of: medication.id, in: stock) {
                         Text(t("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill)) last time"))
                             .janjanBody(13)

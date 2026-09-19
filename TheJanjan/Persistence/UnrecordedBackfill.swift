@@ -25,14 +25,32 @@ enum UnrecordedBackfill {
 
     private static let logger = Logger(subsystem: Janjan.appBundleID, category: "backfill")
 
+    /// 마지막으로 훑은 날. 하루에 한 번이면 족하다.
+    private static let lastRunKey = "janjan.backfill.lastRunDay"
+
     /// 한 번 훑고 비어 있던 자리를 채운다. 여러 번 불러도 결과가 같다 -
     /// 이미 사건이 있는 자리는 건너뛴다.
+    /// - Parameter force: 날이 같아도 다시 훑는다. 테스트와 "이 자리에서
+    ///   당장 맞춰야 하는" 경로만 쓴다.
     @discardableResult
     static func run(
         in context: ModelContext,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        force: Bool = false
     ) -> Int {
+
+        // 훑는 비용은 31일 × 기록 전체다. 앱을 여닫을 때마다 반복하면
+        // 한 해치가 쌓인 기기에서 앞으로 나올 때마다 눈에 띄게 걸린다.
+        // 채울 것은 하루에 한 번만 생기므로 하루에 한 번만 훑는다.
+        let endDayStart = calendar.startOfDay(for: now)
+        let defaults = UserDefaults.standard
+        if !force,
+           let last = defaults.object(forKey: lastRunKey) as? Date,
+           calendar.isDate(last, inSameDayAs: endDayStart) {
+            return 0
+        }
+        defaults.set(endDayStart, forKey: lastRunKey)
 
         let medications = fetch(MedicationRecord.self, in: context).map { $0.core.displayReady }
         guard !medications.isEmpty else { return 0 }
@@ -44,7 +62,7 @@ enum UnrecordedBackfill {
 
         // 화면이 들여다보는 범위와 같은 상한을 쓴다. 이보다 오래된 것은
         // 되돌아볼 자리도 없으므로 채워 봐야 말을 걸지 못한다.
-        let endDay = calendar.startOfDay(for: now)
+        let endDay = endDayStart
         guard let from = calendar.date(
             byAdding: .day, value: -(UnrecordedSlots.maxLookbackDays - 1), to: endDay
         ) else { return 0 }

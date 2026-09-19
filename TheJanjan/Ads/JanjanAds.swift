@@ -136,6 +136,10 @@ struct JanjanBannerView: UIViewRepresentable {
             guard token != lastToken else { return false }
             lastToken = token
             retries = 0
+            // 걸려 있던 백오프도 함께 걷는다. 안 그러면 지금 부르는 것과
+            // 나중에 깨어나는 것이 겹쳐 같은 광고를 두 번 요청한다.
+            retryTask?.cancel()
+            retryTask = nil
             return true
         }
 
