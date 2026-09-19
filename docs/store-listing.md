@@ -36,6 +36,7 @@
 - 아침, 점심, 저녁, 취침, 내가 정한 시간대까지 기록해요.
 - 필요할 때만 먹는 약은 따로 기록할 수 있어요.
 - 알림이 오면 잠금화면에서 '복용함'을 바로 눌러요.
+- 홈 화면과 잠금화면 위젯으로 다음 시간대를 확인해요.
 
 ● 빠트린 날도 찾아요
 - 남은 알약을 세어 기록과 맞춰 봐요.
@@ -48,19 +49,23 @@
 ● 진료 준비는 한 장으로
 - 복약률, 한 달 기분 흐름, 남은 약 개수, 의사에게 물어볼 것을 정리해 둬요.
 - PDF 한 장으로 나와요. 필요하다면 진료실에서 그대로 보여주면 돼요.
+- 내보내기는 무료예요. 짧은 광고를 보면 바로 만들어 드리고, Pro는 광고 없이 받아요.
 - 다음 진료까지 며칠 남았는지 늘 보여요.
 
 ● Pro
-- 패턴 보기: 최근 4주의 기분, 복약, 수면을 같은 눈금에 놓고 봐요.
+월간·연간 구독 또는 평생 이용권 한 번 결제로 열어요.
+- 광고 없이: 화면 아래 배너와 내보내기 광고가 사라져요.
 - 똑똑한 재알림: 기록이 없으면 정한 간격으로 다시 물어봐요.
-- 약봉투 스캔: 사진 한 장으로 약 이름을 읽어 등록해요.
-- 약 모양으로 찾기: 모양, 색, 각인으로 검색해요. 식약처 낱알식별 정보 기준이에요.
 - 소진 예측: 진료 전에 약이 모자라는지 미리 알 수 있어요.
+- Apple Watch: 손목에서 기록하고 알림에 바로 응답해요.
+- 위젯에서 바로 기록: 앱을 열지 않고 위젯에서 눌러 기록해요.
+- 패턴 보기: 최근 4주의 기분, 복약, 수면을 같은 눈금에 놓고 봐요. 최근 7일은 무료로도 보여요.
 - 용량 변경 전후 비교: 바뀐 앞뒤 2주와 바꾼 뒤의 흐름을 나란히 봐요.
 - 지난 진료 기록: 회차별 처방 이력을 모두 봐요. 바로 이전 회차까지는 무료예요.
+- 약봉투 스캔: 사진 한 장으로 약 이름을 읽어 등록해요.
+- 약 모양으로 찾기: 모양, 색, 각인으로 검색해요. 식약처 낱알식별 정보 기준이에요.
 - 약 이름 가리기: 필요한 경우 가려 두고 필요할 때만 눌러서 볼 수 있어요.
 - Pro 테마: 두 가지 색을 더 골라요.
-- Apple Watch: 손목에서 기록하고 알림에 바로 응답해요.
 
 ● 기록은 내 것
 - 서버가 없어요. 기록은 내 기기와 내 iCloud에만 저장돼요.
@@ -113,6 +118,7 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 - Morning, noon, evening, bedtime, or any slot you add.
 - As-needed meds are logged separately, each time you take them.
 - When a reminder arrives, tap 'Taken' right on the lock screen.
+- Check your next slot from a Home Screen or Lock Screen widget.
 
 ● Find the days you missed
 - Count your remaining pills and compare with your records.
@@ -125,19 +131,23 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 ● One page for your visit
 - Adherence, a month of mood, pills remaining, and questions for your doctor.
 - It comes out as a single PDF you can show at the clinic.
+- Exporting is free — watch a short ad and it's ready right away, or skip the ad with Pro.
 - Always see how many days are left until your next visit.
 
 ● Pro
-- Pattern view: mood, doses, and sleep from the past 4 weeks on one scale.
+Open it with a monthly or yearly subscription, or a one-time lifetime purchase.
+- No ads: the bottom banner and the export ad go away.
 - Smart re-reminders: if nothing is logged, it asks again at the interval you choose.
-- Pharmacy bag scan: register meds from one photo.
-- Find by pill appearance: search by shape, color, and imprint, based on Korean MFDS pill identification data.
 - Run-out forecast: know ahead whether your meds will last until the next visit.
+- Apple Watch: log and respond to reminders from your wrist.
+- Log from the widget: tap to log without opening the app.
+- Pattern view: mood, doses, and sleep from the past 4 weeks on one scale. The last 7 days are free.
 - Dose change comparison: the two weeks before and after, and the flow since, side by side.
 - Visit history: every past prescription by visit. The most recent two stay free.
+- Pharmacy bag scan: register meds from one photo.
+- Find by pill appearance: search by shape, color, and imprint, based on Korean MFDS pill identification data.
 - Hide medication names: keep them covered, reveal only when needed.
 - Pro themes: two more colors to choose from.
-- Apple Watch: log and respond to reminders from your wrist.
 
 ● Your records are yours
 - No server. Records live only on your device and in your own iCloud.
@@ -178,7 +188,7 @@ This is the first release of The Janjan.
   - Pages 소스가 main + /docs 라서 심사 때 보이는 건 main 의 파일이다.
     작업 브랜치에서 처리방침을 고치면 main 의 docs/site/ 에도 반영해야 산다.
 - 저작권: © 2026 (개발자 이름)
-- 구독 설명(구독 그룹 로컬라이즈): "패턴 보기·똑똑한 재알림·소진 예측·약봉투 스캔·워치를 열어요."
+- 구독 설명(구독 그룹 로컬라이즈, 45자 제한): "광고 없이·패턴 보기·똑똑한 재알림·소진 예측·약봉투 스캔·워치를 열어요." (41자)
 - **평생 이용권(비소모성 인앱 결제, ASC 에서 별도 생성 필요)**: 제품 ID `pro_lifetime`,
   참조 이름 "Pro 평생 이용권", 가격 ₩49,000(연간의 약 2.5배 - 앵커 겸 구독 기피층 흡수),
   표시 이름 "Pro 평생 이용권", 설명 "한 번 결제로 Pro 전부를 계속 써요. 구독이 아니에요."

@@ -9,7 +9,7 @@ final class ProFeatureTests: XCTestCase {
         XCTAssertEqual(
             ProFeature.launchHighlights,
             [.noAds, .pharmacyScan, .pillFinder, .patternView, .smartFollowUp, .runOutForecast,
-             .doseChangeCompare, .visitHistory, .hideNames, .proThemes, .watchApp]
+             .doseChangeCompare, .visitHistory, .hideNames, .proThemes, .watchApp, .widgetLog]
         )
         XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "광고 없이")
     }
@@ -55,7 +55,7 @@ final class ProFeatureTests: XCTestCase {
     }
 
     func testEveryFeatureHasKoreanTitle() {
-        XCTAssertEqual(ProFeature.allCases.count, 15)
+        XCTAssertEqual(ProFeature.allCases.count, 16)
         for feature in ProFeature.allCases {
             XCTAssertFalse(feature.titleKo.isEmpty, "\(feature) 문구가 비어 있다")
             XCTAssertFalse(feature.rawValue.isEmpty)

@@ -18,6 +18,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case doseChangeCompare
     case visitHistory
     case noAds
+    case widgetLog
     case detailedMoodDiary
     case watchApp
     case reports
@@ -36,6 +37,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .doseChangeCompare: return "용량 변경 전후 비교"
         case .visitHistory: return "지난 진료 기록"
         case .noAds: return "광고 없이"
+        case .widgetLog: return "위젯에서 바로 기록"
         case .detailedMoodDiary: return "자세한 기분일기"
         case .watchApp: return "Apple Watch 앱"
         case .reports: return "진료용 리포트"
@@ -56,6 +58,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .doseChangeCompare: return "Dose change comparison"
         case .visitHistory: return "Visit history"
         case .noAds: return "No ads"
+        case .widgetLog: return "Log from the widget"
         case .detailedMoodDiary: return "Detailed mood journal"
         case .watchApp: return "Apple Watch app"
         case .reports: return "Visit report"
@@ -106,7 +109,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
 
     public var group: Group {
         switch self {
-        case .smartFollowUp, .runOutForecast, .watchApp:
+        case .smartFollowUp, .runOutForecast, .watchApp, .widgetLog:
             return .guarding
         case .patternView, .doseChangeCompare, .visitHistory, .reports:
             return .clinic
@@ -136,6 +139,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
     ///
     /// 패턴 보기·똑똑한 재알림·Pro 테마·지난 진료 기록(2026-09-19)을 더해 열이
     /// 됐고, 광고 도입과 함께 "광고 없이" 가 맨 앞에 붙어 열하나가 됐다.
+    /// 위젯에서 바로 기록하는 것도 이미 잠겨 있었는데 어디에도 적히지 않아
+    /// 열둘이 됐다(대조 2026-09-19) - 잠근 것은 적어야 값으로 보인다.
     /// 그것을 첫 줄에 둔 이유: 나머지 열은 기록이 쌓여야 쓸모가 생기는데,
     /// 광고 없이는 **무료 사용자가 설치 첫날부터 매일 체감하는 유일한 항목**이다.
     ///
@@ -152,7 +157,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
         .visitHistory,
         .hideNames,
         .proThemes,
-        .watchApp
+        .watchApp,
+        .widgetLog
     ]
 
     /// 페이월이 그리는 차례. 빈 묶음은 빼고, 모든 줄이 정확히 한 묶음에 속한다.
