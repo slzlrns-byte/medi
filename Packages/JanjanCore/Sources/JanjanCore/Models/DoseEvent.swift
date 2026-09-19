@@ -42,6 +42,16 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
         case notificationAction
         case widget
         case siri
+        /// **사용자가 답한 것이 아니다.** 시각이 지나도록 아무 답이 없던
+        /// 시간대를 앱이 미기록으로 채운 것이다(2026-09-19 결정).
+        ///
+        /// 이것이 없으면 복약률의 분모가 "답한 횟수" 가 되어, 앱을 가끔만
+        /// 여는 사람일수록 숫자가 더 높게 나오는 역설이 생긴다 - 28일 중
+        /// 14일만 열어 그때마다 복용함을 눌렀으면 100% 로 찍힌다.
+        ///
+        /// 사용자가 직접 고른 "기억나지 않아요" 와는 구별해야 한다. 그쪽은
+        /// 답이므로 다시 묻지 않고, 이쪽은 답이 아니므로 계속 물어본다.
+        case automatic
 
         public var labelKo: String {
             switch self {
@@ -50,6 +60,7 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
             case .notificationAction: return "알림"
             case .widget: return "위젯"
             case .siri: return "시리"
+            case .automatic: return "자동"
             }
         }
 
@@ -60,6 +71,7 @@ public struct DoseEvent: Identifiable, Hashable, Codable, Sendable {
             case .notificationAction: return "Notification"
             case .widget: return "Widget"
             case .siri: return "Siri"
+            case .automatic: return "Automatic"
             }
         }
 

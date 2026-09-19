@@ -25,6 +25,8 @@ public enum DayPlan {
         public let status: DoseEvent.Status?
         /// 대응하는 저장된 사건. 답을 고쳐 쓸 때 이 ID 로 찾는다.
         public let eventID: UUID?
+        /// 그 사건을 누가 남겼는가. `.automatic` 은 앱이 채운 것이라 답이 아니다.
+        public let source: DoseEvent.Source?
 
         public init(
             id: UUID,
@@ -32,7 +34,8 @@ public enum DayPlan {
             medicationName: String,
             dose: Decimal,
             status: DoseEvent.Status? = nil,
-            eventID: UUID? = nil
+            eventID: UUID? = nil,
+            source: DoseEvent.Source? = nil
         ) {
             self.id = id
             self.medicationID = medicationID
@@ -40,6 +43,7 @@ public enum DayPlan {
             self.dose = DecimalQuantity.snapToQuarter(dose)
             self.status = status
             self.eventID = eventID
+            self.source = source
         }
 
         /// 사용자가 답을 준 줄인가.
@@ -47,6 +51,17 @@ public enum DayPlan {
         public var isAnswered: Bool {
             guard let status else { return false }
             return status != .unrecorded
+        }
+
+        /// 아직 물어볼 줄인가.
+        ///
+        /// 아무 사건도 없거나, 앱이 스스로 채워 둔 미기록이면 참이다 -
+        /// 후자는 채워졌을 뿐 답을 받은 것이 아니다. 사용자가 직접 고른
+        /// "기억나지 않아요" 는 답이므로 여기서 빠진다. 같은 질문을 두 번
+        /// 하지 않는 것이 이 구분의 이유다.
+        public var awaitsAnswer: Bool {
+            guard let status else { return true }
+            return status == .unrecorded && source == .automatic
         }
     }
 
@@ -155,7 +170,8 @@ public enum DayPlan {
                     medicationName: medication.name,
                     dose: schedule.dosePerIntake,
                     status: event?.status,
-                    eventID: event?.id
+                    eventID: event?.id,
+                    source: event?.source
                 )
             }
 

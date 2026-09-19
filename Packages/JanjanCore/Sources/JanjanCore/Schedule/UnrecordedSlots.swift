@@ -80,7 +80,9 @@ public enum UnrecordedSlots {
                 let plannedAt = line.time.date(on: day, calendar: calendar)
                 guard plannedAt <= now else { continue }
                 let unrecorded = line.entries.filter { entry in
-                    guard entry.status == nil else { return false }
+                    // 아무 사건도 없거나, 앱이 채워 둔 미기록이면 아직 답이 아니다.
+                    // 사용자가 직접 고른 "기억나지 않아요" 는 답이므로 다시 묻지 않는다.
+                    guard entry.awaitsAnswer else { return false }
                     guard let medication = medicationsByID[entry.medicationID] else { return false }
                     // 중단한 시각보다 뒤의 시간대는 빠트린 것이 아니다.
                     if medication.status == .stopped {

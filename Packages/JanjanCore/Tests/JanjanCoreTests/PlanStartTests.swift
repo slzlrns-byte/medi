@@ -104,3 +104,73 @@ final class PlanStartTests: XCTestCase {
         XCTAssertEqual(after.count, 1)
     }
 }
+
+/// 앱이 채운 미기록과 사용자가 고른 "기억나지 않아요" 는 같은 상태값을
+/// 쓰지만 뜻이 다르다. 하나는 답이 아니고 하나는 답이다.
+final class AutoFilledUnrecordedTests: XCTestCase {
+
+    private let calendar = Fixed.calendar
+    private let day = Fixed.date(2026, 9, 12)
+
+    private var medication: Medication {
+        Medication(id: Fixed.medA, name: "에스시탈로프람")
+    }
+
+    private var morning: Schedule {
+        Schedule(medicationID: Fixed.medA, slot: .morning, weekdays: Weekday.everyday)
+    }
+
+    private func event(source: DoseEvent.Source) -> DoseEvent {
+        DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 9, 12, 8, 0),
+            status: .unrecorded,
+            source: source,
+            quantity: 1,
+            kind: .scheduled,
+            slotKey: DoseSlot.morning.storageKey
+        )
+    }
+
+    private func asksAgain(source: DoseEvent.Source) -> Bool {
+        !UnrecordedSlots.find(
+            from: day,
+            until: Fixed.date(2026, 9, 13),
+            schedules: [morning],
+            medications: [medication],
+            doseEvents: [event(source: source)],
+            calendar: calendar
+        ).isEmpty
+    }
+
+    func testAppFilledUnrecordedIsStillAsked() {
+        XCTAssertTrue(asksAgain(source: .automatic), "앱이 채운 것은 답이 아니라 계속 물어본다")
+    }
+
+    func testUserAnsweredDontRememberIsNotAskedAgain() {
+        XCTAssertFalse(asksAgain(source: .phone), "직접 고른 답을 다시 묻지 않는다")
+        XCTAssertFalse(asksAgain(source: .notificationAction))
+        XCTAssertFalse(asksAgain(source: .watch))
+    }
+
+    /// 분모에는 들어간다. 채우는 목적이 그것이다 - 앱을 안 연 날이
+    /// 복약률에서 조용히 사라지지 않게.
+    func testFilledUnrecordedCountsInTheDenominator() {
+        let taken = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 9, 11, 8, 0),
+            actualAt: Fixed.date(2026, 9, 11, 8, 5),
+            status: .taken,
+            quantity: 1,
+            kind: .scheduled,
+            slotKey: DoseSlot.morning.storageKey
+        )
+        let rate = InventoryCalculator.adherenceRate(
+            doseEvents: [taken, event(source: .automatic)],
+            from: Fixed.date(2026, 9, 11, 0, 0),
+            to: Fixed.date(2026, 9, 13, 0, 0),
+            calendar: calendar
+        )
+        XCTAssertEqual(rate, Decimal(1) / Decimal(2), "둘 중 하나만 복용함이면 절반이다")
+    }
+}

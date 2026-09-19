@@ -96,6 +96,10 @@ struct TheJanjanApp: App {
                             // 되물음(Pro)은 하루치만 걸려 있다 - 날이 바뀌었을 수
                             // 있으니 앱이 앞으로 나올 때마다 오늘치를 다시 깐다.
                             await ReminderPlanner.reschedule(using: modelContainer.mainContext)
+                            // 날이 바뀌었으면 어제까지의 빈 자리를 미기록으로
+                            // 채운다. 채워도 "기록 없이 지나간 시간대" 는
+                            // 그대로 물어본다 - 채우는 것은 답이 아니다.
+                            UnrecordedBackfill.run(in: modelContainer.mainContext)
                         }
                     }
                 }
@@ -152,6 +156,11 @@ final class AppServices {
         // 알림은 매주 반복이라 한 번 깔면 유지되지만, 앱을 지웠다 깔거나
         // 다른 기기에서 iCloud 로 스케줄이 넘어왔을 때는 비어 있다. 열 때마다 맞춰 둔다.
         Task { await ReminderPlanner.reschedule(using: container.mainContext) }
+
+        // 답 없이 지나간 시간대를 미기록으로 채운다. 이것이 없으면 복약률의
+        // 분모가 "답한 횟수" 가 되어, 앱을 가끔만 여는 사람일수록 숫자가
+        // 더 좋게 나온다(QA 2026-09-19).
+        UnrecordedBackfill.run(in: container.mainContext)
     }
 
     /// 기록이 바뀌었으니 워치 화면도 새로 그리라고 밀어 준다.
