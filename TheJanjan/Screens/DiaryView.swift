@@ -648,7 +648,10 @@ struct DiaryView: View {
     /// 지난 날에 남기는 증상의 시각. 그날 정오에 둔다 - 몇 시였는지는 알 수
     /// 없고, 자정에 두면 시간대에 따라 전날로 넘어간다.
     private var symptomTimestamp: Date {
-        guard isDayEditor else { return Date() }
+        // 한 달의 흐름에서 **오늘** 칸을 눌러 들어와도 이 화면은 고치기
+        // 모드다. 그때까지 정오로 박으면 오전에 남긴 증상이 아직 오지 않은
+        // 시각으로 저장된다(QA 2026-09-19). 오늘이면 지금이다.
+        guard isDayEditor, !calendar.isDateInToday(viewedDay) else { return Date() }
         return calendar.date(
             bySettingHour: 12, minute: 0, second: 0, of: viewedDay
         ) ?? viewedDay

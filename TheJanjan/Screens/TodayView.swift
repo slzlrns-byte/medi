@@ -58,7 +58,16 @@ struct TodayView: View {
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
-    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+    /// 약 이름을 가릴지.
+    ///
+    /// **Pro 여부를 보지 않는다**(QA 2026-09-19). 구독이 끝나는 순간 화면의
+    /// 약 이름이 예고 없이 드러나면, 그것을 가리려고 켜 둔 사람에게는 최악의
+    /// 실패다. 위젯과 알림은 애초에 구독을 물을 수 없어 저장된 값만 보고
+    /// 가린 채로 남는데(안전한 실패), 화면만 반대로 동작하고 있었다.
+    /// 테마도 같은 규칙이다 - 구독이 끝나도 이미 고른 색은 그대로 둔다.
+    ///
+    /// 켜는 일 자체는 여전히 Pro 에서만 할 수 있다(설정 화면의 자물쇠).
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     // MARK: - 저장소에서 읽어 온 것
 
@@ -856,7 +865,7 @@ private struct SlotRecordSheet: View {
     @EnvironmentObject private var pro: ProStore
 
     private var lang: JanjanLanguage { .current }
-    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
         NavigationStack {
@@ -947,7 +956,7 @@ private struct UnrecordedSlotsSheet: View {
     /// 약마다 따로 답하려고 펼쳐 둔 줄. 답을 남겨 줄이 사라지면 자연히 잊힌다.
     @State private var splitLineIDs: Set<String> = []
 
-    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
         NavigationStack {
@@ -1005,10 +1014,19 @@ private struct UnrecordedSlotsSheet: View {
                 if isSplit {
                     ForEach(line.entries) { entry in
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                            MaskedNameText(name: entry.medicationName, isMasked: masksNames)
-                                .janjanBody(14, weight: .medium)
-                                .foregroundStyle(Color.ink)
-                                .lineLimit(1)
+                            // 오늘 시간대 시트와 같은 정보량을 준다 - 거기는
+                            // 이름 옆에 늘 개수가 붙어 있다(QA 2026-09-19).
+                            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                                MaskedNameText(name: entry.medicationName, isMasked: masksNames)
+                                    .janjanBody(14, weight: .medium)
+                                    .foregroundStyle(Color.ink)
+                                    .lineLimit(1)
+                                PillChip(text: t(
+                                    "\(DecimalQuantity.display(entry.dose))정",
+                                    pillsEn(entry.dose)
+                                ))
+                                Spacer(minLength: 0)
+                            }
                             answerRow(for: line, entries: [entry], allAtOnce: false)
                         }
                     }

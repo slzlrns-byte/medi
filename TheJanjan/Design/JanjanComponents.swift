@@ -134,8 +134,10 @@ struct WhitePillButton: View {
                 Text(title)
                     .janjanBody(15, weight: .medium)
                     // 큰 글자 설정에서 폭이 모자라면 알약 안에서 두 줄로 꺾여
-                    // 캡슐이 찌부러진다. 모양을 지키고 대신 말줄임한다.
+                    // 캡슐이 찌부러진다. 모양을 지키고 대신 조금 줄인다 -
+                    // 말줄임만 두면 긴 문구가 뜻을 잃는다(QA 2026-09-19).
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(Color.ink)
             .padding(.horizontal, CGFloat(JanjanSpacing.m))

@@ -23,7 +23,6 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case watchApp
     case reports
     case iCloudSync
-    case altIcons
 
     public var titleKo: String {
         switch self {
@@ -42,7 +41,6 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .watchApp: return "Apple Watch 앱"
         case .reports: return "진료용 리포트"
         case .iCloudSync: return "iCloud 동기화"
-        case .altIcons: return "대체 아이콘"
         }
     }
 
@@ -63,7 +61,6 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .watchApp: return "Apple Watch app"
         case .reports: return "Visit report"
         case .iCloudSync: return "iCloud sync"
-        case .altIcons: return "Alternate icons"
         }
     }
 
@@ -117,7 +114,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
             return .easier
         case .noAds:
             return .quiet
-        case .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
+        case .hideNames, .proThemes, .detailedMoodDiary:
             return .mine
         }
     }

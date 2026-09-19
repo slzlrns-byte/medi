@@ -55,7 +55,9 @@ final class ProFeatureTests: XCTestCase {
     }
 
     func testEveryFeatureHasKoreanTitle() {
-        XCTAssertEqual(ProFeature.allCases.count, 16)
+        // 대체 아이콘은 팔지도 만들지도 않은 케이스라 걷었다(QA 2026-09-19).
+        // 코드에만 있는 미완성 기능은 다음 사람이 착각하고 판다.
+        XCTAssertEqual(ProFeature.allCases.count, 15)
         for feature in ProFeature.allCases {
             XCTAssertFalse(feature.titleKo.isEmpty, "\(feature) 문구가 비어 있다")
             XCTAssertFalse(feature.rawValue.isEmpty)

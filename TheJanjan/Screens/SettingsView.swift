@@ -507,6 +507,22 @@ struct SettingsView: View {
         ReportPDF.removeExportedFiles()
         UserDefaults.standard.removeObject(forKey: ReportView.questionsDefaultsKey)
 
+        // 설정도 지운다고 적어 놓고 테마·서체·언어·가리기·알림 설정을 남겨
+        // 두고 있었다(QA 2026-09-19). 기기를 넘기려고 누른 사람에게는
+        // 그것들이 남는 것이 곧 약속을 어긴 것이다.
+        for key in [
+            NotificationManager.hideNamesDefaultsKey,
+            JanjanPrivacy.hideNamesKey,
+            ReminderPlanner.appointmentLeadDaysKey,
+            JanjanFontChoice.defaultsKey,
+            JanjanTheme.defaultsKey,
+            JanjanLanguage.defaultsKey,
+            DoseNotification.followUpMinutesKey,
+            DoseNotification.followUpCountKey
+        ] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
         // 잠금 번호도 설정이다. "설정이 모두 사라집니다" 라고 적어 놓고 남기지 않는다.
         // 키체인 항목은 앱을 지워도 남으므로, 여기서 걷지 않으면 새로 깔아도 따라온다.
         lock.disable()

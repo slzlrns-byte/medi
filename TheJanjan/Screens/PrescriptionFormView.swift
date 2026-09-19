@@ -67,7 +67,7 @@ struct PrescriptionFormView: View {
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
-    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
         ScrollView {
@@ -213,9 +213,7 @@ struct PrescriptionFormView: View {
             if let quantity = refills[medication.id] {
                 // VoiceOver 가 가린 이름을 소리 내어 읽으면 가림이 뚫린다 -
                 // 눈에 보이는 손잡이(togglePill)와 같은 규칙으로 용도줄로 부른다.
-                let spokenName = masksNames
-                    ? (medication.purposeLine.isEmpty ? t("가려진 약", "hidden medication") : medication.purposeLine)
-                    : medication.name
+                let spokenName = spokenName(for: medication)
 
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                     Text(t("받아 온 개수", "Pills picked up"))
@@ -282,8 +280,14 @@ struct PrescriptionFormView: View {
                             .foregroundStyle(Color.muted)
                         CountStepper(
                             text: t("\(DecimalQuantity.display(perIntake))정", pillsEn(perIntake)),
-                            decreaseLabelKo: t("1회 개수 줄이기", "Decrease pills per dose"),
-                            increaseLabelKo: t("1회 개수 늘리기", "Increase pills per dose"),
+                            decreaseLabelKo: t(
+                                "\(spokenName(for: medication)) 1회 개수 줄이기",
+                                "Decrease pills per dose for \(spokenName(for: medication))"
+                            ),
+                            increaseLabelKo: t(
+                                "\(spokenName(for: medication)) 1회 개수 늘리기",
+                                "Increase pills per dose for \(spokenName(for: medication))"
+                            ),
                             onDecrease: { adjustPerIntake(medication, by: -1) },
                             onIncrease: { adjustPerIntake(medication, by: 1) }
                         )
@@ -351,6 +355,15 @@ struct PrescriptionFormView: View {
                 toggle(medication)
             }
         }
+    }
+
+    /// VoiceOver 가 이 약을 부르는 말. 가렸으면 이름 대신 용도로 부른다 -
+    /// 눈에 보이는 손잡이와 같은 규칙이라야 가림이 소리로 뚫리지 않는다.
+    private func spokenName(for medication: Medication) -> String {
+        guard masksNames else { return medication.name }
+        return medication.purposeLine.isEmpty
+            ? t("가려진 약", "hidden medication")
+            : medication.purposeLine
     }
 
     /// 이름을 가린 약을 화면에서 부르는 말. 용도 한 줄 → 용량 표기 → 점 차례다.

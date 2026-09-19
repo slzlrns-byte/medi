@@ -219,6 +219,15 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
                 JanjanField(label: t("이름", "Name"), placeholder: t("예: 에스시탈로프람", "e.g. Escitalopram"), text: $name)
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).count > Self.nameLimit {
+                    Text(t(
+                        "이름이 너무 길어요. \(Self.nameLimit)자 안으로 줄여 주세요.",
+                        "That name is too long. Please keep it under \(Self.nameLimit) characters."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 JanjanField(label: t("용량", "Dose"), placeholder: t("예: 10mg", "e.g. 10mg"), text: $strength)
                 JanjanField(
                     label: t("용도 한 줄 (선택)", "What it's for (optional)"),
@@ -441,8 +450,13 @@ struct MedicationFormView: View {
         form.isSplittable ? DecimalQuantity.step * 2 : 1
     }
 
+    /// 약 이름의 상한. 알림 본문과 워치 화면처럼 줄 수를 앱이 통제할 수 없는
+    /// 자리로 그대로 나가는 값이라, 들어올 때 한 번 막는다(QA 2026-09-19).
+    static let nameLimit = 60
+
     private var canSave: Bool {
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= Self.nameLimit else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,

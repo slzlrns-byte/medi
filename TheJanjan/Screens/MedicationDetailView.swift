@@ -37,7 +37,7 @@ struct MedicationDetailView: View {
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
-    private var masksNames: Bool { pro.isPro && JanjanPrivacy.hidesNames }
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     private var record: MedicationRecord? {
         medicationRecords.first { $0.id == medicationID }

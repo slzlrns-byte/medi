@@ -31,12 +31,22 @@ public struct ReportContent: Hashable, Sendable {
     public let periodKo: String
     public let lines: [Line]
     public let disclaimerKo: String
+    /// 이 장이 쓰인 언어. 내보내는 파일 이름도 이것을 따른다 - 본문은
+    /// 영어인데 파일 이름만 한국어면 첨부해 보낼 때 섞인다(QA 2026-09-19).
+    public let language: JanjanLanguage
 
-    public init(titleKo: String, periodKo: String, lines: [Line], disclaimerKo: String) {
+    public init(
+        titleKo: String,
+        periodKo: String,
+        lines: [Line],
+        disclaimerKo: String,
+        language: JanjanLanguage = .standard
+    ) {
         self.titleKo = titleKo
         self.periodKo = periodKo
         self.lines = lines
         self.disclaimerKo = disclaimerKo
+        self.language = language
     }
 }
 
@@ -169,7 +179,8 @@ public enum ReportComposer {
             titleKo: title,
             periodKo: "\(dayText(start, language: language, calendar: calendar)) – \(dayText(endDay, language: language, calendar: calendar))",
             lines: lines,
-            disclaimerKo: Janjan.medicalDisclaimer(language)
+            disclaimerKo: Janjan.medicalDisclaimer(language),
+            language: language
         )
     }
 

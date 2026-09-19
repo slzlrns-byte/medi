@@ -302,6 +302,7 @@ private struct DayRecordSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
+    @State private var isEditingDoses = false
     /// 이미 남아 있는 기록을 고치러 들어가기 전에 한 번 묻는다. 비어 있던
     /// 날을 뒤늦게 채우는 것은 묻지 않는다 - 없던 것이 생기는 일에는
     /// 되돌릴 것이 없다(사용자 요청 2026-09-19).
@@ -356,10 +357,12 @@ private struct DayRecordSheet: View {
                         }
                     }
 
-                    // 기록이 없던 날도 여기서 뒤늦게 채울 수 있다.
+                    // **버튼 이름이 범위를 말해야 한다.** "이날 기록 고치기" 는
+                    // 복약 표시까지 고쳐 줄 것처럼 보이는데 그쪽은 다른 문이다
+                    // (QA 2026-09-19).
                     WhitePillButton(
                         title: hasAnything
-                            ? t("이날 기록 고치기", "Edit this day")
+                            ? t("기분·증상 고치기", "Edit mood and symptoms")
                             : t("이날 기록 남기기", "Log this day"),
                         systemImage: "pencil"
                     ) {
@@ -370,6 +373,15 @@ private struct DayRecordSheet: View {
                         }
                     }
                     .padding(.top, CGFloat(JanjanSpacing.xs))
+
+                    // 잘못 눌린 "건너뜀" 을 고칠 자리가 앱 어디에도 없었다.
+                    // 진료실에 나가는 숫자라 고칠 길이 있어야 한다.
+                    WhitePillButton(
+                        title: t("복약 기록 고치기", "Edit doses"),
+                        systemImage: "pills"
+                    ) {
+                        isEditingDoses = true
+                    }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
                 .padding(.top, CGFloat(JanjanSpacing.s))
@@ -389,6 +401,9 @@ private struct DayRecordSheet: View {
         .presentationDetents([.medium, .large])
         .sheet(isPresented: $isEditing) {
             DiaryView(day: date)
+        }
+        .sheet(isPresented: $isEditingDoses) {
+            DayDoseEditSheet(date: date)
         }
         .confirmationDialog(
             t("정말 고치시겠습니까?", "Edit this past entry?"),
@@ -509,5 +524,158 @@ private struct DayRecordSheet: View {
             return rest == 0 ? "\(hours)h sleep" : "\(hours)h \(rest)m sleep"
         }
         return rest == 0 ? "수면 \(hours)시간" : "수면 \(hours)시간 \(rest)분"
+    }
+}
+
+/// 지난 날의 복약 표시를 고치는 시트 (QA 2026-09-19).
+///
+/// **왜 필요한가.** 잘못 눌린 "건너뜀" 을 고칠 자리가 앱 어디에도 없었다.
+/// 답이 없는 시간대는 "기록 없이 지나간 시간대" 가 물어보지만, 한 번 답한
+/// 것은 그것으로 굳었다. 그 표시는 복약률이 되어 진료실로 나간다.
+///
+/// 계획은 저장돼 있지 않고 매번 다시 만들어지므로(DayPlan), 여기서도 그
+/// 날의 계획을 다시 세워 놓고 그 위에 답을 얹는다. 약이 없던 날에는
+/// 계획도 없다 - 등록 전 날짜가 여기 올라오지 않는 이유다.
+private struct DayDoseEditSheet: View {
+
+    let date: Date
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+
+    @Query private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+
+    private var calendar: Calendar { .current }
+    private var lang: JanjanLanguage { .current }
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
+
+    private var lines: [DayPlan.SlotLine] {
+        DayPlan.slots(
+            on: date,
+            schedules: scheduleRecords.map(\.core),
+            medications: medicationRecords.map { $0.core.displayReady },
+            doseEvents: doseRecords.map(\.core),
+            calendar: calendar
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                    Text(t(
+                        "이날의 복약 표시를 고쳐요. 고치면 복약률과 리포트에도 새 값으로 나와요.",
+                        "Fix this day's dose marks. Your adherence and report update with them."
+                    ))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if lines.isEmpty {
+                        JanjanCard {
+                            Text(t(
+                                "이날은 예정된 약이 없었어요.",
+                                "Nothing was scheduled on this day."
+                            ))
+                                .janjanBody(14)
+                                .foregroundStyle(Color.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    ForEach(lines) { line in
+                        slotCard(line)
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("복약 기록 고치기", "Edit doses"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func slotCard(_ line: DayPlan.SlotLine) -> some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(line.slot.isCustom
+                     ? line.time.description
+                     : "\(line.slot.label(lang)) \(line.time.description)")
+                    .janjanBody(16, weight: .medium)
+                    .foregroundStyle(Color.ink)
+
+                ForEach(line.entries) { entry in
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                            MaskedNameText(name: entry.medicationName, isMasked: masksNames)
+                                .janjanBody(14, weight: .medium)
+                                .foregroundStyle(Color.ink)
+                                .lineLimit(1)
+                            PillChip(text: t(
+                                "\(DecimalQuantity.display(entry.dose))정",
+                                pillsEn(entry.dose)
+                            ))
+                            Spacer(minLength: 0)
+                            // 지금 무엇으로 적혀 있는지를 먼저 말한다. 색이
+                            // 아니라 글자로 - 상태를 색으로만 말하지 않는다.
+                            PillChip(
+                                text: statusText(entry),
+                                tint: entry.status == .taken ? .sage : .surface2,
+                                textTint: entry.status == .taken ? .sageInk : .ink2
+                            )
+                        }
+                        AnswerPillRow(answers: [
+                            .init(t("먹었어요", "Took it")) { record(entry, in: line, as: .taken) },
+                            .init(t("건너뛰었어요", "Skipped it")) { record(entry, in: line, as: .skipped) },
+                            .init(t("기억나지 않아요", "I don't remember")) {
+                                record(entry, in: line, as: .unrecorded)
+                            }
+                        ])
+                    }
+                    .padding(.vertical, CGFloat(JanjanSpacing.xxs))
+                }
+            }
+        }
+    }
+
+    /// 앱이 채워 둔 미기록과 사용자가 고른 미기록을 화면에서도 가른다.
+    private func statusText(_ entry: DayPlan.Entry) -> String {
+        guard let status = entry.status else { return t("답 없음", "No answer") }
+        if status == .unrecorded, entry.source == .automatic {
+            return t("답 없음", "No answer")
+        }
+        return status.label(lang)
+    }
+
+    private func record(
+        _ entry: DayPlan.Entry,
+        in line: DayPlan.SlotLine,
+        as status: DoseEvent.Status
+    ) {
+        DoseRecorder.record(
+            medicationID: entry.medicationID,
+            slotKey: line.slot.storageKey,
+            status: status,
+            source: .phone,
+            on: date,
+            at: line.time.date(on: date, calendar: calendar),
+            quantity: entry.dose,
+            in: context,
+            calendar: calendar
+        )
+        try? context.save()
+        AppServices.shared.pushWatchSnapshot()
     }
 }

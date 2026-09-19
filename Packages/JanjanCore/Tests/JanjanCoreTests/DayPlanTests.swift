@@ -182,21 +182,34 @@ final class DayPlanTests: XCTestCase {
         XCTAssertTrue(plan(doses: doses)[0].isCompleted)
     }
 
-    func testUnrecordedIsNotAnAnswer() {
-        // 알림에 응답하지 않아 미기록으로 남은 것은 "답함" 이 아니다.
-        let doses = [
+    private func unrecorded(source: DoseEvent.Source) -> [DoseEvent] {
+        [
             DoseEvent(
                 medicationID: Fixed.medA,
                 scheduledAt: Fixed.date(2026, 8, 17, 8, 0),
                 status: .unrecorded,
+                source: source,
                 quantity: 1,
                 kind: .scheduled,
                 slotKey: DoseSlot.morning.storageKey
             )
         ]
+    }
 
-        let slots = plan(doses: doses)
+    /// 앱이 스스로 채운 미기록은 답이 아니다. 답이 없어 채운 것이기 때문이다.
+    func testAppFilledUnrecordedIsNotAnAnswer() {
+        let slots = plan(doses: unrecorded(source: .automatic))
         XCTAssertFalse(slots[0].isCompleted)
+        XCTAssertTrue(slots[0].entries[0].awaitsAnswer)
+        XCTAssertEqual(slots[0].entries[0].status, .unrecorded)
+    }
+
+    /// 직접 고른 "기억나지 않아요" 는 답이다(2026-09-19). 그렇게 보지 않으면
+    /// 다 답한 날에도 타일이 미완료로 남아 "먹었어요 N개" 가 계속 떠 있다.
+    func testChosenDontRememberCountsAsAnAnswer() {
+        let slots = plan(doses: unrecorded(source: .phone))
+        XCTAssertTrue(slots[0].isCompleted)
+        XCTAssertFalse(slots[0].entries[0].awaitsAnswer)
         XCTAssertEqual(slots[0].entries[0].status, .unrecorded)
     }
 

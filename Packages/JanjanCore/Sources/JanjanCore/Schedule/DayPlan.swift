@@ -46,12 +46,14 @@ public enum DayPlan {
             self.source = source
         }
 
-        /// 사용자가 답을 준 줄인가.
-        /// 미기록은 답이 아니다 — 알림에 응답하지 않은 것과 건너뛰기로 정한 것은 다르다.
-        public var isAnswered: Bool {
-            guard let status else { return false }
-            return status != .unrecorded
-        }
+        /// 사용자가 답을 준 줄인가. `awaitsAnswer` 의 반대말이다.
+        ///
+        /// 예전에는 미기록이면 무조건 답이 아니라고 봤다. 그때는 미기록이
+        /// 생기는 길이 하나뿐이었기 때문인데, 앱이 스스로 채우는 길이
+        /// 생기면서 둘을 갈라야 했다(2026-09-19). **직접 고른 "기억나지
+        /// 않아요" 는 답이다** - 그렇게 보지 않으면 그 시간대의 타일이
+        /// 영영 미완료로 남아 다 답한 날에도 "먹었어요 N개" 가 떠 있다.
+        public var isAnswered: Bool { !awaitsAnswer }
 
         /// 아직 물어볼 줄인가.
         ///

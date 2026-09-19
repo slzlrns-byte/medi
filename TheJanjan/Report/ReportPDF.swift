@@ -240,16 +240,29 @@ enum ReportPDF {
         )
     }
 
-    /// "더잔잔-4주요약-2026-08-17.pdf"
+    /// "더잔잔-4주요약-2026-08-17.pdf" 또는 "TheJanjan-4-week-summary-2026-08-17.pdf".
+    ///
+    /// 본문은 언어를 따르는데 파일 이름만 늘 한국어였다(QA 2026-09-19).
+    /// 영어로 쓰는 사람이 의사에게 첨부해 보낼 때 파일 이름에만 한글이
+    /// 섞인다 - 이름도 함께 간다.
     private static func fileName(for content: ReportContent) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
-        return "\(filePrefix)\(formatter.string(from: Date())).pdf"
+        return "\(filePrefix(content.language))\(formatter.string(from: Date())).pdf"
     }
 
     /// 내보낸 파일을 알아볼 수 있게 이름 앞을 고정해 둔다. 걷어 낼 때 이걸로 찾는다.
-    private static let filePrefix = "\(Janjan.appNameKo)-4주요약-"
+    private static func filePrefix(_ language: JanjanLanguage) -> String {
+        language == .english ? filePrefixEn : filePrefixKo
+    }
+
+    private static let filePrefixKo = "\(Janjan.appNameKo)-4주요약-"
+    private static let filePrefixEn = "TheJanjan-4-week-summary-"
+
+    /// 걷어 낼 때는 **두 이름을 다 본다.** 언어를 바꾼 사람의 기기에는 옛
+    /// 이름으로 만든 파일이 남아 있고, 그것도 약 이름이 든 기록이다.
+    private static let filePrefixes = [filePrefixKo, filePrefixEn]
 
     /// 지금까지 내보낸 리포트 PDF 를 지운다.
     ///
@@ -266,7 +279,8 @@ enum ReportPDF {
             includingPropertiesForKeys: nil
         ) else { return }
 
-        for file in files where file.lastPathComponent.hasPrefix(filePrefix) {
+        for file in files
+        where filePrefixes.contains(where: { file.lastPathComponent.hasPrefix($0) }) {
             try? manager.removeItem(at: file)
         }
     }
