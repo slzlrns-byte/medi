@@ -32,6 +32,8 @@ struct ReportView: View {
 
     @State private var exportURL: ExportedFile?
     @State private var isExporting = false
+    /// 무료 내보내기에 붙는 보상형 광고. Pro 면 만들기만 하고 쓰지 않는다.
+    @StateObject private var rewarded = RewardedAdLoader()
     /// 질문 칸의 키보드를 "완료" 로 내리기 위한 초점(사용자 요청 2026-09-19).
     @FocusState private var isEditingQuestions: Bool
 
@@ -85,7 +87,11 @@ struct ReportView: View {
                         ReportPDF.removeExportedFiles()
                     }
             }
-            .onAppear(perform: maybeAskForReview)
+            .onAppear {
+                maybeAskForReview()
+                // 누른 뒤에 받으면 몇 초를 기다리게 된다. Pro 는 부르지 않는다.
+                if !pro.isPro { rewarded.preload() }
+            }
         }
     }
 
@@ -275,8 +281,13 @@ struct ReportView: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
-                WhitePillButton(title: t("PDF 로 내보내기", "Export as PDF"), systemImage: "square.and.arrow.up") {
-                    export()
+                WhitePillButton(
+                    title: pro.isPro
+                        ? t("PDF 로 내보내기", "Export as PDF")
+                        : t("광고 보고 PDF 받기", "Watch an ad to get the PDF"),
+                    systemImage: pro.isPro ? "square.and.arrow.up" : "play.rectangle"
+                ) {
+                    exportTapped()
                 }
                 .overlay(
                     Capsule(style: .continuous).strokeBorder(Color.hairline, lineWidth: 1)
@@ -292,6 +303,16 @@ struct ReportView: View {
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if !pro.isPro {
+                    Text(t(
+                        "내보내기는 무료예요. 짧은 광고를 보면 바로 만들어 드려요.",
+                        "Exporting is free — watch a short ad and it's made right away."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -348,6 +369,18 @@ struct ReportView: View {
     }
 
     // MARK: - 내보내기
+
+    /// 무료는 광고를 보고 받는다(2026-09-19 광고 도입). 강제로 끼어드는
+    /// 전면 광고가 아니라 눌러서 여는 교환이고, 광고를 못 받았으면 그냥
+    /// 통과시킨다 - 진료에 들고 갈 종이를 광고 때문에 못 만들게 하지 않는다.
+    private func exportTapped() {
+        guard !isExporting else { return }
+        if pro.isPro {
+            export()
+        } else {
+            rewarded.show { export() }
+        }
+    }
 
     private func export() {
         guard !isExporting else { return }

@@ -63,6 +63,9 @@ struct RootTabView: View {
                 .tag(Tab.report)
         }
         .tint(Color.ink)
+        // 무료에게만 붙는 하단 띠. 일기·증상처럼 마음을 적는 자리는 시트로
+        // 열려 화면을 덮으므로 그 위에서는 구조적으로 보이지 않는다.
+        .bannerSlot()
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
         }

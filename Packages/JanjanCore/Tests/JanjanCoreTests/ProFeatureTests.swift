@@ -8,10 +8,10 @@ final class ProFeatureTests: XCTestCase {
     func testLaunchHighlightsAreWhatTheAppActuallyLocks() {
         XCTAssertEqual(
             ProFeature.launchHighlights,
-            [.pharmacyScan, .pillFinder, .patternView, .smartFollowUp, .runOutForecast,
+            [.noAds, .pharmacyScan, .pillFinder, .patternView, .smartFollowUp, .runOutForecast,
              .doseChangeCompare, .visitHistory, .hideNames, .proThemes, .watchApp]
         )
-        XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "약봉투 스캔")
+        XCTAssertEqual(ProFeature.launchHighlights.map(\.titleKo).first, "광고 없이")
     }
 
     /// 페이월에 적은 것은 앱에서 실제로 잠겨 있어야 한다(2.3.1 · 3.1.2).
@@ -50,7 +50,7 @@ final class ProFeatureTests: XCTestCase {
     }
 
     func testEveryFeatureHasKoreanTitle() {
-        XCTAssertEqual(ProFeature.allCases.count, 14)
+        XCTAssertEqual(ProFeature.allCases.count, 15)
         for feature in ProFeature.allCases {
             XCTAssertFalse(feature.titleKo.isEmpty, "\(feature) 문구가 비어 있다")
             XCTAssertFalse(feature.rawValue.isEmpty)

@@ -64,7 +64,7 @@
 
 ● 기록은 내 것
 - 서버가 없어요. 기록은 내 기기와 내 iCloud에만 저장돼요.
-- 개발자는 어떤 데이터도 수집하지 않아요.
+- 개발자는 기록을 수집하지 않아요. 무료 화면의 광고는 기록을 보지 않고, 관심사 추적도 하지 않아요.
 - 보안을 위해 Face ID나 암호로 잠글 수 있어요.
 
 이 앱은 의료 기기가 아니며 의료 조언을 제공하지 않습니다. 진단과 처방은 담당 의사의 지시를 따라 주세요. Pro는 자동 갱신 구독(월간 또는 연간, 연간은 7일 무료 체험) 또는 평생 이용권(한 번 결제, 자동 갱신 없음)으로 열 수 있습니다. 구독 결제는 Apple 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되고, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
@@ -141,7 +141,7 @@ The Janjan records your psychiatric meds and mood, and turns them into a one-pag
 
 ● Your records are yours
 - No server. Records live only on your device and in your own iCloud.
-- The developer collects no data. No login, no ads.
+- The developer never collects your records. Ads on free screens don't read them and don't track you.
 - Lock the app with Face ID or a passcode.
 
 This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions. Pro opens with an auto-renewing subscription (monthly or yearly, with a 7-day free trial on yearly) or a lifetime purchase (one-time, nothing auto-renews). Subscription payment is charged to your Apple Account, renews automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
@@ -167,7 +167,12 @@ This is the first release of The Janjan.
   의료/치료 정보 "없음"(새 정의가 '진단 또는 지침 제공'인데 앱은 일부러 안 함 - 심사 노트와 일치),
   건강/웰빙 주제 "예", 음주·흡연 언급 "드묾"(술·담배 기록 체크). 나머지 전부 없음/아니요.
   처음에 의료 정보를 "빈번"으로 넣었더니 16+가 나와서 정의대로 고쳐 13+.
-- Privacy Nutrition Label: **데이터를 수집하지 않음**
+- Privacy Nutrition Label: **광고 도입으로 다시 입력해야 함(2026-09-19)**
+  - "데이터를 수집하지 않음" 은 더 이상 사실이 아니다. AdMob SDK 가 기기 식별자와
+    사용 데이터를 광고 목적으로 가져간다.
+  - **"추적" 항목에는 아무것도 넣지 않는다** - 비개인화 광고(npa=1)만 쓰고 ATT 를
+    띄우지 않으므로 앱 간 추적을 하지 않는다. 이 약속이 코드와 어긋나면 거짓 신고가 된다.
+  - 사용자 기록(복약·기분·증상)은 여전히 수집하지 않는다. 그 부분은 그대로다.
 - 개인정보처리방침 URL: https://slzlrns-byte.github.io/medi/site/privacy.html
 - 지원 URL: https://slzlrns-byte.github.io/medi/site/support.html (2026-09-16 ASC 입력 완료)
   - Pages 소스가 main + /docs 라서 심사 때 보이는 건 main 의 파일이다.

@@ -17,6 +17,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case hideNames
     case doseChangeCompare
     case visitHistory
+    case noAds
     case detailedMoodDiary
     case watchApp
     case reports
@@ -34,6 +35,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .hideNames: return "약 이름 가리기"
         case .doseChangeCompare: return "용량 변경 전후 비교"
         case .visitHistory: return "지난 진료 기록"
+        case .noAds: return "광고 없이"
         case .detailedMoodDiary: return "자세한 기분일기"
         case .watchApp: return "Apple Watch 앱"
         case .reports: return "진료용 리포트"
@@ -53,6 +55,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
         case .hideNames: return "Hide medication names"
         case .doseChangeCompare: return "Dose change comparison"
         case .visitHistory: return "Visit history"
+        case .noAds: return "No ads"
         case .detailedMoodDiary: return "Detailed mood journal"
         case .watchApp: return "Apple Watch app"
         case .reports: return "Visit report"
@@ -104,7 +107,7 @@ public enum ProFeature: String, CaseIterable, Sendable {
             return .clinic
         case .pharmacyScan, .pillFinder, .iCloudSync:
             return .easier
-        case .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
+        case .noAds, .hideNames, .proThemes, .detailedMoodDiary, .altIcons:
             return .mine
         }
     }
@@ -124,11 +127,15 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// **App Store Connect 의 구독 설명도 이 목록과 같아야 한다.** 한쪽만 고치면
     /// 앱과 스토어가 서로 다른 약속을 하게 된다.
     ///
-    /// 패턴 보기·똑똑한 재알림·Pro 테마(2026-09-19 신설)를 더해 아홉이 됐고,
-    /// 지난 진료 기록(2026-09-19 결정 - 바로 이전 회차는 무료, 그 이전 이력이 Pro)
-    /// 을 더해 열이 됐다. ASC 구독 설명은 45자 제한이라 다 못 적어 다섯 항목만
-    /// 적는다 - 설명이 약속한 것이 실제 잠금의 부분집합이면 어긋남이 아니다(3.10).
+    /// 패턴 보기·똑똑한 재알림·Pro 테마·지난 진료 기록(2026-09-19)을 더해 열이
+    /// 됐고, 광고 도입과 함께 "광고 없이" 가 맨 앞에 붙어 열하나가 됐다.
+    /// 그것을 첫 줄에 둔 이유: 나머지 열은 기록이 쌓여야 쓸모가 생기는데,
+    /// 광고 없이는 **무료 사용자가 설치 첫날부터 매일 체감하는 유일한 항목**이다.
+    ///
+    /// ASC 구독 설명은 45자 제한이라 다 못 적어 몇 항목만 적는다 - 설명이
+    /// 약속한 것이 실제 잠금의 부분집합이면 어긋남이 아니다(3.10).
     public static let launchHighlights: [ProFeature] = [
+        .noAds,
         .pharmacyScan,
         .pillFinder,
         .patternView,
