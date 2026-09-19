@@ -31,14 +31,8 @@ enum JanjanAds {
         /// 실제 단위 (2026-09-19 발급).
         static let banner = "ca-app-pub-8133411184190419/8295274985"
 
-        /// **아직 구글 테스트 단위다.** 이것으로 출시하면 "Test Ad" 가 뜨고
-        /// 수익이 0 이다. 보상형 단위를 발급받으면 여기만 바꾸면 된다.
-        static let rewarded = "ca-app-pub-3940256099942544/1712485313"
-
-        /// 보상형이 아직 테스트 값인지. 제출 전 확인용이다.
-        static var rewardedIsTestUnit: Bool {
-            rewarded.hasPrefix("ca-app-pub-3940256099942544")
-        }
+        /// 실제 단위 (2026-09-19 발급).
+        static let rewarded = "ca-app-pub-8133411184190419/7421177012"
     }
 
     // MARK: - 시작
