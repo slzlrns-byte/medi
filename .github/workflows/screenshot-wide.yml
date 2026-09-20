@@ -1,0 +1,184 @@
+# 더잔잔 — 넓은 기기만 다시 찍기
+#
+# `screenshots.yml` 은 두 기기 · 영어 · 워치까지 다 돌아 50분이 걸리고,
+# 끝에서 `ci/screenshots` 를 통째로 새로 쓴다. 넓은 기기 한 장이 비었을 때
+# 그것을 다시 돌리는 것은 너무 비싸고, 나머지 51장을 다시 만드는 위험도 진다.
+#
+# 이 워크플로는 넓은 기기 UI 테스트만 돌려 나온 사진을 `ci/screenshots` 에
+# **덮어쓰기만** 한다. 좁은 화면·영어·워치 사진은 건드리지 않는다.
+
+name: Screenshots (wide only)
+
+on:
+  workflow_dispatch:
+  # 이 파일이 아직 기본 브랜치에 없으면 dispatch 가 안 먹을 수 있다.
+  # screenshots.yml 과 같은 방법 - 이 파일을 밀 때 한 번 돈다.
+  push:
+    branches:
+      - claude/local-work-app-integration-5fnhoc
+    paths:
+      - '.github/workflows/screenshot-wide.yml'
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: 넓은 기기만 찍기
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Xcode 선택 (latest-stable)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: 넓은 시뮬레이터 고르기
+        id: simulator
+        run: |
+          set -o pipefail
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+
+          # 스토어 제출은 6.9"(1320x2868) 또는 6.7"(1290x2796)만 받는다.
+          WIDE = ["iPhone 17 Pro Max", "iPhone 16 Pro Max", "iPhone 15 Pro Max",
+                  "iPhone 17 Plus", "iPhone 16 Plus", "iPhone 15 Plus"]
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          newest, phones = None, []
+          for identifier, devices in runtimes.items():
+              if "iOS" not in identifier:
+                  continue
+              available = [d for d in devices
+                           if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not available:
+                  continue
+              if newest is None or version(identifier) > newest:
+                  newest, phones = version(identifier), available
+
+          if not phones:
+              sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
+
+          wide = next((d for name in WIDE
+                       if (d := next((x for x in phones if x["name"] == name), None))),
+                      phones[0])
+          sys.stderr.write("넓은 기기: {}\n".format(wide["name"]))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+              handle.write("wide_udid={}\nwide_name={}\n".format(wide["udid"], wide["name"]))
+          '
+
+      - name: 시뮬레이터 미리 켜 두기
+        run: |
+          xcrun simctl boot "${{ steps.simulator.outputs.wide_udid }}" 2>/dev/null || true
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.wide_udid }}" -b || true
+
+      - name: UI 테스트로 화면 찍기
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.simulator.outputs.wide_udid }}" \
+            -resultBundlePath build/wide.xcresult \
+            -skipPackagePluginValidation \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 480 \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: 첨부에서 PNG 꺼내기
+        if: always()
+        run: |
+          set -o pipefail
+          mkdir -p build/named build/raw
+          xcrun xcresulttool export attachments \
+            --path build/wide.xcresult --output-path build/raw
+
+          RAW=build/raw OUT=build/named python3 - <<'PY'
+          import json, os, shutil
+
+          root, out = os.environ["RAW"], os.environ["OUT"]
+          os.makedirs(out, exist_ok=True)
+          named = 0
+          manifest_path = os.path.join(root, "manifest.json")
+
+          if os.path.exists(manifest_path):
+              try:
+                  with open(manifest_path, encoding="utf-8") as handle:
+                      manifest = json.load(handle)
+                  entries = manifest if isinstance(manifest, list) else [manifest]
+                  for test in entries:
+                      for attachment in (test or {}).get("attachments", []):
+                          exported = attachment.get("exportedFileName")
+                          if not exported:
+                              continue
+                          source = os.path.join(root, exported)
+                          if not os.path.exists(source):
+                              continue
+                          label = (attachment.get("suggestedHumanReadableName")
+                                   or attachment.get("name") or exported)
+                          shutil.copyfile(
+                              source,
+                              os.path.join(out, os.path.splitext(label)[0] + ".png")
+                          )
+                          named += 1
+              except Exception as error:
+                  print("manifest 를 읽지 못했습니다:", error)
+
+          if named == 0:
+              for entry in sorted(os.listdir(root)):
+                  if entry.lower().endswith(".png"):
+                      shutil.copyfile(os.path.join(root, entry), os.path.join(out, entry))
+                      named += 1
+          print("사진 {}장".format(named))
+          PY
+
+          ls -la build/named
+          test "$(ls build/named/*.png 2>/dev/null | wc -l)" -gt 0 \
+            || { echo "::error::사진을 하나도 꺼내지 못했습니다."; exit 1; }
+
+      - name: ci/screenshots 에 덮어쓰기
+        if: always()
+        run: |
+          set -e
+          ls build/named/*.png >/dev/null 2>&1 || { echo "올릴 사진 없음"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p /tmp/fresh && cp build/named/*.png /tmp/fresh/
+          git fetch origin ci/screenshots --depth=1
+          git checkout -f -B ci-shots FETCH_HEAD
+          # **덮어쓰기만 한다.** 좁은 화면·영어·워치 사진은 그대로 둔다.
+          cp /tmp/fresh/*.png shots/
+          {
+            echo "# 시뮬레이터 화면"
+            echo
+            echo "넓은 기기 몫만 다시 찍었습니다. 나머지는 이전 런 그대로입니다."
+            echo
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo "- 찍은 때: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "- 기기: ${{ steps.simulator.outputs.wide_name }}"
+          } > README.md
+          git add -f shots README.md
+          git commit -q -m "화면(넓은 기기만) ${GITHUB_SHA:0:7}" || { echo "바뀐 사진 없음"; exit 0; }
+          git push origin HEAD:ci/screenshots
