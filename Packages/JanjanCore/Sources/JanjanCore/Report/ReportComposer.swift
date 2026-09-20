@@ -500,12 +500,11 @@ public enum ReportComposer {
 
         for (index, week) in weeks.enumerated() {
             let dayAfter = calendar.date(byAdding: .day, value: 1, to: week.end) ?? week.end
-            let range = "\(monthDayText(week.start, language: language, calendar: calendar))"
-                + "–\(monthDayText(week.end, language: language, calendar: calendar))"
-            lines.append(.init(
-                style: .body,
-                text: en ? "Week \(index + 1) · \(range)" : "\(index + 1)주차 · \(range)"
-            ))
+            let first = monthDayText(week.start, language: language, calendar: calendar)
+            let last = monthDayText(week.end, language: language, calendar: calendar)
+            let range = first + "–" + last
+            let label = en ? "Week \(index + 1)" : "\(index + 1)주차"
+            lines.append(.init(style: .body, text: label + " · " + range))
 
             let weekCheckIns = checkIns.filter { $0.date >= week.start && $0.date < dayAfter }
             if !weekCheckIns.isEmpty {
@@ -553,8 +552,19 @@ public enum ReportComposer {
         return lines
     }
 
+    /// 한 주에 적힌 증상 한 가지.
+    private struct WeeklySymptom {
+        let id: String
+        let count: Int
+        let isSafety: Bool
+        let name: String
+    }
+
     /// 한 주에 적힌 증상을 많이 적힌 차례로 센다. 이름은 카탈로그에서 찾고,
     /// 없으면(사용자가 직접 더한 항목) 적힌 id 를 그대로 쓴다.
+    ///
+    /// 한 줄짜리 map/sorted 사슬로 쓰면 타입 검사기가 손을 든다(CI 129).
+    /// 풀어 쓰는 쪽이 읽기도 낫다.
     private static func symptomCounts(
         _ entries: [SymptomEntry],
         catalog: SymptomCatalog,
@@ -562,26 +572,33 @@ public enum ReportComposer {
     ) -> [(name: String, count: Int)] {
 
         var counts: [String: Int] = [:]
-        for entry in entries { counts[entry.symptomID, default: 0] += 1 }
+        for entry in entries {
+            counts[entry.symptomID, default: 0] += 1
+        }
 
-        let ranked = counts
-            .map { id, count in
-                (id: id,
-                 count: count,
-                 safety: catalog.symptom(id: id)?.isSafetyItem ?? false,
-                 name: catalog.symptom(id: id)?.name(language) ?? id)
-            }
-            // 횟수가 같으면 id 로 갈라 차례를 고정한다 - 같은 기록으로 두 번
-            // 뽑은 종이가 서로 달라 보이면 안 된다.
-            .sorted { lhs, rhs in
-                lhs.count != rhs.count ? lhs.count > rhs.count : lhs.id < rhs.id
-            }
+        var ranked: [WeeklySymptom] = []
+        for (id, count) in counts {
+            let item = catalog.symptom(id: id)
+            ranked.append(WeeklySymptom(
+                id: id,
+                count: count,
+                isSafety: item?.isSafetyItem ?? false,
+                name: item?.name(language) ?? id
+            ))
+        }
+        // 횟수가 같으면 id 로 갈라 차례를 고정한다 - 같은 기록으로 두 번
+        // 뽑은 종이가 서로 달라 보이면 안 된다.
+        ranked.sort { lhs, rhs in
+            lhs.count == rhs.count ? lhs.id < rhs.id : lhs.count > rhs.count
+        }
 
         var shown = Array(ranked.prefix(weeklySymptomLimit))
         // 자해·자살 생각은 자른 뒤에도 남긴다. 그 한 줄을 보이려고 종이를
         // 만드는 사람이 있는데, 다른 증상이 많았다는 이유로 빠지면 안 된다.
-        for item in ranked where item.safety && !shown.contains(where: { $0.id == item.id }) {
-            shown.append(item)
+        for item in ranked where item.isSafety {
+            if !shown.contains(where: { $0.id == item.id }) {
+                shown.append(item)
+            }
         }
         return shown.map { (name: $0.name, count: $0.count) }
     }

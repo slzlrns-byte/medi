@@ -191,10 +191,14 @@ final class ScreenshotTests: XCTestCase {
                 row.tap()
                 settle()
                 let compare = app.buttons["약 변경 보기"].firstMatch
-                if !compare.waitForExistence(timeout: 3) {
-                    // 용량 변경 카드는 화면 아래쪽이다.
+                // 용량 변경 카드는 화면 아래쪽이다. 한 번만 밀면 기기 높이에
+                // 따라 지나치거나 못 미친다 — 09-19 세트에서 넓은 기기의
+                // 이 한 장만 비어 있었다. 보일 때까지 조금씩 민다.
+                var swipes = 0
+                while !compare.waitForExistence(timeout: 2), swipes < 5 {
                     app.swipeUp()
                     settle()
+                    swipes += 1
                 }
                 if compare.waitForExistence(timeout: 5) {
                     compare.tap()
