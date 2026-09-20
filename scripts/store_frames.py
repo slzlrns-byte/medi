@@ -8,7 +8,7 @@
 글꼴은 프리텐다드 Light. 앱이 본문에 쓰는 것과 같은 글꼴이고 저장소에
 있다(OFL). 제목용 SUIT 도 써 봤지만 먼저 만든 그림과 다르게 보였다.
 
-    python3 scripts/store_frames.py <캡처폴더> <낼폴더>
+    python3 scripts/store_frames.py <캡처폴더> <낼폴더> [ko|en]
 """
 
 from __future__ import annotations
@@ -67,6 +67,21 @@ FRAMES = [
     ("08", "진료마다\n처방 기록을 남겨요", None, "08-처방-기록"),
     ("09", "남은 알약을 세면\n기록과 맞춰 줘요", None, "16-다시-세기"),
     ("10", "빠트린 날은\n더잔잔이 함께 찾아요", None, "15-지나간-시간대"),
+]
+
+# 영어판. 한국어와 같은 차례·같은 화면이고, 말투도 스토어 설명과 같다 -
+# 느낌표 없이, 앱이 대신 해 주는 것을 그대로 적는다.
+FRAMES_EN = [
+    ("01", "Today's doses,\nlogged at a glance", None, "17-오늘-영어"),
+    ("02", "Today's mood,\nleft as a color", None, "27-기록-영어"),
+    ("03", "The night before,\none page and you're ready", None, "21-리포트-영어"),
+    ("04", "The Janjan keeps count\nof what's left", None, "32-약-영어"),
+    ("05", "That pill in the drawer,\nfind out what it is", "Korean MFDS pill data", "25-모양찾기-영어"),
+    ("06", "When a dose changes,\nsee it side by side", None, "29-용량변경-영어"),
+    ("07", "Medication names\ncan stay hidden", "Tap to peek", "22-가림-영어"),
+    ("08", "Keep a record\nof every prescription", None, "30-처방-영어"),
+    ("09", "Count what's left\nand it squares with your log", None, "33-다시-세기-영어"),
+    ("10", "Missed a day?\nThe Janjan finds it with you", None, "23-지나간-영어"),
 ]
 
 
@@ -153,16 +168,18 @@ def compose(caption: str, subtitle: str | None, shot: Path) -> Image.Image:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         print(__doc__)
         return 2
 
     source = Path(sys.argv[1])
     target = Path(sys.argv[2])
+    language = sys.argv[3] if len(sys.argv) == 4 else "ko"
+    frames = FRAMES_EN if language == "en" else FRAMES
     target.mkdir(parents=True, exist_ok=True)
 
     missing = []
-    for order, caption, subtitle, stem in FRAMES:
+    for order, caption, subtitle, stem in frames:
         shot = find(source, stem)
         if shot is None:
             missing.append(f"{order} · {stem}")

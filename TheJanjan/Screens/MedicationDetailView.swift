@@ -129,6 +129,9 @@ struct MedicationDetailView: View {
         #if DEBUG
         // 화면 찍기 전용: simctl 로 띄우는 영어 캡처는 눌러 들어갈 수 없다.
         .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("-JanjanShowRecount") {
+                isShowingRecountSheet = true
+            }
             guard ProcessInfo.processInfo.arguments.contains("-JanjanShowDoseCompare"),
                   comparingChange == nil,
                   let first = doseChangeRecords

@@ -100,7 +100,8 @@ struct MedicationsView: View {
                 // 잡으면 변경 기록이 없는 약에 들어가 버린다 - 한국어 세트가
                 // 그래서 두 번 비었다.
                 if arguments.contains("-JanjanShowMedication")
-                    || arguments.contains("-JanjanShowDoseCompare") {
+                    || arguments.contains("-JanjanShowDoseCompare")
+                    || arguments.contains("-JanjanShowRecount") {
                     let rows = sections.flatMap(\.rows)
                     let target = rows.first { row in
                         doseChangeRecords.contains { $0.medicationID == row.id }
