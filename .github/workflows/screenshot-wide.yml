@@ -137,6 +137,13 @@ jobs:
                               continue
                           label = (attachment.get("suggestedHumanReadableName")
                                    or attachment.get("name") or exported)
+                          # 우리가 capture() 로 붙인 것만 가져온다. 테스트가
+                          # 실패하면 XCUITest 가 화면 녹화와 계층 덤프까지
+                          # 붙이는데, 그것까지 퍼 오면 51MB 짜리 mp4 가
+                          # .png 이름을 달고 저장소에 올라간다(런 2).
+                          # 우리 이름은 전부 숫자로 시작한다(01~25).
+                          if not label[:1].isdigit():
+                              continue
                           shutil.copyfile(
                               source,
                               os.path.join(out, os.path.splitext(label)[0] + ".png")
@@ -147,7 +154,7 @@ jobs:
 
           if named == 0:
               for entry in sorted(os.listdir(root)):
-                  if entry.lower().endswith(".png"):
+                  if entry.lower().endswith(".png") and entry[:1].isdigit():
                       shutil.copyfile(os.path.join(root, entry), os.path.join(out, entry))
                       named += 1
           print("사진 {}장".format(named))
@@ -168,7 +175,11 @@ jobs:
           mkdir -p /tmp/fresh && cp build/named/*.png /tmp/fresh/
           git fetch origin ci/screenshots --depth=1
           git checkout -f -B ci-shots FETCH_HEAD
-          # **덮어쓰기만 한다.** 좁은 화면·영어·워치 사진은 그대로 둔다.
+          # 런 2 가 흘린 쓰레기를 치운다 - 테스트가 실패하자 XCUITest 의
+          # 화면 녹화·계층 덤프까지 올라갔다(51MB 짜리 mp4 가 .png 이름으로).
+          # 우리 사진 이름은 전부 숫자로 시작한다.
+          find shots -type f ! -name '[0-9]*' -print -delete || true
+          # **나머지는 덮어쓰기만 한다.** 좁은 화면·영어·워치 사진은 그대로 둔다.
           cp /tmp/fresh/*.png shots/
           {
             echo "# 시뮬레이터 화면"

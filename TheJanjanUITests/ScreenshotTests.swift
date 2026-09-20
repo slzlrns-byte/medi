@@ -198,7 +198,19 @@ final class ScreenshotTests: XCTestCase {
                 back()
                 backs += 1
             }
-            let row = app.buttons.matching(identifier: "medicationRow").firstMatch
+
+            // **첫 줄을 잡으면 안 된다.** 용량 변경이 달린 약은 에스시탈로프람
+            // 하나인데(DemoSeed.seedDoseChanges), 넓은 기기에서는 첫 줄이
+            // 쿠에티아핀이라 "약 변경 보기" 가 아예 없는 화면에 들어가 있었다.
+            // 좁은 기기는 첫 줄이 달라 우연히 맞았고, 그래서 한쪽에만 구멍이
+            // 났다 - 두 세트를 이것으로 잃었다. 이름으로 찾는다.
+            let rows = app.buttons.matching(identifier: "medicationRow")
+            var row = rows.firstMatch
+            for index in 0..<rows.count where rows.element(boundBy: index)
+                .label.contains("에스시탈로프람") {
+                row = rows.element(boundBy: index)
+                break
+            }
             if row.waitForExistence(timeout: 10) {
                 row.tap()
                 settle()
