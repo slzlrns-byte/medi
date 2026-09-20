@@ -26,7 +26,7 @@ INK = "#1A1A19"
 # 오늘 화면의 배경도 fog 라서, 테두리가 없으면 캡처가 바탕에 녹아 사라진다.
 HAIRLINE = "#D4D4D1"
 
-FONT = Path("TheJanjan/Resources/Fonts/Pretendard-Light.otf")
+FONT = Path("TheJanjan/Resources/Fonts/GowunDodum-Regular.ttf")
 FONT_SIZE = 104
 LINE_HEIGHT = 150
 # 문구 첫 줄 윗변.
