@@ -198,6 +198,7 @@ jobs:
           shot "28-약-상세-영어" -JanjanTab meds -JanjanShowMedication
           shot "29-용량변경-영어" -JanjanTab meds -JanjanShowDoseCompare
           shot "30-처방-영어" -JanjanTab meds -JanjanShowPrescription
+          shot "32-약-영어" -JanjanTab meds
 
           # 구독 화면만 Pro 를 켜지 않는다. 켜 두면 열리자마자 스스로 닫힌다.
           xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true

@@ -98,7 +98,10 @@ struct PatternCard: View {
             Text(label)
                 .janjanBody(11)
                 .foregroundStyle(Color.muted)
-                .frame(width: 30, alignment: .leading)
+                .lineLimit(1)
+                // 한국어 라벨은 두 글자라 30 이면 되지만 "Doses" 는 넘쳐서
+                // "Dose / s" 로 꺾였다(영어 캡처 2026-09-20).
+                .frame(width: lang == .english ? 46 : 30, alignment: .leading)
             HStack(spacing: spacing) {
                 ForEach(timeline.days, id: \.date) { day in
                     mark(day)
