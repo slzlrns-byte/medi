@@ -5,7 +5,8 @@
 캡처 자체는 손대지 않는다 - 스토어 그림은 실제 앱과 같아야 하고(심사 2.3.3),
 여기서 하는 일은 그 캡처를 줄여 앉히고 위에 말을 얹는 것뿐이다.
 
-글꼴은 앱이 쓰는 것과 같은 SUIT(제목)다. 둘 다 저장소에 있고 OFL 이다.
+글꼴은 프리텐다드 Light. 앱이 본문에 쓰는 것과 같은 글꼴이고 저장소에
+있다(OFL). 제목용 SUIT 도 써 봤지만 먼저 만든 그림과 다르게 보였다.
 
     python3 scripts/store_frames.py <캡처폴더> <낼폴더>
 """
@@ -25,7 +26,7 @@ INK = "#1A1A19"
 # 오늘 화면의 배경도 fog 라서, 테두리가 없으면 캡처가 바탕에 녹아 사라진다.
 HAIRLINE = "#D4D4D1"
 
-FONT = Path("TheJanjan/Resources/Fonts/SUIT-Light.otf")
+FONT = Path("TheJanjan/Resources/Fonts/Pretendard-Light.otf")
 FONT_SIZE = 104
 LINE_HEIGHT = 150
 # 문구 첫 줄 윗변.
