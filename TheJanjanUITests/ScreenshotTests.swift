@@ -245,7 +245,40 @@ final class ScreenshotTests: XCTestCase {
             }
         }
 
+        capturePaywall()
+
         assertRequiredCaptures()
+    }
+
+    /// 구독 화면. **맨 마지막에 한다** - 앱을 다시 띄우므로 앞 단계가 만들어
+    /// 둔 화면 상태가 사라진다.
+    ///
+    /// 두 가지를 바꿔 띄운다.
+    ///   · `JANJAN_FORCE_PRO` 를 끈다. 켜 두면 페이월이 열리자마자 스스로
+    ///     닫힌다(PaywallView 가 isPro 를 보고 dismiss 한다).
+    ///   · `-JanjanShowPaywall` 로 뜨자마자 연다. 페이월은 잠긴 기능을 눌러야
+    ///     열려서 걸어 들어갈 길이 마땅치 않다.
+    ///
+    /// 값·가격은 스킴에 붙인 로컬 StoreKit 설정에서 온다. 그것이 없으면
+    /// "불러오는 중" 카드가 찍히므로, 상품 줄이 뜰 때까지 기다린 뒤에 찍는다.
+    private func capturePaywall() {
+        app.terminate()
+        app.launchEnvironment["JANJAN_FORCE_PRO"] = "0"
+        app.launchArguments = ["-JanjanSeedDemoData", "-JanjanShowPaywall"]
+        app.launch()
+
+        // 상품을 불러오는 데 시간이 걸린다. 가격이 붙은 줄이 나올 때까지 본다.
+        let plans = app.buttons.containing(
+            NSPredicate(format: "label CONTAINS %@", "연간")
+        ).firstMatch
+        _ = plans.waitForExistence(timeout: 30)
+        settle()
+        capture("26-구독")
+
+        // 심사는 상품 이름·기간·가격과 자동 갱신 안내가 한 장에 보여야 한다.
+        // 긴 화면이라 아래쪽을 따로 한 장 더 찍는다.
+        scrollToBottom(limit: 4)
+        capture("26b-구독-아래")
     }
 
     // MARK: - 조각
@@ -380,7 +413,8 @@ final class ScreenshotTests: XCTestCase {
     /// 화면을 못 찾으면 그 자리에서 알려 주어야 다음 런을 낭비하지 않는다.
     private static let required = [
         "01-오늘", "02-약", "03-약-상세", "04-기록",
-        "08-처방-기록", "15-지나간-시간대", "20-용량변경-전후"
+        "08-처방-기록", "15-지나간-시간대", "20-용량변경-전후",
+        "26-구독", "26b-구독-아래"
     ]
 
     private func assertRequiredCaptures() {

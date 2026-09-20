@@ -6,6 +6,7 @@ struct RootTabView: View {
 
     @State private var selection: Tab = RootTabView.launchTab
     @State private var isShowingSettings = false
+    @State private var isShowingPaywall = RootTabView.launchesPaywall
 
     /// 화면 찍기 전용: `-JanjanTab report` 처럼 받아 그 탭으로 연다.
     /// 시뮬레이터를 simctl 로만 띄우는 영어 캡처가 탭을 누를 수 없어서다.
@@ -25,6 +26,15 @@ struct RootTabView: View {
         return .today
         #endif
     }
+    /// 화면 찍기 전용: 뜨자마자 구독 화면을 열지. DEBUG 밖에서는 늘 거짓이다.
+    private static var launchesPaywall: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-JanjanShowPaywall")
+        #else
+        return false
+        #endif
+    }
+
     /// 서체·테마·언어 선택. 값이 바뀌면 각 탭의 내용을 id 로 갈아 끼워 새 값으로 다시 그린다.
     /// TabView 자체에 id 를 걸면 열려 있는 설정 시트까지 닫혀 버려서 내용에만 건다.
     @AppStorage(JanjanFontChoice.defaultsKey) private var fontChoiceRaw = JanjanFontChoice.standard.rawValue
@@ -72,6 +82,13 @@ struct RootTabView: View {
         .tint(Color.ink)
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
+        }
+        // 화면 찍기 전용: `-JanjanShowPaywall` 이면 뜨자마자 구독 화면을 연다.
+        // 페이월은 잠긴 기능을 눌러야 열려서, 인앱결제 심사용 스크린샷을
+        // 찍을 길이 달리 없었다(2026-09-20). Pro 가 켜져 있으면 이 화면은
+        // 스스로 닫히므로, 찍을 때는 JANJAN_FORCE_PRO 를 꺼야 한다.
+        .sheet(isPresented: $isShowingPaywall) {
+            PaywallView()
         }
         // 무료 위젯의 "먹었어요" 는 기록하는 대신 앱을 연다. 앱이 이미
         // 다른 탭에 떠 있었다면 그대로 앞으로 나올 뿐이라, 기록할 자리인
