@@ -186,6 +186,18 @@ final class ScreenshotTests: XCTestCase {
         // 있어 전 2주·후 2주가 실데이터로 채워진다.
         if isTabBarReachable {
             tap(tab: "약")
+            // **앞 단계(다시 세기)가 약 상세에 서 있는 채로 끝난다.** 탭을 다시
+            // 눌러도 SwiftUI 는 뿌리로 돌려보내지 않으므로, 목록 대신 상세가
+            // 그대로 있고 medicationRow 를 영영 못 찾는다 - 09-19 · 09-20 두
+            // 세트에서 넓은 기기의 이 한 장만 비어 있던 이유다(좁은 기기는
+            // 시트를 닫느라 쓸어내린 것이 뒤로 가기로 먹혀 우연히 넘어갔다).
+            // 목록이 보일 때까지 뒤로 나온다.
+            var backs = 0
+            while !app.buttons.matching(identifier: "medicationRow").firstMatch
+                .waitForExistence(timeout: 2), backs < 3 {
+                back()
+                backs += 1
+            }
             let row = app.buttons.matching(identifier: "medicationRow").firstMatch
             if row.waitForExistence(timeout: 10) {
                 row.tap()
@@ -220,6 +232,8 @@ final class ScreenshotTests: XCTestCase {
                 capture("01c-아침-시트")
             }
         }
+
+        assertRequiredCaptures()
     }
 
     // MARK: - 조각
@@ -331,6 +345,8 @@ final class ScreenshotTests: XCTestCase {
         return isTabBarReachable
     }
 
+    private var captured: Set<String> = []
+
     private func back() {
         let backButton = app.navigationBars.buttons.element(boundBy: 0)
         if backButton.exists { backButton.tap() }
@@ -342,5 +358,24 @@ final class ScreenshotTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+        captured.insert(name)
+    }
+
+    /// 스토어에 꼭 필요한 화면. **없으면 테스트를 빨갛게 만든다.**
+    ///
+    /// 여태 한 장이 빠져도 초록으로 끝났다. 어느 화면이 안 찍혔는지는
+    /// 사진 목록을 세어 보기 전에는 몰랐고, 두 세트를 그렇게 흘려보냈다.
+    /// 화면을 못 찾으면 그 자리에서 알려 주어야 다음 런을 낭비하지 않는다.
+    private static let required = [
+        "01-오늘", "02-약", "03-약-상세", "04-기록",
+        "08-처방-기록", "15-지나간-시간대", "20-용량변경-전후"
+    ]
+
+    private func assertRequiredCaptures() {
+        let missing = Self.required.filter { !captured.contains($0) }
+        XCTAssertTrue(
+            missing.isEmpty,
+            "스토어에 쓰는 화면을 못 찍었습니다: \(missing.joined(separator: ", "))"
+        )
     }
 }
