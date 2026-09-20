@@ -1227,9 +1227,12 @@ private struct StockRecountSheet: View {
                             Text(t("기록상 잔여", "On record"))
                                 .janjanBody(12, weight: .medium)
                                 .foregroundStyle(Color.muted)
+                            // 바로 위 라벨이 이미 "기록상 잔여" 라고 말한다.
+                            // 값에 다시 붙이면 영어가 "On record / On record:
+                            // 17 pills" 로 두 번 읽힌다(영어 캡처 2026-09-20).
                             Text(t(
-                                "기록상 \(DecimalQuantity.display(remaining))정",
-                                "On record: \(pillsEn(remaining))"
+                                "\(DecimalQuantity.display(remaining))정",
+                                pillsEn(remaining)
                             ))
                                 .janjanDisplay(24)
                                 .foregroundStyle(Color.ink)

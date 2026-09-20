@@ -80,7 +80,7 @@ FRAMES_EN = [
     ("06", "When a dose changes,\nsee it side by side", None, "29-용량변경-영어"),
     ("07", "Medication names\ncan stay hidden", "Tap to peek", "22-가림-영어"),
     ("08", "Keep a record\nof every prescription", None, "30-처방-영어"),
-    ("09", "Count what's left\nand it squares with your log", None, "33-다시-세기-영어"),
+    ("09", "Count what's left,\nyour log catches up", None, "33-다시-세기-영어"),
     ("10", "Missed a day?\nThe Janjan finds it with you", None, "23-지나간-영어"),
 ]
 
