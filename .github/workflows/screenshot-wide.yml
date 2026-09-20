@@ -10,14 +10,10 @@
 name: Screenshots (wide only)
 
 on:
+  # 손으로만 부른다. push 로도 돌게 해 뒀더니 이 파일을 고칠 때마다
+  # 자동 런과 손으로 부른 런이 같은 커밋에서 둘 다 돌았다 - 12분짜리
+  # macOS 런을 한 번씩 그냥 버렸다.
   workflow_dispatch:
-  # 이 파일이 아직 기본 브랜치에 없으면 dispatch 가 안 먹을 수 있다.
-  # screenshots.yml 과 같은 방법 - 이 파일을 밀 때 한 번 돈다.
-  push:
-    branches:
-      - claude/local-work-app-integration-5fnhoc
-    paths:
-      - '.github/workflows/screenshot-wide.yml'
 
 concurrency:
   group: screenshots
@@ -175,11 +171,37 @@ jobs:
           mkdir -p /tmp/fresh && cp build/named/*.png /tmp/fresh/
           git fetch origin ci/screenshots --depth=1
           git checkout -f -B ci-shots FETCH_HEAD
-          # 런 2 가 흘린 쓰레기를 치운다 - 테스트가 실패하자 XCUITest 의
-          # 화면 녹화·계층 덤프까지 올라갔다(51MB 짜리 mp4 가 .png 이름으로).
-          # 우리 사진 이름은 전부 숫자로 시작한다.
+          # 우리 사진 이름은 전부 숫자로 시작한다. 그렇지 않은 것은 실패한
+          # 런이 흘린 것이다 - 런 2 가 51MB 짜리 화면 녹화를 .png 이름으로
+          # 올려 두었다.
           find shots -type f ! -name '[0-9]*' -print -delete || true
-          # **나머지는 덮어쓰기만 한다.** 좁은 화면·영어·워치 사진은 그대로 둔다.
+
+          # **같은 화면의 지난 벌을 지운다.** 파일 이름에 시뮬레이터 UUID 가
+          # 붙어서, 덮어쓰기만 하면 런마다 같은 화면이 한 벌씩 쌓인다
+          # (세 런 만에 52장이 104장이 됐다). 그러면 홍보 그림을 만들 때
+          # 어느 것이 최신인지 알 길이 없다. 들어오는 것과 같은 화면·같은
+          # 기기의 옛 파일만 지운다 - 좁은 화면·영어·워치는 건드리지 않는다.
+          FRESH=/tmp/fresh python3 - <<'PY'
+          import os, re
+
+          fresh = sorted(os.listdir(os.environ["FRESH"]))
+          def stem(name):
+              return re.split(r"_0_", name)[0]
+          incoming = {stem(n) for n in fresh}
+
+          removed = 0
+          for name in sorted(os.listdir("shots")):
+              if not name.endswith(".png") or name in fresh:
+                  continue
+              # 좁은 화면 세트는 이 워크플로가 찍지 않는다.
+              if "좁은화면" in name:
+                  continue
+              if stem(name) in incoming:
+                  os.remove(os.path.join("shots", name))
+                  removed += 1
+          print("지난 벌 {}장 지움".format(removed))
+          PY
+
           cp /tmp/fresh/*.png shots/
           {
             echo "# 시뮬레이터 화면"
