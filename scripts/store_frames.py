@@ -38,14 +38,14 @@ HAIRLINE = "#D4D4D1"
 
 FONT = Path("TheJanjan/Resources/Fonts/GowunDodum-Regular.ttf")
 FONT_SIZE = 104
-LINE_HEIGHT = 150
+LINE_HEIGHT = 138
 # 문구 아래 작은 한 줄. 있는 그림에만 붙는다.
 SUBTITLE_SIZE = 44
 SUBTITLE_GAP = 22
 # 문구 첫 줄 윗변. 너무 내리면 캡처가 아래로 처져 화면이 조금밖에 안 보인다.
-CAPTION_TOP = 300
+CAPTION_TOP = 210
 # 문구 아랫변과 캡처 윗변 사이.
-CAPTION_GAP = 100
+CAPTION_GAP = 70
 
 PHONE_WIDTH = 1150
 CORNER_RADIUS = 72
