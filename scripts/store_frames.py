@@ -32,12 +32,16 @@ SIZES = {
 # 디자인 토큰의 fog / ink. 앱 배경과 같은 색이라 그림과 캡처가 이어져 보인다.
 BACKGROUND = "#F7F7F6"
 INK = "#1A1A19"
+MUTED = "#8B8C87"
 # 오늘 화면의 배경도 fog 라서, 테두리가 없으면 캡처가 바탕에 녹아 사라진다.
 HAIRLINE = "#D4D4D1"
 
 FONT = Path("TheJanjan/Resources/Fonts/GowunDodum-Regular.ttf")
 FONT_SIZE = 104
 LINE_HEIGHT = 150
+# 문구 아래 작은 한 줄. 있는 그림에만 붙는다.
+SUBTITLE_SIZE = 44
+SUBTITLE_GAP = 22
 # 문구 첫 줄 윗변. 너무 내리면 캡처가 아래로 처져 화면이 조금밖에 안 보인다.
 CAPTION_TOP = 300
 # 문구 아랫변과 캡처 윗변 사이.
@@ -50,17 +54,19 @@ SHADOW_DROP = 16
 
 # 차례 · 문구 · 쓸 캡처. 문구의 줄바꿈은 손으로 정한다 - 한국어는 자동으로
 # 끊으면 "먹었는지 / 바로" 처럼 어절 한가운데가 갈린다.
+# 스토어에 올라가 있는 차례 그대로다. 사용자가 고쳐 준 문구만 바꿨다.
+# 셋째 칸은 문구 아래 붙는 작은 줄이고, 없으면 None 이다.
 FRAMES = [
-    ("01", "오늘 약, 먹었는지\n바로 알 수 있어요", "01-오늘"),
-    ("02", "오늘의 기분은\n색으로 남겨요", "04-기록"),
-    ("03", "남은 약 개수,\n더잔잔이 세고 있어요", "03-약-상세"),
-    ("04", "약이 바뀌면,\n비교해 볼 수 있어요", "20-용량변경-전후"),
-    ("05", "진료마다\n처방 기록을 남겨요", "08-처방-기록"),
-    ("06", "빠트린 날은\n더잔잔이 함께 찾아요", "15-지나간-시간대"),
-    ("07", "진료실에 들고 갈 한 장,\n미리 모아 둬요", "06-리포트"),
-    ("08", "약 모양만 알아도\n찾을 수 있어요", "24-모양찾기"),
-    ("09", "약 이름은\n가려 둘 수 있어요", "19-오늘-가림"),
-    ("10", "필요하면 Pro 로,\n아니면 그대로 무료로", "26-구독"),
+    ("01", "오늘 약, 먹었는지\n바로 알 수 있어요", None, "01-오늘"),
+    ("02", "오늘의 기분은\n색으로 남겨요", None, "04-기록"),
+    ("03", "진료 전날,\n한 장으로 준비 끝", None, "06-리포트"),
+    ("04", "남은 약 개수,\n더잔잔이 세고 있어요", None, "02-약"),
+    ("05", "서랍 속 알약,\n무슨 약인지 찾아요", "식약처 낱알식별 데이터", "24-모양찾기"),
+    ("06", "약이 바뀌면,\n비교해 볼 수 있어요", None, "20-용량변경-전후"),
+    ("07", "약 이름은\n가려 둘 수 있어요", "누르면 잠깐 보여요", "19-오늘-가림"),
+    ("08", "진료마다\n처방 기록을 남겨요", None, "08-처방-기록"),
+    ("09", "남은 알약을 세어\n기록과 맞춰 봐요", None, "16-다시-세기"),
+    ("10", "빠트린 날은\n더잔잔이 함께 찾아요", None, "15-지나간-시간대"),
 ]
 
 
@@ -96,16 +102,25 @@ def shadow(size: tuple[int, int], radius: int) -> Image.Image:
     return layer.filter(ImageFilter.GaussianBlur(SHADOW_BLUR))
 
 
-def compose(caption: str, shot: Path) -> Image.Image:
+def centered(draw, text, font, top, fill):
+    box = draw.textbbox((0, 0), text, font=font)
+    draw.text(((CANVAS[0] - (box[2] - box[0])) // 2 - box[0], top), text, font=font, fill=fill)
+
+
+def compose(caption: str, subtitle: str | None, shot: Path) -> Image.Image:
     canvas = Image.new("RGB", CANVAS, BACKGROUND)
     draw = ImageDraw.Draw(canvas)
     font = ImageFont.truetype(str(FONT), FONT_SIZE)
 
     lines = caption.split("\n")
     for index, line in enumerate(lines):
-        box = draw.textbbox((0, 0), line, font=font)
-        x = (CANVAS[0] - (box[2] - box[0])) // 2 - box[0]
-        draw.text((x, CAPTION_TOP + index * LINE_HEIGHT), line, font=font, fill=INK)
+        centered(draw, line, font, CAPTION_TOP + index * LINE_HEIGHT, INK)
+
+    below = CAPTION_TOP + len(lines) * LINE_HEIGHT
+    if subtitle:
+        small = ImageFont.truetype(str(FONT), SUBTITLE_SIZE)
+        centered(draw, subtitle, small, below + SUBTITLE_GAP, MUTED)
+        below += SUBTITLE_GAP + SUBTITLE_SIZE
 
     phone = Image.open(shot).convert("RGB")
     scale = PHONE_WIDTH / phone.size[0]
@@ -121,7 +136,7 @@ def compose(caption: str, shot: Path) -> Image.Image:
     )
 
     left = (CANVAS[0] - PHONE_WIDTH) // 2
-    top = CAPTION_TOP + len(lines) * LINE_HEIGHT + CAPTION_GAP
+    top = below + CAPTION_GAP
 
     pad = SHADOW_BLUR * 3
     canvas.paste(
@@ -147,13 +162,13 @@ def main() -> int:
     target.mkdir(parents=True, exist_ok=True)
 
     missing = []
-    for order, caption, stem in FRAMES:
+    for order, caption, subtitle, stem in FRAMES:
         shot = find(source, stem)
         if shot is None:
             missing.append(f"{order} · {stem}")
             continue
         name = f"{order}-{caption.splitlines()[0].rstrip(',')}.png"
-        image = compose(caption, shot)
+        image = compose(caption, subtitle, shot)
         for label, size in SIZES.items():
             folder = target / label
             folder.mkdir(parents=True, exist_ok=True)
