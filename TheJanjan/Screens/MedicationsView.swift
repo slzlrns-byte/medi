@@ -17,8 +17,12 @@ struct MedicationsView: View {
     @Query private var stockRecords: [StockEventRecord]
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
+    // 화면 찍기 전용 인자가 용량 변경이 달린 약을 고를 때만 쓴다.
+    @Query private var doseChangeRecords: [DoseChangeRecord]
 
     @State private var isShowingAddFlow = false
+    /// 화면 찍기 전용: 실행 인자로 약 상세를 바로 열 때 쓰는 길.
+    @State private var path: [UUID] = []
     @State private var isShowingPrescription = false
     @State private var isShowingVisitHistory = false
     @State private var pendingDeletion: Row?
@@ -32,7 +36,7 @@ struct MedicationsView: View {
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(spacing: CGFloat(JanjanSpacing.s)) {
                     prescriptionCard
@@ -42,9 +46,7 @@ struct MedicationsView: View {
                     ForEach(sections, id: \.title) { section in
                         sectionHeader(section.title)
                         ForEach(section.rows) { row in
-                            NavigationLink {
-                                MedicationDetailView(medicationID: row.id)
-                            } label: {
+                            NavigationLink(value: row.id) {
                                 medicationRow(row)
                             }
                             .buttonStyle(.plain)
@@ -84,14 +86,32 @@ struct MedicationsView: View {
                 AddMedicationEntryView()
             }
             #if DEBUG
-            // 화면 찍기 전용: simctl 로만 띄우는 캡처는 탭을 못 누르므로
-            // -JanjanShowPillFinder 로 약 추가 시트를 바로 연다.
+            // 화면 찍기 전용: simctl 로만 띄우는 캡처는 눌러 들어갈 수가 없다.
+            // 영어 세트는 이 인자들이 없으면 찍을 길이 아예 없다(2026-09-20).
             .onAppear {
-                if ProcessInfo.processInfo.arguments.contains("-JanjanShowPillFinder") {
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("-JanjanShowPillFinder") {
                     isShowingAddFlow = true
+                }
+                if arguments.contains("-JanjanShowPrescription") {
+                    isShowingPrescription = true
+                }
+                // 용량 변경이 달린 약(에스시탈로프람)으로 들어간다. 첫 줄을
+                // 잡으면 변경 기록이 없는 약에 들어가 버린다 - 한국어 세트가
+                // 그래서 두 번 비었다.
+                if arguments.contains("-JanjanShowMedication")
+                    || arguments.contains("-JanjanShowDoseCompare") {
+                    let rows = sections.flatMap(\.rows)
+                    let target = rows.first { row in
+                        doseChangeRecords.contains { $0.medicationID == row.id }
+                    } ?? rows.first
+                    if let target, path.isEmpty { path = [target.id] }
                 }
             }
             #endif
+            .navigationDestination(for: UUID.self) { id in
+                MedicationDetailView(medicationID: id)
+            }
             .sheet(isPresented: $isShowingPrescription) {
                 NavigationStack {
                     PrescriptionFormView { isShowingPrescription = false }

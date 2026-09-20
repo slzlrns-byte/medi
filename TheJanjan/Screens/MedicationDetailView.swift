@@ -126,6 +126,19 @@ struct MedicationDetailView: View {
         .sheet(isPresented: $isShowingRecountSheet) {
             StockRecountSheet(medicationID: medicationID)
         }
+        #if DEBUG
+        // 화면 찍기 전용: simctl 로 띄우는 영어 캡처는 눌러 들어갈 수 없다.
+        .onAppear {
+            guard ProcessInfo.processInfo.arguments.contains("-JanjanShowDoseCompare"),
+                  comparingChange == nil,
+                  let first = doseChangeRecords
+                      .filter({ $0.medicationID == medicationID })
+                      .sorted(by: { $0.changedAt > $1.changedAt })
+                      .first
+            else { return }
+            comparingChange = first
+        }
+        #endif
         .sheet(item: $comparingChange) { entry in
             DoseChangeCompareSheet(
                 change: entry.core,
