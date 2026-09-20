@@ -418,7 +418,12 @@ struct ReportView: View {
             // 무료에서는 진료일을 넘기지 않아 부족 캡션 자체가 생기지 않는다.
             nextVisit: pro.isPro ? nextVisit : nil,
             questionsKo: questions,
-            language: JanjanLanguage.current
+            language: JanjanLanguage.current,
+            // 주차별 구역도 같은 이유로 Pro 다. 패턴 보기가 파는 것이 이
+            // 4주 시계열이라, 무료 종이에 찍어 주면 잠근 문 옆에 문을 하나
+            // 더 내는 셈이 된다. 무료에서는 구역 자체가 생기지 않는다 -
+            // 종이에 "Pro 에서 열려요" 를 적지는 않는다(진료실에서 본다).
+            weeklyBreakdown: pro.isPro
         )
 
         // 한 박자 넘긴 뒤에 그린다. 동기로 이어 붙이면 isExporting 이 true 인

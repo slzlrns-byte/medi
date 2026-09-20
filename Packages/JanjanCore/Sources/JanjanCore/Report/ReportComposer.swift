@@ -99,6 +99,10 @@ public enum ReportComposer {
         nextVisit: Date? = nil,
         questionsKo: String = "",
         language: JanjanLanguage = .korean,
+        /// 주차별 구역을 넣을지. 패턴 보기(Pro)가 파는 것이 이 시계열이라
+        /// 무료에서는 구역 자체를 만들지 않는다 - `nextVisit` 과 같은 이유다.
+        weeklyBreakdown: Bool = false,
+        symptomCatalog: SymptomCatalog = Catalogs.symptoms,
         calendar: Calendar = .current
     ) -> ReportContent {
 
@@ -148,6 +152,17 @@ public enum ReportComposer {
             language: language,
             calendar: calendar
         ))
+        if weeklyBreakdown {
+            lines.append(contentsOf: weeklyLines(
+                checkIns: checkIns,
+                symptomEntries: symptomEntries,
+                from: start,
+                to: end,
+                catalog: symptomCatalog,
+                language: language,
+                calendar: calendar
+            ))
+        }
         lines.append(contentsOf: dreamLines(
             checkIns: checkIns, from: start, to: end, language: language, calendar: calendar
         ))
@@ -434,6 +449,145 @@ public enum ReportComposer {
         }
         return lines
     }
+
+    /// 주차별 기분·증상 (Pro). 기간을 7일씩 끊어 그 주에 무엇이 몇 번 적혔는지만 옮긴다.
+    ///
+    /// 위의 기분 구역은 기간 전체를 한 줄로 접는다. 의사가 실제로 묻는 것은
+    /// 그 한 줄이 아니라 "언제부터" 인데, 주를 나란히 놓으면 그게 보인다.
+    /// 여기서도 세기만 한다 — "2주차에 나빠졌다" 는 만들지 않는다.
+    ///
+    /// **무료에서는 이 구역이 생기지 않는다.** 패턴 보기(Pro)가 파는 것이
+    /// 정확히 이 4주 시계열이라, 여기에 찍어 주면 잠근 문 옆에 문을 하나 더
+    /// 내는 셈이다. 잠긴 것을 종이에 알리지도 않는다 - 이 종이는 진료실에서
+    /// 의사가 본다.
+    private static func weeklyLines(
+        checkIns: [CheckIn],
+        symptomEntries: [SymptomEntry],
+        from start: Date,
+        to end: Date,
+        catalog: SymptomCatalog,
+        language: JanjanLanguage,
+        calendar: Calendar
+    ) -> [ReportContent.Line] {
+
+        let en = language == .english
+        let endDay = calendar.startOfDay(for: end)
+
+        // 주 경계. 마지막 주는 7일이 안 될 수 있어 실제 끝 날짜를 적는다 —
+        // 사흘치를 그냥 "4주차" 라고 적으면 옆의 주와 같은 무게로 읽힌다.
+        var weeks: [(start: Date, end: Date)] = []
+        var cursor = calendar.startOfDay(for: start)
+        while cursor <= endDay {
+            let last = calendar.date(byAdding: .day, value: 6, to: cursor) ?? cursor
+            weeks.append((cursor, min(last, endDay)))
+            guard let next = calendar.date(byAdding: .day, value: 7, to: cursor) else { break }
+            cursor = next
+        }
+        // 한 주뿐이면 위의 기분 구역과 같은 말을 한 번 더 하는 것이다.
+        guard weeks.count >= 2 else { return [] }
+
+        // 한 주도 빠짐없이 비었으면 구역을 만들지 않는다. "없습니다" 만
+        // 늘어선 표는 요약이 아니라 빈 칸 재촉이다.
+        let windowEnd = calendar.date(byAdding: .day, value: 1, to: endDay) ?? endDay
+        let hasAnything =
+            checkIns.contains { $0.date >= weeks[0].start && $0.date < windowEnd }
+            || symptomEntries.contains { $0.startedAt >= weeks[0].start && $0.startedAt < windowEnd }
+        guard hasAnything else { return [] }
+
+        var lines: [ReportContent.Line] = [
+            .init(style: .heading, text: en ? "By week" : "주차별")
+        ]
+
+        for (index, week) in weeks.enumerated() {
+            let dayAfter = calendar.date(byAdding: .day, value: 1, to: week.end) ?? week.end
+            let range = "\(monthDayText(week.start, language: language, calendar: calendar))"
+                + "–\(monthDayText(week.end, language: language, calendar: calendar))"
+            lines.append(.init(
+                style: .body,
+                text: en ? "Week \(index + 1) · \(range)" : "\(index + 1)주차 · \(range)"
+            ))
+
+            let weekCheckIns = checkIns.filter { $0.date >= week.start && $0.date < dayAfter }
+            if !weekCheckIns.isEmpty {
+                var moodCounts: [Int: Int] = [:]
+                for checkIn in weekCheckIns { moodCounts[checkIn.mood.score, default: 0] += 1 }
+                // 위의 기분 구역과 **똑같은** 규칙을 쓴다: 평균이 아니라 가장
+                // 자주 고른 값, 같은 횟수면 같은 쪽. 한 장 안에서 두 구역이
+                // 서로 다른 기분을 적으면 읽는 사람은 둘 다 믿지 않는다.
+                if let top = moodCounts.max(by: { lhs, rhs in
+                    lhs.value != rhs.value ? lhs.value < rhs.value : lhs.key < rhs.key
+                }) {
+                    let label = CheckIn.Mood(top.key).label(language)
+                    lines.append(.init(
+                        style: .caption,
+                        text: en
+                            ? "Mood \(label) · \(dayCount(top.value, language: language))"
+                            : "기분 \(label) · \(top.value)일"
+                    ))
+                }
+            }
+
+            let counts = symptomCounts(
+                symptomEntries.filter { $0.startedAt >= week.start && $0.startedAt < dayAfter },
+                catalog: catalog,
+                language: language
+            )
+            if !counts.isEmpty {
+                lines.append(.init(
+                    style: .caption,
+                    text: counts
+                        .map { en ? "\($0.name) ×\($0.count)" : "\($0.name) \($0.count)회" }
+                        .joined(separator: " · ")
+                ))
+            }
+
+            if weekCheckIns.isEmpty && counts.isEmpty {
+                // 빈 주를 지우지 않는다. 기록이 끊긴 주가 있었다는 것도
+                // 진료실에서 읽을 것 중 하나다.
+                lines.append(.init(
+                    style: .caption,
+                    text: en ? "No entries this week." : "이 주에는 기록이 없습니다."
+                ))
+            }
+        }
+        return lines
+    }
+
+    /// 한 주에 적힌 증상을 많이 적힌 차례로 센다. 이름은 카탈로그에서 찾고,
+    /// 없으면(사용자가 직접 더한 항목) 적힌 id 를 그대로 쓴다.
+    private static func symptomCounts(
+        _ entries: [SymptomEntry],
+        catalog: SymptomCatalog,
+        language: JanjanLanguage
+    ) -> [(name: String, count: Int)] {
+
+        var counts: [String: Int] = [:]
+        for entry in entries { counts[entry.symptomID, default: 0] += 1 }
+
+        let ranked = counts
+            .map { id, count in
+                (id: id,
+                 count: count,
+                 safety: catalog.symptom(id: id)?.isSafetyItem ?? false,
+                 name: catalog.symptom(id: id)?.name(language) ?? id)
+            }
+            // 횟수가 같으면 id 로 갈라 차례를 고정한다 - 같은 기록으로 두 번
+            // 뽑은 종이가 서로 달라 보이면 안 된다.
+            .sorted { lhs, rhs in
+                lhs.count != rhs.count ? lhs.count > rhs.count : lhs.id < rhs.id
+            }
+
+        var shown = Array(ranked.prefix(weeklySymptomLimit))
+        // 자해·자살 생각은 자른 뒤에도 남긴다. 그 한 줄을 보이려고 종이를
+        // 만드는 사람이 있는데, 다른 증상이 많았다는 이유로 빠지면 안 된다.
+        for item in ranked where item.safety && !shown.contains(where: { $0.id == item.id }) {
+            shown.append(item)
+        }
+        return shown.map { (name: $0.name, count: $0.count) }
+    }
+
+    /// 한 주에 적는 증상 수. 더 늘리면 요약이 아니라 목록이 된다.
+    private static let weeklySymptomLimit = 4
 
     /// 꿈 (강점 결정서 4위). 척도를 세고 메모를 옮길 뿐, 뜻풀이는 하지 않는다 —
     /// 꿈 해석은 이 앱이 의도적으로 하지 않는 것 목록에 있다.
