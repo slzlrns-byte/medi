@@ -20,6 +20,15 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 # 제출 규격 6.9". 캡처와 같은 비율이라 가로를 맞추면 세로는 따라온다.
 CANVAS = (1320, 2868)
+
+# App Store Connect 의 아이폰 칸. 6.9" 는 새 앱에 필수이고, 나머지는 애플이
+# 줄여서 쓰므로 선택이다. 그래도 같이 내는 이유: 6.5" 칸에 예전 그림이 남아
+# 있으면 스토어가 기기에 따라 서로 다른 문구를 보여 준다.
+# 6.9" 로 그린 뒤 통째로 줄인다 - 두 비율 차이가 0.4% 라 눈에 띄지 않는다.
+SIZES = {
+    "6.9": (1320, 2868),
+    "6.5": (1242, 2688),
+}
 # 디자인 토큰의 fog / ink. 앱 배경과 같은 색이라 그림과 캡처가 이어져 보인다.
 BACKGROUND = "#F7F7F6"
 INK = "#1A1A19"
@@ -144,7 +153,12 @@ def main() -> int:
             missing.append(f"{order} · {stem}")
             continue
         name = f"{order}-{caption.splitlines()[0].rstrip(',')}.png"
-        compose(caption, shot).save(target / name)
+        image = compose(caption, shot)
+        for label, size in SIZES.items():
+            folder = target / label
+            folder.mkdir(parents=True, exist_ok=True)
+            page = image if size == CANVAS else image.resize(size, Image.LANCZOS)
+            page.save(folder / name)
         print(f"{name}  ←  {shot.name}")
 
     for item in missing:
