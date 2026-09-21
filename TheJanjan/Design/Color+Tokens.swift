@@ -54,6 +54,8 @@ extension Color {
     static var ink2: Color { .janjan(.ink2) }
     static var muted: Color { .janjan(.muted) }
     static var hairline: Color { .janjan(.line) }
+    /// 누를 수 있는 것의 테두리. 카드 위에서도 보이는 값이다.
+    static var outline: Color { .janjan(.outline) }
 
     /// 기분 점수(−3…3)에 대응하는 색. 항상 라벨과 함께 쓴다.
     static func mood(_ score: Int) -> Color {

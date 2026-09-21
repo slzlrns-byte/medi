@@ -65,24 +65,34 @@ struct MonthWaveCard: View {
         }
     }
 
+    /// 제목과 달 이동을 두 줄로 나눈다.
+    ///
+    /// 한 줄에 다 넣었더니 버튼 둘(44×2) + 고정폭 "September 2026"(약 98pt) +
+    /// 간격이 218pt 를 먼저 가져가, SE 에서 제목에 남는 것이 93pt 뿐이었다.
+    /// "This month's flow" 가 석 줄로 꺾였다(QA 2026-09-21).
     private var header: some View {
-        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             Text(t("이번 달의 흐름", "This month's flow"))
                 .janjanDisplay(20)
                 .foregroundStyle(Color.ink)
-            Spacer(minLength: 0)
-            monthButton("chevron.left", labelKo: t("지난달", "Previous month")) {
-                move(by: -1)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                monthButton("chevron.left", labelKo: t("지난달", "Previous month")) {
+                    move(by: -1)
+                }
+                Text(monthYearText)
+                    .janjanBody(14)
+                    .foregroundStyle(Color.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                monthButton("chevron.right", labelKo: t("다음 달", "Next month")) {
+                    move(by: 1)
+                }
+                .disabled(isShowingCurrentMonth)
+                .opacity(isShowingCurrentMonth ? 0.3 : 1)
+                Spacer(minLength: 0)
             }
-            Text(monthYearText)
-                .janjanBody(14)
-                .foregroundStyle(Color.muted)
-                .fixedSize()
-            monthButton("chevron.right", labelKo: t("다음 달", "Next month")) {
-                move(by: 1)
-            }
-            .disabled(isShowingCurrentMonth)
-            .opacity(isShowingCurrentMonth ? 0.3 : 1)
         }
     }
 

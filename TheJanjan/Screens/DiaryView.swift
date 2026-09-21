@@ -235,13 +235,17 @@ struct DiaryView: View {
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     TogglePill(
                         text: t("술 마셨어요", "Had alcohol"),
-                        isOn: record.activities.contains(ActivityTag.alcoholID)
+                        isOn: record.activities.contains(ActivityTag.alcoholID),
+                        minWidth: 0,
+                        fillsRow: true
                     ) {
                         toggleActivity(ActivityTag.alcoholID, in: record)
                     }
                     TogglePill(
                         text: t("담배 피웠어요", "Smoked"),
-                        isOn: record.activities.contains(ActivityTag.smokingID)
+                        isOn: record.activities.contains(ActivityTag.smokingID),
+                        minWidth: 0,
+                        fillsRow: true
                     ) {
                         toggleActivity(ActivityTag.smokingID, in: record)
                     }
@@ -313,9 +317,18 @@ struct DiaryView: View {
                         .foregroundStyle(Color.muted)
                 }
             }
+            // 제목은 별도 요소라 버튼과 이어지지 않는다 - VoiceOver 로는
+            // "1 2 3 4 5" 가 열 몇 개 줄줄이 나올 뿐 어느 것이 기운이고
+            // 어느 것이 불안인지 알 수 없었다(QA 2026-09-21).
             HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                 ForEach(1...5, id: \.self) { step in
-                    TogglePill(text: "\(step)", isOn: value.wrappedValue == step) {
+                    TogglePill(
+                        text: "\(step)",
+                        isOn: value.wrappedValue == step,
+                        minWidth: 0,
+                        fillsRow: true,
+                        accessibilityLabel: t("\(title) \(step)점", "\(title) \(step)")
+                    ) {
                         value.wrappedValue = (value.wrappedValue == step) ? nil : step
                     }
                 }
@@ -338,11 +351,15 @@ struct DiaryView: View {
                     onIncrease: { adjustSleep(record, by: 30) }
                 )
 
+                // 최소 폭을 곱해 늘어놓으면 큰 글자에서 줄이 카드를 넘는다 -
+                // TogglePill 자신의 주석이 적어 둔 규칙이다(QA 2026-09-21).
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(CheckIn.SleepQuality.allCases, id: \.self) { quality in
                         TogglePill(
                             text: quality.label(JanjanLanguage.current),
-                            isOn: record.sleepQualityRaw == quality.rawValue
+                            isOn: record.sleepQualityRaw == quality.rawValue,
+                            minWidth: 0,
+                            fillsRow: true
                         ) {
                             record.sleepQualityRaw =
                                 (record.sleepQualityRaw == quality.rawValue) ? nil : quality.rawValue

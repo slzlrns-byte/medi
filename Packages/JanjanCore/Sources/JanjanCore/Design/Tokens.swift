@@ -103,6 +103,10 @@ public enum JanjanColor: String, Sendable, CaseIterable {
     // 선
     case line
     case line2
+    /// 누를 수 있는 것의 테두리. line·line2 보다 진하다 — 흰 카드 위 흰
+    /// 알약 버튼은 hairline(1.25:1) 으로 둘러 봐야 보이지 않아서, 글자만
+    /// 떠 있는 것처럼 읽혔다(QA 2026-09-21). 컨트롤 경계는 3:1 이 필요하다.
+    case outline
 
     // 파스텔
     case sage
@@ -134,6 +138,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .muted: return "muted"
         case .line: return "line"
         case .line2: return "line2"
+        case .outline: return "outline"
         case .sage: return "sage"
         case .sageInk: return "sage-ink"
         case .lav: return "lav"
@@ -160,9 +165,14 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .surface2: return "#EEEEEC"
         case .ink: return "#1A1A19"
         case .ink2: return "#4A4B48"
-        case .muted: return "#8B8C87"
+        // 라이트 muted 는 예전에 #8B8C87 이었는데, 흰 카드 위 3.39 · fog 위 3.16 ·
+        // surface2 위 2.92 로 본문 기준(4.5)을 어디서도 못 넘겼다. 11~13pt 에만
+        // 쓰여 큰 글자 예외도 못 탄다(QA 2026-09-21). 한 단계 내려 surface2
+        // 위에서도 4.6 을 넘긴다. 다크 값은 원래 통과해서 그대로 둔다.
+        case .muted: return "#6A6B66"
         case .line: return "#E6E6E4"
         case .line2: return "#D4D4D1"
+        case .outline: return "#94948D"
         case .sage:
             switch theme {
             case .sky: return "#C9DCE4"
@@ -171,11 +181,14 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .dawn: return "#CAC9E4"
             case .sea: return "#C2E1CE"
             }
+        // 파스텔 위 ~Ink 값 몇 개가 3.92~4.43 으로 본문 기준(4.5)에 못 미쳤다
+        // (QA 2026-09-21). 같은 색상·채도를 두고 명도만 한 단계 내려 다섯 테마
+        // 전부 4.6 이상으로 맞췄다. `TokensTests.testPastelInkContrast` 가 잠근다.
         case .sageInk:
             switch theme {
             case .sky: return "#2F5B66"
-            case .sprout: return "#55703F"
-            case .sunset: return "#8A6238"
+            case .sprout: return "#50693B"
+            case .sunset: return "#7B5832"
             case .dawn: return "#2F3266"
             case .sea: return "#2C5F3A"
             }
@@ -190,7 +203,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .lavInk:
             switch theme {
             case .sky: return "#2F4A72"
-            case .sprout: return "#4F7259"
+            case .sprout: return "#4C6D55"
             case .sunset: return "#5F4B82"
             case .dawn: return "#462F72"
             case .sea: return "#2C6B57"
@@ -206,10 +219,10 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .butterInk:
             switch theme {
             case .sky: return "#33587E"
-            case .sprout: return "#8A6A2F"
-            case .sunset: return "#9A6B2A"
+            case .sprout: return "#82642C"
+            case .sunset: return "#8A6026"
             case .dawn: return "#46337E"
-            case .sea: return "#30775A"
+            case .sea: return "#2E7256"
             }
         case .peach:
             switch theme {
@@ -223,8 +236,8 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             switch theme {
             case .sky: return "#6E6254"
             case .sprout: return "#8A5A45"
-            case .sunset: return "#8A5A45"
-            case .dawn: return "#666E54"
+            case .sunset: return "#855742"
+            case .dawn: return "#616850"
             case .sea: return "#685059"
             }
         case .mood1:
@@ -297,6 +310,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .muted: return "#8E8F8A"
         case .line: return "#2E2F2C"
         case .line2: return "#3B3C39"
+        case .outline: return "#6B6C67"
         case .sage:
             switch theme {
             case .sky: return "#21333B"
@@ -305,6 +319,9 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .dawn: return "#23213B"
             case .sea: return "#1D3426"
             }
+        // 파스텔 위 ~Ink 값 몇 개가 3.92~4.43 으로 본문 기준(4.5)에 못 미쳤다
+        // (QA 2026-09-21). 같은 색상·채도를 두고 명도만 한 단계 내려 다섯 테마
+        // 전부 4.6 이상으로 맞췄다. `TokensTests.testPastelInkContrast` 가 잠근다.
         case .sageInk:
             switch theme {
             case .sky: return "#9CC6D8"

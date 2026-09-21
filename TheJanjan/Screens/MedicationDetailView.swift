@@ -488,6 +488,7 @@ struct MedicationDetailView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityExpanded(isShowingOlderDoseChanges)
                 }
 
                 // 용량이 실제로 바뀐 바로 그때. 적어 둔 것이 없으면 권하지 않는다.
@@ -567,13 +568,22 @@ struct MedicationDetailView: View {
                 Text(change.fromText)
                     .janjanBody(15)
                     .foregroundStyle(Color.muted)
+                // line2 는 흰 바탕에서 1.49:1 이라 사실상 안 보였다. 다른
+                // 곳의 꺾쇠는 옆 글자가 같은 뜻을 말해 주지만, 이 화살표는
+                // 어느 쪽이 지금 용량인지를 나르는 유일한 기호다(QA 2026-09-21).
                 Image(systemName: "arrow.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.janjan(.line2))
+                    .foregroundStyle(Color.ink2)
                 Text(change.toText)
                     .janjanBody(17, weight: .medium)
                     .foregroundStyle(Color.ink)
             }
+            // 조각으로 읽으면 "10mg" "15mg" 두 덩어리라 방향이 사라진다.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(t(
+                "\(change.fromText) 에서 \(change.toText) 으로",
+                "from \(change.fromText) to \(change.toText)"
+            )))
         } else {
             Text(change.toText)
                 .janjanBody(17, weight: .medium)

@@ -21,10 +21,85 @@ final class TokensTests: XCTestCase {
                 )
             }
         }
-        XCTAssertEqual(JanjanColor.allCases.count, 23)
+        XCTAssertEqual(JanjanColor.allCases.count, 24)
         // 무료 3 + Pro 2 (밤 라일락·깊은 바다, 2026-09-19).
         XCTAssertEqual(JanjanTheme.allCases.count, 5)
         XCTAssertEqual(JanjanTheme.proOnly, [.dawn, .sea])
+    }
+
+    // MARK: - 대비
+
+    /// WCAG 상대 휘도.
+    private func luminance(_ hex: String) -> Double {
+        guard let rgb = JanjanRGB(hex: hex) else { return 0 }
+        func channel(_ value: Double) -> Double {
+            value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(rgb.red) + 0.7152 * channel(rgb.green) + 0.0722 * channel(rgb.blue)
+    }
+
+    private func contrast(_ a: String, _ b: String) -> Double {
+        let (x, y) = (luminance(a), luminance(b))
+        return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+    }
+
+    /// 파스텔 칩 위의 글자는 본문 기준(4.5:1)을 넘어야 한다.
+    ///
+    /// 이 값들은 11~13pt 에만 쓰인다 - "복용함" 칩, "지난 시간대" 경고,
+    /// 아침·저녁 표시. 큰 글자 예외(3:1)를 탈 수 없는 크기다. 한때 다섯
+    /// 테마 중 여덟 조합이 3.92~4.43 이었다(QA 2026-09-21).
+    func testPastelInkContrast() {
+        let pairs: [(JanjanColor, JanjanColor)] = [
+            (.sage, .sageInk), (.lav, .lavInk),
+            (.butter, .butterInk), (.peach, .peachInk)
+        ]
+        for theme in JanjanTheme.allCases {
+            for (background, foreground) in pairs {
+                for isDark in [false, true] {
+                    let bg = isDark ? background.darkHex(theme) : background.lightHex(theme)
+                    let fg = isDark ? foreground.darkHex(theme) : foreground.lightHex(theme)
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(bg, fg), 4.5,
+                        "\(theme) \(foreground) on \(background) (\(isDark ? "다크" : "라이트")) 대비 부족"
+                    )
+                }
+            }
+        }
+    }
+
+    /// 작은 회색 글자가 바탕 셋 위에서 모두 읽혀야 한다.
+    ///
+    /// muted 는 캡션·설명 한 줄·"N개 남음" 에 쓰여 흰 카드·fog·surface2
+    /// 위에 다 올라간다. 가장 나쁜 조합(surface2)까지 넘겨야 한다.
+    func testMutedContrastOnEverySurface() {
+        for theme in JanjanTheme.allCases {
+            for isDark in [false, true] {
+                let muted = isDark ? JanjanColor.muted.darkHex(theme) : JanjanColor.muted.lightHex(theme)
+                for surface in [JanjanColor.surface, .fog, .surface2] {
+                    let bg = isDark ? surface.darkHex(theme) : surface.lightHex(theme)
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(bg, muted), 4.5,
+                        "muted on \(surface) (\(isDark ? "다크" : "라이트")) 대비 부족"
+                    )
+                }
+            }
+        }
+    }
+
+    /// 누를 수 있는 것의 테두리는 바탕과 3:1 이상이어야 한다(WCAG 1.4.11).
+    func testOutlineIsVisibleOnCards() {
+        for theme in JanjanTheme.allCases {
+            for isDark in [false, true] {
+                let outline = isDark ? JanjanColor.outline.darkHex(theme) : JanjanColor.outline.lightHex(theme)
+                for surface in [JanjanColor.surface, .fog] {
+                    let bg = isDark ? surface.darkHex(theme) : surface.lightHex(theme)
+                    XCTAssertGreaterThanOrEqual(
+                        contrast(bg, outline), 3,
+                        "outline on \(surface) (\(isDark ? "다크" : "라이트")) 가 안 보인다"
+                    )
+                }
+            }
+        }
     }
 
     func testCoreBrandColorsMatchTheDesignDocument() {

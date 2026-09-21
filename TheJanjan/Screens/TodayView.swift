@@ -670,8 +670,16 @@ struct TodayView: View {
     }
 
     private func asNeededRow(_ medication: Medication) -> some View {
-        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            MaskedNameText(name: medication.displayTitle, isMasked: masksNames)
+        // VoiceOver 로 넘기면 "먹었어요 버튼" 이 줄마다 똑같이 나와, 어느
+        // 약을 기록하는지 모른 채 누르게 됐다. 가린 상태에서는 앞의 이름도
+        // 전부 같은 한 마디였다(QA 2026-09-21).
+        let spoken = spokenName(for: medication)
+        return HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            MaskedNameText(
+                name: medication.displayTitle,
+                isMasked: masksNames,
+                spokenWhenMasked: spoken
+            )
                 .janjanBody(15, weight: .medium)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
@@ -696,13 +704,29 @@ struct TodayView: View {
                 .foregroundStyle(Color.ink2)
                 .padding(.horizontal, CGFloat(JanjanSpacing.s))
                 .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 2)
+                .frame(minHeight: 44)
                 .background(Capsule(style: .continuous).fill(Color.janjan(.surface2)))
+                .contentShape(Capsule(style: .continuous))
             }
+            .accessibilityLabel(Text(t("\(spoken) 1회 개수", "Dose count for \(spoken)")))
 
             WhitePillButton(title: t("먹었어요", "Took it")) {
                 recordAsNeeded(medicationID: medication.id, quantity: asNeededQuantity(for: medication.id))
             }
+            .accessibilityLabel(Text(t("\(spoken) 먹었어요", "Took \(spoken)")))
         }
+    }
+
+    /// VoiceOver 가 이 약을 부르는 말. 가렸으면 이름 대신 용도로 부른다 —
+    /// 눈에 보이는 것과 같은 규칙이라야 가림이 소리로 뚫리지 않는다
+    /// (진료 기록 폼·워치 스냅샷과 같은 순서).
+    private func spokenName(for medication: Medication) -> String {
+        guard masksNames else { return medication.displayTitle }
+        if !medication.purposeLine.isEmpty { return medication.purposeLine }
+        if !medication.strengthText.isEmpty {
+            return t("가려진 약, \(medication.strengthText)", "Hidden medication, \(medication.strengthText)")
+        }
+        return t("가려진 약", "hidden medication")
     }
 
     private func asNeededHistoryRow(_ event: DoseEventRecord) -> some View {
@@ -789,13 +813,19 @@ struct TodayView: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
 
-                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                // HStack 이 아니라 FlowRow: 영어판 SE 에서 두 칩이 합쳐 328pt 를
+                // 요구하는데 카드가 주는 것은 311pt 뿐이라 오른쪽이 잘려 나갔다
+                // (QA 2026-09-21). 넘치면 줄을 바꾼다 - 약 탭의 처방 카드가
+                // 이미 같은 이유로 FlowRow 다.
+                FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     // 눌러서 다음 진료 일정을 바로 잡는다(사용자 요청 2026-09-19).
                     // 미정일 때만이 아니라 잡힌 날짜를 고칠 때도 같은 입구다.
                     Button {
                         isShowingNextVisitSheet = true
                     } label: {
                         PillChip(text: nextVisitText, tint: .surface2)
+                            .frame(minHeight: 44)
+                            .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(Text(t("다음 진료 일정을 정해요.", "Set the next visit date.")))
@@ -848,10 +878,9 @@ struct TodayView: View {
         }
 
         guard !short.isEmpty else { return t("부족한 약 없음", "Nothing running low") }
-        // 이름을 가려 둔 동안은 여기서도 부르지 않는다 - 개수로만 말한다.
-        if short.count == 1 && !masksNames {
-            return t("\(short[0].name) 모자람", "\(short[0].name) running low")
-        }
+        // 약 이름은 최대 60자라, 하나뿐일 때 이름을 넣으면 줄지 않는 칩이
+        // 화면 밖까지 달아난다(QA 2026-09-21). 어느 약인지는 바로 아래
+        // 시간대 줄과 약 탭이 말해 주므로 여기서는 늘 개수로 센다.
         return t("모자라는 약 \(short.count)개", "\(short.count) meds running low")
     }
 

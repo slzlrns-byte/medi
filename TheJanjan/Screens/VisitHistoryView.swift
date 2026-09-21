@@ -98,6 +98,7 @@ struct VisitHistoryView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityExpanded(isShowingOlder)
     }
 
     /// 접힌 줄에 적는 말.
@@ -270,7 +271,9 @@ struct VisitHistoryView: View {
         } else {
             FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                 ForEach(names, id: \.self) { name in
-                    PillChip(text: name)
+                    // 이름 길이는 사용자가 정한다. 줄지 않는 칩이면 한 장이
+                    // 카드를 뚫는다(QA 2026-09-21).
+                    PillChip(text: name, truncates: true)
                 }
             }
         }

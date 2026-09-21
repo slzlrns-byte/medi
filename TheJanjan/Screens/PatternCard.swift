@@ -71,6 +71,15 @@ struct PatternCard: View {
         return timeline.days[timeline.days.count - Self.freeClearDays].date
     }
 
+    /// VoiceOver 가 기분 칸 하나를 부르는 말.
+    private func moodSpokenText(_ day: PatternTimeline.Day) -> String {
+        let date = ReportComposer.monthDayText(day.date, language: lang)
+        guard let score = day.moodScore else {
+            return t("\(date) 기록 없음", "\(date), not recorded")
+        }
+        return "\(date) \(CheckIn.Mood(score).label(lang))"
+    }
+
     private func isBlurred(_ day: PatternTimeline.Day) -> Bool {
         guard let blurBefore else { return false }
         return day.date < blurBefore
@@ -78,10 +87,15 @@ struct PatternCard: View {
 
     private var chart: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            // 복약 줄은 채움·반채움·테두리로 모양이 갈리고 수면 줄은 높이로
+            // 말하는데, 기분 줄만 색이 유일한 정보였다. 색각 이상에서는 읽을
+            // 수 없고 VoiceOver 로는 그림이 있다는 것조차 몰랐다
+            // (QA 2026-09-21). 달력 칸이 이미 같은 방식으로 읽어 준다.
             chartRow(label: t("기분", "Mood")) { day in
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(day.moodScore.map { Color.mood($0) } ?? Color.janjan(.surface2))
                     .frame(height: rowHeight)
+                    .accessibilityLabel(Text(moodSpokenText(day)))
             }
             chartRow(label: t("복약", "Doses")) { day in
                 doseMark(day.takenFraction)

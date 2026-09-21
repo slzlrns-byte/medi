@@ -53,14 +53,25 @@ struct PillChip: View {
     var tint: JanjanColor = .surface2
     var textTint: JanjanColor = .ink2
 
+    /// 줄이 모자랄 때 줄어들 수 있는지. 기본은 아니다 — 칩은 모양을 지킨다.
+    ///
+    /// 다만 **길이를 앱이 정하지 않는 글자**(사용자가 지은 약 이름, 영어
+    /// 번역문)가 들어가면 얘기가 다르다. 칩이 양보하지 않으므로 줄 전체가
+    /// 카드 밖으로 나가고, 넘친 폭이 바깥 VStack 을 키워 그 화면의 카드가
+    /// 전부 좌우로 잘린다(QA 2026-09-21 · MoodPickerRow 가 겪은 그 병).
+    /// 그런 자리에서만 켠다.
+    var truncates: Bool = false
+
     var body: some View {
         Text(text)
             .janjanBody(13, weight: .medium)
             .foregroundStyle(Color.janjan(textTint))
+            .lineLimit(truncates ? 1 : nil)
+            .truncationMode(.tail)
             .padding(.horizontal, CGFloat(JanjanSpacing.s))
             .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 2)
             .background(Capsule(style: .continuous).fill(Color.janjan(tint)))
-            .fixedSize(horizontal: true, vertical: false)
+            .fixedSize(horizontal: !truncates, vertical: false)
     }
 }
 
@@ -145,7 +156,10 @@ struct WhitePillButton: View {
             .background(Capsule(style: .continuous).fill(Color.surface))
             .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(Color.hairline, lineWidth: hasBorder ? 1 : 0)
+                    // hairline 은 흰 카드 위에서 1.25:1 이라 사실상 안 보였다.
+                    // 테두리를 붙인 수정(2026-09-19)이 값을 잘못 잡아 증상이
+                    // 그대로였다(QA 2026-09-21).
+                    .strokeBorder(Color.outline, lineWidth: hasBorder ? 1 : 0)
             )
         }
         .buttonStyle(.plain)
@@ -228,10 +242,16 @@ struct BlackPillButton: View {
                 } else {
                     Text(title)
                         .janjanBody(17, weight: .semibold)
+                        // 글자 크게(AX)에서 "미정으로 되돌리기" 가 두 줄로
+                        // 꺾여 캡슐 위아래로 삐져나갔다(QA 2026-09-21).
+                        // 흰 알약 버튼이 이미 쓰는 처방이다.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .padding(.horizontal, CGFloat(JanjanSpacing.m))
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(minHeight: 56)
             .foregroundStyle(Color.janjan(.surface))
             .background(
                 Capsule(style: .continuous)
@@ -415,7 +435,7 @@ struct StrengthUnitRow: View {
                             )
                             .overlay(
                                 Capsule(style: .continuous)
-                                    .strokeBorder(Color.janjan(.line2), lineWidth: 1)
+                                    .strokeBorder(Color.outline, lineWidth: 1)
                             )
                             .contentShape(Capsule(style: .continuous))
                     }
@@ -463,6 +483,10 @@ struct TogglePill: View {
     /// 커져서, 이 줄뿐 아니라 **화면의 모든 카드**가 좌우로 잘려 나간다.
     var fillsRow: Bool = false
 
+    /// VoiceOver 가 부를 말. 글자가 "3" 처럼 그 자체로는 뜻이 없을 때 준다 -
+    /// 제목은 별도 요소라 버튼과 이어지지 않는다(QA 2026-09-21).
+    var accessibilityLabel: String?
+
     let action: () -> Void
 
     var body: some View {
@@ -489,6 +513,7 @@ struct TogglePill: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(accessibilityLabel ?? text))
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
     }
 }
@@ -560,6 +585,13 @@ struct MaskedNameText: View {
     let name: String
     var isMasked: Bool
 
+    /// 가렸을 때 VoiceOver 가 이 약을 부르는 말(대개 용도 한 줄).
+    ///
+    /// 없으면 전부 "가려진 약 이름" 으로만 읽혀, 비상약 목록이나 시간대
+    /// 시트를 넘길 때 어느 줄인지 구별되지 않는다(QA 2026-09-21).
+    /// 진료 기록 폼과 워치 스냅샷은 이미 용도로 부르는 규칙을 쓰고 있다.
+    var spokenWhenMasked: String?
+
     @State private var isRevealed = false
 
     /// 가려졌을 때 보이는 점 표기. `TogglePill` 처럼 블러를 못 쓰는 자리
@@ -582,13 +614,18 @@ struct MaskedNameText: View {
                 .accessibilityHint(Text(t("누르면 가려요", "Tap to hide")))
         } else {
             Text(name)
+                // 블러는 글자 상자 밖으로 번진다. 예전에는 상자 경계에서
+                // 잘라 냈는데(.clipped), 그러면 뿌연 글자의 가장자리가 칼로
+                // 자른 듯 끊겼다 - 24pt 여러 줄 이름에서는 모자이크가 아니라
+                // 깨진 그림처럼 보였다(QA 2026-09-21). 번질 자리를 먼저
+                // 확보하고 다시 제자리 크기로 돌린다.
+                .padding(-Self.blurRadius)
                 .blur(radius: Self.blurRadius)
-                // 블러는 글자 상자 밖으로 번진다. 제자리에서만 뿌옇게 보이게 자른다.
-                .clipped()
+                .padding(Self.blurRadius)
                 .contentShape(Rectangle())
                 .onTapGesture { isRevealed = true }
                 // VoiceOver 가 진짜 이름을 읽으면 가림이 뚫린다 - 라벨을 통째로 바꾼다.
-                .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+                .accessibilityLabel(Text(spokenWhenMasked ?? t("가려진 약 이름", "Hidden medication name")))
                 .accessibilityHint(Text(t("누르면 보여요", "Tap to show")))
                 .accessibilityAddTraits(.isButton)
         }
