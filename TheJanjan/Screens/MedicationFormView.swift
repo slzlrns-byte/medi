@@ -229,6 +229,18 @@ struct MedicationFormView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 JanjanField(label: t("용량", "Dose"), placeholder: t("예: 10mg", "e.g. 10mg"), text: $strength)
+                // 숫자만 적어 두면 목록에서 "10" 으로만 보여, 10mg 인지 10정인지
+                // 알 수가 없다(사용자 지적 2026-09-21). 막지는 않는다 - 단위를
+                // 대신 붙여 주면 약 정보를 앱이 지어내는 셈이 된다.
+                if strengthNeedsUnit {
+                    Text(t(
+                        "단위까지 적어 주세요. 용량이면 10mg, 개수면 2개처럼요.",
+                        "Add the unit too — 10mg for a strength, 2 pills for a count."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 JanjanField(
                     label: t("용도 한 줄 (선택)", "What it's for (optional)"),
                     placeholder: t("예: 잠들기 쉽게", "e.g. To help me sleep"),
@@ -236,6 +248,16 @@ struct MedicationFormView: View {
                 )
             }
         }
+    }
+
+    /// 용량 칸에 숫자만 적혀 있는지. 빈 칸은 괜찮다 - 용량은 선택이다.
+    ///
+    /// 소수점·쉼표·가운뎃점·빗금까지는 숫자의 일부로 본다("0.5", "1/2").
+    private var strengthNeedsUnit: Bool {
+        let text = strength.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return false }
+        let numeric = CharacterSet(charactersIn: "0123456789.,/·- ")
+        return text.unicodeScalars.allSatisfy { numeric.contains($0) }
     }
 
     private var kindCard: some View {

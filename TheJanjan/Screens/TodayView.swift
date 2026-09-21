@@ -27,6 +27,11 @@ struct TodayView: View {
     @State private var openSlot: SlotSelection?
     /// 되돌리기를 물어보는 중인 시간대.
     @State private var undoing: SlotSelection?
+    /// 꽃가루를 내리는 중인지. 끝나면 스스로 꺼진다.
+    @State private var isCelebrating = false
+    /// 마지막으로 축하한 날. 하루에 한 번만 내린다 - 되돌렸다가 다시
+    /// 채울 때마다 터지면 축하가 아니라 방해가 된다.
+    @AppStorage("janjan.today.celebratedDay") private var celebratedDay = ""
     @State private var safetyReason: SafetyReason?
     @State private var isShowingUnrecordedSheet = false
     @State private var isShowingNextVisitSheet = false
@@ -167,6 +172,15 @@ struct TodayView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            // 오늘 것을 다 챙긴 순간 한 번. 스크롤 위가 아니라 화면 전체에
+            // 얹어야 어디를 보고 있든 눈에 든다.
+            .overlay { if isCelebrating { ConfettiBurst().id(celebratedDay) } }
+            // 마지막 한 칸을 채우는 그 순간에만 터진다. 화면에 들어올 때마다
+            // 다시 터지면 축하가 아니라 방해가 된다 - 그래서 날짜를 적어 둔다.
+            .onChange(of: isTodayComplete) { _, complete in
+                guard complete else { return }
+                celebrate()
+            }
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -261,6 +275,14 @@ struct TodayView: View {
         }
     }
 
+    /// 오늘 챙길 것이 있었고, 그것을 다 챙겼는지.
+    ///
+    /// 예정이 아예 없는 날은 축하하지 않는다 - 아무것도 안 했는데 꽃가루가
+    /// 내리면 이 앱이 무엇을 세고 있는지 알 수 없게 된다.
+    private var isTodayComplete: Bool {
+        !plan.isEmpty && DayPlan.pendingSlotCount(in: plan) == 0
+    }
+
     /// 한 문장에 한 정보. 놓쳤다고 다그치지 않고 남은 것만 알린다.
     private var subtitleKo: String {
         guard hasAnyMedication else { return t("약을 등록하면 여기에 오늘 일정이 보여요.", "Add a medication and today's plan will show up here.") }
@@ -288,6 +310,20 @@ struct TodayView: View {
     ///
     /// 이미 건너뜀으로 적어 둔 것은 건드리지 않는다. 사용자가 일부러 고른 답을
     /// 한 번의 손짓이 조용히 덮으면 안 된다.
+    /// 오늘 몫을 다 채운 것을 한 번 축하한다.
+    private func celebrate() {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: today)
+        let key = "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)"
+        guard celebratedDay != key else { return }
+        celebratedDay = key
+        isCelebrating = true
+        // 꽃가루가 다 내린 뒤에 걷는다. 켜 둔 채로 두면 화면이 다시 그려질
+        // 때마다 조각이 처음 자리로 돌아가 깜빡인다.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            isCelebrating = false
+        }
+    }
+
     /// 그 시간대의 오늘 기록을 통째로 지워 다시 물어볼 수 있게 한다.
     private func undoSlot(_ slotKey: String) {
         guard let line = plan.first(where: { $0.slotKey == slotKey }) else { return }
