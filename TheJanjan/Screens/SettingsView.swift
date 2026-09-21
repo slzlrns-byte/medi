@@ -559,6 +559,20 @@ struct SettingsView: View {
             UserDefaults.standard.removeObject(forKey: key)
         }
 
+        // **앱 그룹에도 같은 값이 산다.** 가리기·언어·Pro 사본은 위젯과
+        // 워치가 읽도록 두 곳에 쓰는데(`JanjanPrivacy.store` 등), 지울 때는
+        // standard 만 걷고 있었다(QA 2026-09-21). 앱은 비었는데 위젯은
+        // 지난 설정 그대로였고, 다음에 앱이 값을 읽으면 그룹 쪽이 먼저라
+        // 지웠던 설정이 되살아났다.
+        if let group = UserDefaults(suiteName: Janjan.appGroupID) {
+            // Pro 사본(`JanjanEntitlement.proKey`)은 남긴다. 사용자 데이터가
+            // 아니라 StoreKit 권한의 그림자이고, 지우면 돈을 낸 사람의 위젯만
+            // 다음 갱신까지 잠긴 채로 보인다.
+            for key in [JanjanPrivacy.hideNamesKey, JanjanLanguage.defaultsKey] {
+                group.removeObject(forKey: key)
+            }
+        }
+
         // 잠금 번호도 설정이다. "설정이 모두 사라집니다" 라고 적어 놓고 남기지 않는다.
         // 키체인 항목은 앱을 지워도 남으므로, 여기서 걷지 않으면 새로 깔아도 따라온다.
         lock.disable()

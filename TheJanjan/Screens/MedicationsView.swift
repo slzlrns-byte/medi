@@ -181,10 +181,16 @@ struct MedicationsView: View {
     private var stockEvents: [StockEvent] { stockRecords.map(\.core) }
 
     /// 가장 가까운 다음 진료. 부족 판단의 기준선이다.
+    ///
+    /// **날 단위로 센다.** `today` 는 앱을 켠 그 순간이라 시각으로 견주면
+    /// 오전 10시 진료가 오후에는 "지난 것" 이 되어 이 탭만 "다음 진료 미정"
+    /// 으로 바뀌었다 - 같은 시각 오늘 탭은 "오늘 진료" 라고 했다
+    /// (QA 2026-09-21).
     private var nextVisit: Date? {
-        prescriptionRecords
+        let startOfToday = Calendar.current.startOfDay(for: today)
+        return prescriptionRecords
             .compactMap { $0.core.nextVisitDate }
-            .filter { $0 >= today }
+            .filter { $0 >= startOfToday }
             .min()
     }
 
@@ -289,10 +295,23 @@ struct MedicationsView: View {
                 } else {
                     // 무료에게 "적어 두면 켜져요" 라고만 말하면, 돈이 아니라
                     // 입력만 하면 되는 줄 안다. 다 적어도 안 켜진다(QA 2026-09-21).
-                    Text(shortageNoticeText)
-                        .janjanBody(12)
-                        .foregroundStyle(Color.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // Pro 라고 적어 두고 누를 자리를 안 주면 읽고 끝난다.
+                    // 그 문장일 때만 문을 단다 - 재료가 없다는 안내까지
+                    // 페이월로 보내면 돈이 아니라 입력이 필요한 사람을
+                    // 엉뚱한 데로 보낸다(QA 2026-09-21).
+                    if nextVisit != nil, !pro.isPro {
+                        Text(shortageNoticeText)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .proGated(.runOutForecast, showsBadge: false)
+                    } else {
+                        Text(shortageNoticeText)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 // 처방일수와 다음 진료일이 둘 다 들어와 계산 재료가 막 갖춰졌을 때.

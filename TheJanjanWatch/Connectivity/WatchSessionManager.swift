@@ -104,13 +104,19 @@ final class WatchSessionManager: NSObject, ObservableObject {
                     isCompleted: true
                 )
             }
+            // **빠진 칸은 기본값으로 채워진다.** `asNeeded` 와 `languageRaw` 를
+            // 안 넘기면 시간대 하나를 누른 순간 필요시 약 목록이 통째로 사라지고
+            // 화면이 한국어로 되돌아갔다 - 폰이 다음 스냅샷을 밀어 줄 때까지
+            // (QA 2026-09-21). 옮겨 적는 것은 **전부** 옮겨 적는다.
             manager.snapshot = WatchSnapshot(
                 generatedAt: old.generatedAt,
                 dateText: old.dateText,
                 slots: slots,
+                asNeeded: old.asNeeded,
                 remainingCountToday: max(0, old.remainingCountToday - completedCount),
                 isPro: old.isPro,
-                themeRaw: old.themeRaw
+                themeRaw: old.themeRaw,
+                languageRaw: old.languageRaw
             )
         }
     }

@@ -18,9 +18,15 @@ enum JanjanEntitlement {
     /// 값이 이어지도록 문자열을 바꾸지 않는다.
     static let proKey = "janjan.pro.cached"
 
+    /// `bool(forKey:)` 는 없는 키에도 `false` 를 돌려주므로 `??` 가 걸리지
+    /// 않는다 - 그룹에 아직 값을 안 쓴 기기에서 Pro 가 아닌 것으로 읽혔다
+    /// (QA 2026-09-21). 키가 있는지를 먼저 묻는다.
     static var isPro: Bool {
-        UserDefaults(suiteName: Janjan.appGroupID)?.bool(forKey: proKey)
-            ?? UserDefaults.standard.bool(forKey: proKey)
+        if let group = UserDefaults(suiteName: Janjan.appGroupID),
+           let stored = group.object(forKey: proKey) as? Bool {
+            return stored
+        }
+        return UserDefaults.standard.bool(forKey: proKey)
     }
 
     /// 권한이 바뀔 때마다 두 곳에 같이 쓴다. 한쪽만 쓰면 위젯이 옛 값을 본다.

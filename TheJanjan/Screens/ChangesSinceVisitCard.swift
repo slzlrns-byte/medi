@@ -20,15 +20,27 @@ struct ChangesSinceVisitCard: View {
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
+    @ObservedObject private var clock = JanjanClock.shared
+    private var endOfToday: Date { clock.endOfToday }
+
     @State private var isExpanded = false
 
     private var lang: JanjanLanguage { .current }
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
-    /// 마지막 진료일. 없으면 이 카드 자체를 그리지 않는다 -
+    /// 마지막으로 **다녀온** 진료일. 없으면 이 카드 자체를 그리지 않는다 -
     /// 기준이 없으면 "그 이후" 가 성립하지 않는다.
+    ///
+    /// 리포트 탭·지난 진료 기록과 **같은 규칙**으로 고른다(QA 2026-09-21).
+    /// 그냥 `first` 를 쓰면 오늘 탭에서 잡아 둔 다음 진료 일정(약·처방일수·
+    /// 메모가 비어 있는 가짜 기록)이나 아직 오지 않은 날짜가 기준이 되어,
+    /// 그 사이에 올린 용량이 "유지됨" 으로 적혔다.
     private var lastVisit: Date? {
-        prescriptionRecords.first?.core.visitDate
+        prescriptionRecords
+            .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
+            .map(\.core.visitDate)
+            .filter { $0 < endOfToday }
+            .max()
     }
 
     private struct Row: Identifiable {

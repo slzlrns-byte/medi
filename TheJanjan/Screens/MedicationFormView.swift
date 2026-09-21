@@ -195,6 +195,18 @@ struct MedicationFormView: View {
                 }
                 .padding(.top, CGFloat(JanjanSpacing.s))
 
+                // 버튼이 왜 꺼져 있는지 **버튼 옆에서** 말한다. 이유가 화면
+                // 위쪽 카드 안의 한 줄뿐이면, 아래까지 내려와 저장을 누르는
+                // 사람은 이유를 못 보고 막힌 채로 남는다(QA 2026-09-21).
+                if let reason = saveBlockedReason {
+                    Text(reason)
+                        .janjanBody(12)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, CGFloat(JanjanSpacing.xs))
+                }
+
                 MedicalDisclaimer()
                     .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
                     .padding(.top, CGFloat(JanjanSpacing.s))
@@ -207,17 +219,21 @@ struct MedicationFormView: View {
         .scrollContentBackground(.hidden)
         .keyboardDoneBar()
         .confirmationDialog(
-            t("요일을 바꾸면 복약률이 새로 집계됩니다. 괜찮으시겠어요?",
-              "Changing the days recalculates your adherence. Is that okay?"),
+            t("요일을 바꾸면 지난 날의 계획이 새 요일로 다시 그려집니다. 괜찮으시겠어요?",
+              "Changing the days re-plans your past days with the new schedule. Is that okay?"),
             isPresented: $isConfirmingWeekdayChange,
             titleVisibility: .visible
         ) {
             Button(t("바꾸기", "Change")) { commitSave() }
             Button(t("그대로 두기", "Keep the days"), role: .cancel) {}
         } message: {
+            // 복약률은 이제 **진료에서 받은 알 수**로 세므로 요일을 바꿔도
+            // 움직이지 않는다(`InventoryCalculator.prescriptionAdherence`).
+            // 예전 문구는 그것을 몰랐다 - 실제로 달라지는 것만 적는다
+            // (QA 2026-09-21).
             Text(t(
-                "지난 기록은 그대로 남아요. 다만 지난 날들의 예정이 새 요일로 다시 그려져서, 복약률과 그래프의 숫자가 달라질 수 있어요.",
-                "Your past records stay as they are. But past days are re-planned with the new schedule, so the adherence number and the charts may change."
+                "지난 기록과 복약률은 그대로예요. 달력·패턴 보기의 '예정'과 '기록 없이 지나간 시간대'가 새 요일로 다시 그려지고, 소진 예측이 달라질 수 있어요.",
+                "Your past records and your adherence stay as they are. The calendar, the pattern view and the missed-dose list are re-planned with the new days, and the run-out forecast may change."
             ))
         }
         .navigationTitle(isEditing ? t("약 고치기", "Edit medication") : t("직접 입력", "Enter manually"))
@@ -498,6 +514,36 @@ struct MedicationFormView: View {
     /// 약 이름의 상한. 알림 본문과 워치 화면처럼 줄 수를 앱이 통제할 수 없는
     /// 자리로 그대로 나가는 값이라, 들어올 때 한 번 막는다(QA 2026-09-19).
     static let nameLimit = 60
+
+    /// 저장이 막힌 이유 한 줄. 막히지 않았으면 nil.
+    /// `canSave` 와 **같은 순서**로 본다 - 둘이 어긋나면 이유 없이 꺼진
+    /// 버튼이 생긴다.
+    private var saveBlockedReason: String? {
+        guard !canSave, !isSaving else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return t("약 이름을 적어 주세요.", "Enter the medication name.") }
+        if trimmed.count > Self.nameLimit {
+            return t("약 이름이 너무 길어요(\(Self.nameLimit)자까지).",
+                     "That name is too long (up to \(Self.nameLimit) characters).")
+        }
+        if strengthNeedsUnit(strength) {
+            return t("용량에 단위를 붙여 주세요. 예: 15 mg",
+                     "Add a unit to the strength. For example: 15 mg")
+        }
+        if needsStock {
+            return t("지금 남은 개수를 적어야 저장할 수 있어요. 하나도 없으면 0 이라고 적어 주세요.",
+                     "Enter how many pills you have now to save. If you have none, enter 0.")
+        }
+        guard kind == .scheduled else { return nil }
+        if weekdays.isEmpty {
+            return t("요일을 하나 이상 골라 주세요.", "Pick at least one day of the week.")
+        }
+        if hasDuplicateTimes {
+            return t("같은 시각에 두 줄을 둘 수 없어요. 시각을 다르게 해 주세요.",
+                     "Two rows can't share the same time. Set different times.")
+        }
+        return t("복용 시간대를 하나 이상 켜 주세요.", "Turn on at least one dose time.")
+    }
 
     private var canSave: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

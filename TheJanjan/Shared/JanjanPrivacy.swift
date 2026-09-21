@@ -16,9 +16,17 @@ enum JanjanPrivacy {
     /// 사용자가 켜 두었는지. **적용 여부가 아니다** — 그건 `hidesNames` 다.
     ///
     /// 앱이 값을 바꿀 때 두 곳에 같이 쓴다 — `store(_:)`.
+    /// **`bool(forKey:)` 로는 떨어질 수 없다**(QA 2026-09-21). 없는 키에도
+    /// `false` 를 돌려주므로 `??` 는 그룹이 통째로 없을 때만 걸린다. 그룹은
+    /// 있는데 그 안에 아직 값을 안 쓴 기기(앱 그룹 쓰기를 넣기 전에 스위치를
+    /// 켜 둔 사람)에서는 켜 둔 값이 조용히 꺼진 것으로 읽혔다 - 목록·위젯·
+    /// 잠금화면의 약 이름이 드러난다. 키가 있는지를 먼저 묻는다.
     static var isOn: Bool {
-        UserDefaults(suiteName: Janjan.appGroupID)?.bool(forKey: hideNamesKey)
-            ?? UserDefaults.standard.bool(forKey: hideNamesKey)
+        if let group = UserDefaults(suiteName: Janjan.appGroupID),
+           let stored = group.object(forKey: hideNamesKey) as? Bool {
+            return stored
+        }
+        return UserDefaults.standard.bool(forKey: hideNamesKey)
     }
 
     /// 지금 실제로 가리는 중인지.
