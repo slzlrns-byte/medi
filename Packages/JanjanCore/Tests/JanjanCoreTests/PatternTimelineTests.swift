@@ -95,3 +95,64 @@ final class PatternTimelineTests: XCTestCase {
         XCTAssertNil(timeline.days[0].takenFraction, "계획이 없던 날은 0% 가 아니라 빈 칸입니다")
     }
 }
+
+// MARK: - 중단한 약 (QA 2026-09-21)
+
+extension PatternTimelineTests {
+
+    /// 약 하나를 끊는 순간 지난 4주가 다시 그려지면 안 된다.
+    ///
+    /// 아침 약은 다 먹고 저녁 약은 2주 내내 건너뛴 사람. 저녁 약을 끊으면
+    /// `DayPlan` 이 지금 상태만 보므로 지난 2주에서 저녁 줄이 통째로 사라져
+    /// 그래프가 갑자기 꽉 찬다. 같은 날 뽑은 종이는 여전히 절반이다.
+    func testStoppingAMedicationDoesNotRefillThePastChart() {
+        let end = Fixed.date(2026, 9, 14, 23)
+        let stoppedAt = Fixed.date(2026, 9, 14, 12)
+
+        let morning = Medication(id: Fixed.medA, name: "아침약")
+        var evening = Medication(id: Fixed.medB, name: "저녁약")
+        evening.status = .stopped
+        evening.stoppedAt = stoppedAt
+
+        let schedules = [
+            Schedule(medicationID: Fixed.medA, slot: .morning, dosePerIntake: 1),
+            Schedule(medicationID: Fixed.medB, slot: .evening, dosePerIntake: 1)
+        ]
+
+        var doses: [DoseEvent] = []
+        for day in 1...13 {
+            doses.append(DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: Fixed.date(2026, 9, day, 8),
+                actualAt: Fixed.date(2026, 9, day, 8),
+                status: .taken, quantity: 1, kind: .scheduled,
+                slotKey: DoseSlot.morning.storageKey
+            ))
+            doses.append(DoseEvent(
+                medicationID: Fixed.medB,
+                scheduledAt: Fixed.date(2026, 9, day, 19),
+                status: .skipped, quantity: 1, kind: .scheduled,
+                slotKey: DoseSlot.evening.storageKey
+            ))
+        }
+
+        let timeline = PatternTimeline.make(
+            dayCount: 14,
+            endingAt: end,
+            checkIns: [],
+            schedules: schedules,
+            medications: [morning, evening],
+            doseEvents: doses,
+            calendar: Fixed.calendar
+        )
+
+        // 중단 전의 날에는 두 줄이 다 서 있어야 한다.
+        let before = timeline.days.first { Fixed.calendar.isDate($0.date, inSameDayAs: Fixed.date(2026, 9, 5)) }
+        XCTAssertEqual(before?.scheduledCount, 2, "끊기 전 날에는 저녁 약도 예정에 있었다")
+        XCTAssertEqual(before?.takenCount, 1, "저녁 약은 건너뛰었다")
+
+        // 중단한 뒤의 날에는 아침 약만 남는다.
+        let after = timeline.days.last
+        XCTAssertEqual(after?.scheduledCount, 1, "끊은 뒤에는 저녁 약이 빠진다")
+    }
+}

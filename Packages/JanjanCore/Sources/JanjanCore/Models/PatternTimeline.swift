@@ -75,10 +75,24 @@ public struct PatternTimeline: Hashable, Sendable {
         var days: [Day] = []
         for offset in stride(from: dayCount - 1, through: 0, by: -1) {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: endDay) else { continue }
+            // 중단한 약도 **중단하기 전의 날** 에는 복용 중이었다.
+            // `DayPlan` 은 지금 상태만 보므로, 그대로 쓰면 약 하나를 끊는
+            // 순간 지난 4주에서 그 약이 통째로 사라져 그래프가 갑자기 꽉
+            // 찬다 - 저녁 약을 2주 내내 건너뛴 사람이 그 약을 끊으면 지난
+            // 2주가 100% 로 보였다(QA 2026-09-21). "기록 없이 지나간
+            // 시간대" 가 이미 쓰는 되살리기를 여기에도 쓴다.
+            let dayMedications = medications.map { medication -> Medication in
+                guard medication.status == .stopped,
+                      let stoppedAt = medication.stoppedAt,
+                      stoppedAt > date else { return medication }
+                var revived = medication
+                revived.status = .active
+                return revived
+            }
             let lines = DayPlan.slots(
                 on: date,
                 schedules: schedules,
-                medications: medications,
+                medications: dayMedications,
                 doseEvents: doseEvents,
                 calendar: calendar
             )
