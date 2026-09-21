@@ -29,6 +29,8 @@ struct TodayView: View {
     @State private var undoing: SlotSelection?
     /// 꽃가루를 내리는 중인지. 끝나면 스스로 꺼진다.
     @State private var isCelebrating = false
+    /// 기본 접힘·펼침을 손으로 뒤집어 둔 시간대들.
+    @State private var flippedSlots: Set<String> = []
     /// 마지막으로 축하한 날. 하루에 한 번만 내린다 - 되돌렸다가 다시
     /// 채울 때마다 터지면 축하가 아니라 방해가 된다.
     @AppStorage("janjan.today.celebratedDay") private var celebratedDay = ""
@@ -294,11 +296,110 @@ struct TodayView: View {
 
     // MARK: - 시간대 타일
 
+    /// 시간대 하나가 지금 어떤 처지인지.
+    ///
+    /// 화면에 시간대를 넷씩 전부 펼쳐 두면, 점심에 저녁 약까지 눌러 버리는
+    /// 일이 생긴다(사용자 지적 2026-09-21). 지금 할 일만 펼쳐 둔다.
+    enum SlotStanding {
+        /// 다 적었다. 접는다 - 지나갔고 할 일이 없다.
+        case done
+        /// 시각이 지났는데 아직 답이 없다. 펼치고 표시를 단다.
+        case overdue
+        /// 다음 차례. 펼친다.
+        case next
+        /// 아직 멀었다. 접는다.
+        case later
+
+        var isExpandedByDefault: Bool {
+            switch self {
+            case .overdue, .next: return true
+            case .done, .later: return false
+            }
+        }
+    }
+
+    /// 시간대마다의 처지. `plan` 은 시각 순이다.
+    private var standings: [(line: DayPlan.SlotLine, standing: SlotStanding)] {
+        let now = Date()
+        var foundNext = false
+        return plan.map { line in
+            if line.isCompleted { return (line, .done) }
+            if line.time.date(on: today) <= now { return (line, .overdue) }
+            if !foundNext {
+                foundNext = true
+                return (line, .next)
+            }
+            return (line, .later)
+        }
+    }
+
+    /// 접힘·펼침은 기본값을 따르되, 누르면 그 줄만 뒤집힌다.
+    /// 뒤집은 것을 기억해 두므로 "저녁 약을 미리 보고 싶다" 도 된다.
+    private func isExpanded(_ line: DayPlan.SlotLine, _ standing: SlotStanding) -> Bool {
+        // 밀린 줄은 접지 못한다. 아까 손으로 접어 둔 것이 그대로 남아, 시각이
+        // 지난 뒤에도 접혀 있으면 이 화면이 존재하는 이유가 사라진다.
+        if standing == .overdue { return true }
+        return standing.isExpandedByDefault != flippedSlots.contains(line.slotKey)
+    }
+
     private var slotSection: some View {
         VStack(spacing: CGFloat(JanjanSpacing.s)) {
-            ForEach(plan) { line in
-                slotTile(line)
+            ForEach(standings, id: \.line.id) { entry in
+                if isExpanded(entry.line, entry.standing) {
+                    slotTile(entry.line, standing: entry.standing)
+                } else {
+                    collapsedSlotRow(entry.line, standing: entry.standing)
+                }
             }
+        }
+    }
+
+    /// 접힌 시간대. 한 줄로 줄이되 **무엇이 남았는지는 그대로 말한다** -
+    /// 접는 것은 실수를 줄이려는 것이지 숨기려는 것이 아니다.
+    private func collapsedSlotRow(_ line: DayPlan.SlotLine, standing: SlotStanding) -> some View {
+        Button {
+            flip(line.slotKey)
+        } label: {
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(line.slot.label(lang))
+                    .janjanBody(15, weight: .medium)
+                    .foregroundStyle(Color.ink2)
+                if !line.slot.isCustom {
+                    Text(line.time.description)
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                }
+                Spacer(minLength: CGFloat(JanjanSpacing.xs))
+                if standing == .done {
+                    Text(t("완료", "Done"))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.janjan(.sageInk))
+                } else {
+                    Text(t("\(line.pendingCount)개 남음", "\(line.pendingCount) left"))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.janjan(.line2))
+            }
+            .padding(.horizontal, CGFloat(JanjanSpacing.m))
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                    .fill(Color.janjan(.surface2))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text(t("눌러서 펼칩니다", "Tap to expand")))
+    }
+
+    private func flip(_ slotKey: String) {
+        if flippedSlots.contains(slotKey) {
+            flippedSlots.remove(slotKey)
+        } else {
+            flippedSlots.insert(slotKey)
         }
     }
 
@@ -358,7 +459,7 @@ struct TodayView: View {
     /// 오른쪽 '먹었어요' 는 한 번에 그 시간대를 끝낸다. 왼쪽 본문은 예전처럼
     /// 시트를 열어 약마다 따로 답하게 한다. 자주 하는 쪽이 크고 가깝고,
     /// 드문 쪽(하나만 건너뛰기, 되돌리기)이 한 겹 안에 있다.
-    private func slotTile(_ line: DayPlan.SlotLine) -> some View {
+    private func slotTile(_ line: DayPlan.SlotLine, standing: SlotStanding) -> some View {
         JanjanTile(tint: tint(for: line.slot), padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.s)) {
                 Button {
@@ -374,6 +475,22 @@ struct TodayView: View {
                                 Text(line.time.description)
                                     .janjanBody(13)
                                     .foregroundStyle(Color.ink2)
+                            }
+                            // 시각이 지났는데 답이 없는 줄. 색만으로 말하지 않으려고
+                            // 그림과 글자를 함께 둔다 - 저녁에 점심 약이 남아 있으면
+                            // 두 줄이 나란히 서므로 어느 쪽이 밀린 것인지 보여야 한다.
+                            if standing == .overdue {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text(t("지난 시간대", "Overdue"))
+                                        .janjanBody(11, weight: .semibold)
+                                }
+                                .foregroundStyle(Color.janjan(.peachInk))
+                                .padding(.horizontal, CGFloat(JanjanSpacing.xs))
+                                .padding(.vertical, 2)
+                                .background(Capsule(style: .continuous).fill(Color.janjan(.peach)))
+                                .fixedSize(horizontal: true, vertical: false)
                             }
                         }
                         slotNamesText(line)
