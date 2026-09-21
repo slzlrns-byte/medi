@@ -25,6 +25,8 @@ struct MedicationDetailView: View {
 
     @State private var composing: MedicationNote.Kind?
     @State private var isShowingDoseChangeSheet = false
+    /// 용량 변경 이력에서 최신 하나 말고 나머지도 펴 둘지.
+    @State private var isShowingOlderDoseChanges = false
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
     @State private var pendingNoteDeletion: MedicationNoteRecord?
     @State private var selectedAsNeededQuantity: Decimal?
@@ -409,6 +411,11 @@ struct MedicationDetailView: View {
         let mine = doseChangeRecords
             .filter { $0.medicationID == medicationID }
             .sorted { $0.changedAt > $1.changedAt }
+        let older = max(mine.count - 1, 0)
+        let moreLabel = t(
+            "이전 변경 \(older)개 더 보기",
+            older == 1 ? "1 earlier change" : "\(older) earlier changes"
+        )
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
@@ -423,10 +430,34 @@ struct MedicationDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                ForEach(Array(mine.enumerated()), id: \.element.id) { index, entry in
-                    // 배지는 맨 위 한 줄에만. 변경이 셋이면 자물쇠도 셋이
-                    // 되어 카드가 잠금 표시로 뒤덮인다(TestFlight 17 화면).
+                // 최신 것 하나만 펴 두고 나머지는 접는다(사용자 요청 2026-09-21).
+                // 약을 오래 먹을수록 이 목록이 길어지는데, 지금 몇 mg 인지
+                // 보러 온 사람에게 3년치 이력을 펼쳐 놓을 이유가 없다.
+                // 배지는 맨 위 한 줄에만 - 변경이 셋이면 자물쇠도 셋이 되어
+                // 카드가 잠금 표시로 뒤덮인다(TestFlight 17 화면).
+                ForEach(Array(shownDoseChanges(mine).enumerated()), id: \.element.id) { index, entry in
                     doseChangeRow(entry, showsProBadge: index == 0)
+                }
+
+                if older > 0 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            isShowingOlderDoseChanges.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
+                            Text(isShowingOlderDoseChanges ? t("접기", "Collapse") : moreLabel)
+                                .janjanBody(13)
+                                .foregroundStyle(Color.ink2)
+                            Image(systemName: isShowingOlderDoseChanges ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.janjan(.line2))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 // 용량이 실제로 바뀐 바로 그때. 적어 둔 것이 없으면 권하지 않는다.
@@ -483,6 +514,11 @@ struct MedicationDetailView: View {
             }
             .proGated(.doseChangeCompare, showsBadge: showsProBadge)
         }
+    }
+
+    /// 화면에 실제로 그리는 변경들. 접혀 있으면 최신 하나뿐이다.
+    private func shownDoseChanges(_ all: [DoseChangeRecord]) -> [DoseChangeRecord] {
+        isShowingOlderDoseChanges ? all : Array(all.prefix(1))
     }
 
     /// 바뀐 용량 한 줄.
@@ -928,7 +964,9 @@ private struct DoseChangeSheet: View {
     }
 
     private var isSavable: Bool {
-        !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        // 단위 없이 넘기면 이력에 "10 → 15" 가 남는다. 고르개가 바로 위에 있다.
+        return !strengthNeedsUnit(toText) && !strengthNeedsUnit(fromText)
     }
 }
 

@@ -148,12 +148,14 @@ struct ChangesSinceVisitCard: View {
 
             Spacer(minLength: CGFloat(JanjanSpacing.xs))
 
-            // 색만으로 말하지 않는다. 글자가 늘 함께 온다.
-            if row.change != nil {
-                PillChip(text: t("변경", "Changed"), tint: .peach, textTint: .peachInk)
-            } else {
-                PillChip(text: t("유지", "Same"), tint: .surface2)
-            }
+            // 알약을 씌우니 눌리는 것처럼 보였다(사용자, 2026-09-21). 이건
+            // 손잡이가 아니라 상태라서, 바탕을 걷고 글자만 남긴다 - 이 화면에서
+            // 캡슐은 누르는 것들이 쓰고 있다. 색만으로 말하지 않는 규칙은
+            // 그대로다: 글자가 늘 함께 온다.
+            Text(row.change != nil ? t("변경됨", "Changed") : t("유지됨", "Unchanged"))
+                .janjanBody(13, weight: row.change != nil ? .medium : .regular)
+                .foregroundStyle(Color.janjan(row.change != nil ? .peachInk : .muted))
+                .fixedSize()
         }
         .padding(.vertical, CGFloat(JanjanSpacing.xxs))
     }

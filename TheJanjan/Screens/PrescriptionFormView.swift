@@ -444,7 +444,18 @@ struct PrescriptionFormView: View {
     // MARK: - 규칙
 
     /// 진료일만 있어도 저장된다. 약을 아직 안 넣었어도 "다음 진료 D-" 는 살아난다.
-    private var canSave: Bool { !isSaving }
+    ///
+    /// 다만 **새로 적은** 용량에 단위가 빠져 있으면 막는다 - 그대로 넘기면
+    /// 이력에 "10 → 15" 가 남고, 그게 mg 인지 정인지는 나중에 아무도 모른다.
+    /// 손대지 않은 옛 표기까지 막으면 단위 없는 약을 가진 사람이 진료 자체를
+    /// 저장할 수 없게 되므로, 바꾼 것만 본다.
+    private var canSave: Bool {
+        guard !isSaving else { return false }
+        return !doseEdits.contains { medicationID, edit in
+            guard let medication = activeMedications.first(where: { $0.id == medicationID }) else { return false }
+            return edit.strengthText != medication.strengthText && strengthNeedsUnit(edit.strengthText)
+        }
+    }
 
     /// 재고 계산은 **마지막 직접 정정**을 기준점으로 삼고 그 이전 사건을 전부 버린다(설계 05절).
     /// 그래서 정정보다 앞선 날짜로 보충을 넣으면 개수가 하나도 안 늘어난다.

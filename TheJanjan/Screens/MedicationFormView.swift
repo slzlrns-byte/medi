@@ -465,6 +465,10 @@ struct MedicationFormView: View {
     private var canSave: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= Self.nameLimit else { return false }
+        // 단위 없는 용량은 아예 들여보내지 않는다. 띄워만 주고 그냥 저장되게
+        // 두니 결국 "15" 가 남았다("용량 15 mg 이런 식으로 해야지", 2026-09-21).
+        // 고르개가 바로 아래 있으니 막혀도 한 번 누르면 풀린다.
+        guard !strengthNeedsUnit(strength) else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
