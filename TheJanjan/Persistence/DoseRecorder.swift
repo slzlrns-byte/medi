@@ -115,6 +115,32 @@ enum DoseRecorder {
 
     // MARK: - 찾기
 
+    /// 그 시간대 기록을 지워 **아직 답하지 않은 상태로 되돌린다.**
+    ///
+    /// 미기록으로 바꾸지 않는 이유: 미기록은 "지나갔는데 답이 없다" 는 뜻이라
+    /// 리포트의 분모에 들어간다. 잘못 누른 것을 되돌리는 것은 그것과 다르다 -
+    /// 아무 일도 없던 것으로 만들어야 다시 물어볼 수 있다(사용자 요청 2026-09-21).
+    ///
+    /// - Returns: 지운 것이 있으면 참.
+    @discardableResult
+    static func clear(
+        medicationID: UUID,
+        slotKey: String,
+        on day: Date,
+        in context: ModelContext,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let record = existingRecord(
+            medicationID: medicationID,
+            slotKey: slotKey,
+            on: day,
+            in: context,
+            calendar: calendar
+        ) else { return false }
+        context.delete(record)
+        return true
+    }
+
     /// 그 날 · 그 시간대 · 그 약의 기록. 여럿이면 가장 나중 것.
     static func existingRecord(
         medicationID: UUID,

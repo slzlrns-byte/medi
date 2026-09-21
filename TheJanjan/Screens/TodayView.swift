@@ -25,6 +25,8 @@ struct TodayView: View {
     private var prescriptionRecords: [PrescriptionRecord]
 
     @State private var openSlot: SlotSelection?
+    /// 되돌리기를 물어보는 중인 시간대.
+    @State private var undoing: SlotSelection?
     @State private var safetyReason: SafetyReason?
     @State private var isShowingUnrecordedSheet = false
     @State private var isShowingNextVisitSheet = false
@@ -180,6 +182,28 @@ struct TodayView: View {
             .sheet(item: $safetyReason) { _ in
                 SafetyCardView()
             }
+            // 되돌리기는 한 번 묻는다. 복용 기록은 리포트의 분모와 재고를
+            // 같이 움직이므로, 잘못 지우면 그 흔적이 진료실까지 간다.
+            .confirmationDialog(
+                t("정말 복약을 취소하시겠어요?", "Undo this dose record?"),
+                isPresented: Binding(
+                    get: { undoing != nil },
+                    set: { if !$0 { undoing = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: undoing
+            ) { selection in
+                Button(t("취소하기", "Undo"), role: .destructive) {
+                    undoSlot(selection.id)
+                    undoing = nil
+                }
+                Button(t("그대로 두기", "Keep it"), role: .cancel) { undoing = nil }
+            } message: { _ in
+                Text(t(
+                    "이 시간대의 오늘 기록이 지워지고, 다시 답할 수 있게 돼요.",
+                    "Today's entries for this slot are removed, and you can answer again."
+                ))
+            }
             .sheet(item: $openSlot) { selection in
                 if let line = plan.first(where: { $0.slotKey == selection.id }) {
                     SlotRecordSheet(line: line) { entry, status in
@@ -264,6 +288,20 @@ struct TodayView: View {
     ///
     /// 이미 건너뜀으로 적어 둔 것은 건드리지 않는다. 사용자가 일부러 고른 답을
     /// 한 번의 손짓이 조용히 덮으면 안 된다.
+    /// 그 시간대의 오늘 기록을 통째로 지워 다시 물어볼 수 있게 한다.
+    private func undoSlot(_ slotKey: String) {
+        guard let line = plan.first(where: { $0.slotKey == slotKey }) else { return }
+        for entry in line.entries {
+            DoseRecorder.clear(
+                medicationID: entry.medicationID,
+                slotKey: slotKey,
+                on: today,
+                in: context
+            )
+        }
+        save()
+    }
+
     private func recordRestTaken(in line: DayPlan.SlotLine) {
         for entry in line.entries where entry.status == nil || entry.status == .unrecorded {
             record(entry, in: line, as: .taken)
@@ -317,8 +355,24 @@ struct TodayView: View {
                 if line.isCompleted {
                     // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
                     // 높이는 아래 버튼과 맞춘다 - 다르면 다 적은 순간 타일이 튄다.
-                    PillChip(text: t("완료", "Done"), tint: .surface, textTint: .sageInk)
-                        .frame(minWidth: 96, minHeight: 56)
+                    //
+                    // 다시 누르면 되돌린다. 잘못 눌러 놓고 시트를 열어 약마다
+                    // 지우게 두면, 실수 하나를 무르는 데 손이 너무 많이 간다
+                    // (사용자 요청 2026-09-21). 묻고 나서 지운다 - 되돌리기가
+                    // 실수로 또 눌리면 처음 실수와 똑같은 일이 된다.
+                    Button {
+                        undoing = SlotSelection(id: line.slotKey)
+                    } label: {
+                        PillChip(text: t("완료", "Done"), tint: .surface, textTint: .sageInk)
+                            .frame(minWidth: 96, minHeight: 56)
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(t(
+                        "\(line.slot.labelKo) 약 완료됨",
+                        "\(line.slot.label(.english)) doses done"
+                    )))
+                    .accessibilityHint(Text(t("눌러서 되돌립니다", "Tap to undo")))
                 } else {
                     Button {
                         recordRestTaken(in: line)
@@ -569,10 +623,17 @@ struct TodayView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(Text(t("다음 진료 일정을 정해요.", "Set the next visit date.")))
-                    // 소진 예측은 Pro. 무료에서는 자리만 비우고 조르지 않는다 —
-                    // 유도 지점은 설계가 정한 세 곳뿐이고 여기는 그 중 하나가 아니다.
-                    if pro.isPro, let text = shortfallText {
-                        PillChip(text: text, tint: .surface2)
+                    // 소진 예측은 Pro 다. 예전에는 무료에서 **아예 그리지
+                    // 않았는데**, 그러면 잠긴 것이 아니라 없는 기능이 된다
+                    // (사용자 지적 2026-09-21). 자물쇠를 얹어 보여 준다.
+                    if let text = shortfallText {
+                        if pro.isPro {
+                            PillChip(text: text, tint: .surface2)
+                        } else {
+                            PillChip(text: text, tint: .surface2)
+                                .blur(radius: 4)
+                                .proGated(.runOutForecast)
+                        }
                     }
                 }
             }
