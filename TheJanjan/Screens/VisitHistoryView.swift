@@ -12,6 +12,7 @@ struct VisitHistoryView: View {
 
     @EnvironmentObject private var pro: ProStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
 
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
@@ -22,6 +23,8 @@ struct VisitHistoryView: View {
 
     /// 가장 최근 진료 말고 나머지도 펴 둘지(사용자 요청 2026-09-21).
     @State private var isShowingOlder = false
+    /// 지우기 직전의 진료 기록. 확인을 한 번 거친다.
+    @State private var pendingDeletion: PrescriptionRecord?
 
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
@@ -66,6 +69,26 @@ struct VisitHistoryView: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            .confirmationDialog(
+                t("이 진료 기록을 지울까요?", "Delete this visit record?"),
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingDeletion
+            ) { record in
+                Button(t("지우기", "Delete"), role: .destructive) {
+                    MedicationStore.delete(prescriptionID: record.id, in: context)
+                    pendingDeletion = nil
+                }
+                Button(t("그대로 두기", "Keep it"), role: .cancel) { pendingDeletion = nil }
+            } message: { _ in
+                Text(t(
+                    "이 진료로 더해진 약 개수도 함께 빠져요. 그날 세어 둔 남은 개수와, 이때 적용한 용량 변경은 그대로 남아요.",
+                    "The pills this visit added are removed too. What you counted that day, and any dose change applied then, stay as they are."
+                ))
+            }
             .navigationTitle(t("지난 진료 기록", "Visit history"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -253,6 +276,25 @@ struct VisitHistoryView: View {
                     }
                 }
                 .blur(radius: isBlurred ? 5 : 0)
+
+                // 진료일을 잘못 고르거나 개수를 잘못 셌을 때 고칠 길이
+                // 아예 없었다(QA 2026-09-21). 지우고 다시 적는 것이 고치는
+                // 길이다. 흐려 둔 카드에는 두지 않는다 - 읽지도 못하는
+                // 기록을 지우게 할 이유가 없다.
+                if !isBlurred {
+                    Button {
+                        pendingDeletion = record
+                    } label: {
+                        Text(t("이 진료 기록 지우기", "Delete this visit"))
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .underline()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }

@@ -252,6 +252,30 @@ enum MedicationStore {
         return prescription.id
     }
 
+    /// 진료 기록 하나와 **그 진료가 더한 보충**을 지운다.
+    ///
+    /// 진료일을 잘못 고르거나 개수를 잘못 센 사람이 고칠 길이 아예 없었다
+    /// (QA 2026-09-21). 지우고 다시 적는 것이 고치는 길이다.
+    ///
+    /// 함께 지우는 것은 이 처방에 매인 보충(`prescriptionID`)뿐이다.
+    /// 진료일에 세어 둔 "받기 전 남아 있던 개수" 는 **정정**이라 기준점을
+    /// 세우는 사건이고, 그건 그날 실제로 센 수다. 보충만 빠지면 재고는
+    /// "그날 센 개수에서 그 뒤 먹은 만큼 뺀 값" 이 되어 여전히 말이 맞는다.
+    ///
+    /// 이 진료에서 적용한 용량 변경은 건드리지 않는다. 약의 지금 용량을
+    /// 되돌리는 일은 약 상세의 용량 변경 카드가 맡는다.
+    static func delete(prescriptionID: UUID, in context: ModelContext) {
+        delete(FetchDescriptor<StockEventRecord>(
+            predicate: #Predicate { $0.prescriptionID == prescriptionID }
+        ), in: context)
+
+        delete(FetchDescriptor<PrescriptionRecord>(
+            predicate: #Predicate { $0.id == prescriptionID }
+        ), in: context)
+
+        save("진료 기록 삭제", in: context)
+    }
+
     /// 복용 중 ↔ 중단. 기록은 그대로 두고 앞으로의 일정에서만 뺀다.
     static func setStatus(_ status: Medication.Status, for medicationID: UUID, in context: ModelContext) {
         guard let record = medicationRecord(medicationID, in: context) else { return }

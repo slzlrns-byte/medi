@@ -46,11 +46,24 @@ struct PatternCard: View {
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                chart
+                // 설치 첫날에는 빈 회색 줄 셋과 자물쇠만 남는다 - 볼 것이
+                // 없는데 잠겼다는 말만 있는 화면이다(QA 2026-09-21).
+                // 같은 화면의 다른 카드들은 전부 빈 상태를 말한다.
+                if hasNothing {
+                    Text(t(
+                        "기분이나 복약을 며칠 남기면 여기에 그림이 생겨요.",
+                        "Log mood or doses for a few days and the picture appears here."
+                    ))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    chart
 
-                legend
+                    legend
+                }
 
-                if isLocked {
+                if isLocked, !hasNothing {
                     Text(t(
                         "최근 7일은 그대로 보여요. 4주 전체는 Pro 에서 열려요.",
                         "The last 7 days stay clear. The full 4 weeks open with Pro."
@@ -78,6 +91,13 @@ struct PatternCard: View {
             return t("\(date) 기록 없음", "\(date), not recorded")
         }
         return "\(date) \(CheckIn.Mood(score).label(lang))"
+    }
+
+    /// 그릴 것이 하나도 없는지.
+    private var hasNothing: Bool {
+        !timeline.days.contains { day in
+            day.moodScore != nil || day.takenFraction != nil || day.sleepMinutes != nil
+        }
     }
 
     private func isBlurred(_ day: PatternTimeline.Day) -> Bool {

@@ -388,8 +388,9 @@ struct MedicationsView: View {
                 // 이름 자체를 블러로 가린다(사용자 결정 2026-09-16). 글자로 보려면
                 // 상세로 들어간다 - 거기서 MaskedNameText 를 누르면 보인다.
                 Text(medication.name)
+                    .padding(-MaskedNameText.blurRadius)
                     .blur(radius: MaskedNameText.blurRadius)
-                    .clipped()
+                    .padding(MaskedNameText.blurRadius)
                     .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
             } else {
                 Text(medication.name)
@@ -421,6 +422,10 @@ struct MedicationsView: View {
 
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
 
+                // 오른쪽 열에 상한을 둔다. 영어의 "5 days short before the
+                // visit" 는 180pt 를 요구하는데(한국어는 100pt) 두 열이 다
+                // 유연해서 이름 몫이 100pt 안팎까지 밀렸다 - SE 영어판에서
+                // "Escitalo…" 가 됐다(QA 2026-09-21).
                 VStack(alignment: .trailing, spacing: 2) {
                     if row.hasStock {
                         // "17/28정" - 남은 숫자만으로는 많은지 적은지 모른다.
@@ -458,6 +463,8 @@ struct MedicationsView: View {
                         Text(text)
                             .janjanBody(12)
                             .foregroundStyle(Color.muted)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else if showsLockedForecast(row) {
                         // 무료에게 이 줄을 통째로 숨기면 소진 예측이 있다는
                         // 사실조차 모른다 - 스토어에서는 파는데 앱에는 흔적이
@@ -471,6 +478,7 @@ struct MedicationsView: View {
                         .foregroundStyle(Color.muted)
                     }
                 }
+                .frame(maxWidth: 130, alignment: .trailing)
             }
         }
         .contextMenu {

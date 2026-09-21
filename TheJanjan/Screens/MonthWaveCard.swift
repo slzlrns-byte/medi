@@ -230,8 +230,11 @@ private struct MonthWaveGrid: View {
                 Color.clear
             }
         }
+        // 한 줄 일곱 칸이라 SE 에서 칸 하나가 39.3pt 까지 줄었다 - 21일을
+        // 누르려다 22일이 열렸다(QA 2026-09-21). 정사각을 유지하되 최소
+        // 높이를 44 로 잡아, 좁은 기기에서는 칸이 세로로 조금 길어진다.
         .aspectRatio(1, contentMode: .fit)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 44)
     }
 
     private func isFuture(_ day: Int) -> Bool {

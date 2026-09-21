@@ -11,6 +11,7 @@ struct MedicationDetailView: View {
     let medicationID: UUID
 
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var pro: ProStore
 
     @Query private var medicationRecords: [MedicationRecord]
@@ -27,6 +28,7 @@ struct MedicationDetailView: View {
     @State private var isShowingDoseChangeSheet = false
     /// 지우기 직전의 필요시 기록. 확인을 한 번 거친다.
     @State private var pendingAsNeededDeletion: DoseEventRecord?
+    @State private var isConfirmingDeletion = false
     /// 용량 변경 이력에서 최신 하나 말고 나머지도 펴 둘지.
     @State private var isShowingOlderDoseChanges = false
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
@@ -722,7 +724,32 @@ struct MedicationDetailView: View {
                     )
                     Task { await ReminderPlanner.reschedule(using: context) }
                 }
+
+                // 잘못 등록한 약을 지우는 길이 목록 행을 **길게 누르기**
+                // 하나뿐이었고, 그런 손잡이가 있다는 힌트가 화면 어디에도
+                // 없었다(QA 2026-09-21). 이 약에 대해 할 수 있는 일이
+                // 모이는 자리에 둔다.
+                WhitePillButton(title: t("이 약 지우기", "Delete this medication"), systemImage: "trash") {
+                    isConfirmingDeletion = true
+                }
             }
+        }
+        .confirmationDialog(
+            t("이 약을 지울까요?", "Delete this medication?"),
+            isPresented: $isConfirmingDeletion,
+            titleVisibility: .visible
+        ) {
+            Button(t("지우기", "Delete"), role: .destructive) {
+                MedicationStore.delete(medicationID: medicationID, in: context)
+                Task { await ReminderPlanner.reschedule(using: context) }
+                dismiss()
+            }
+            Button(t("그대로 두기", "Keep it"), role: .cancel) {}
+        } message: {
+            Text(t(
+                "이 약의 복용 기록과 재고도 함께 사라져요. 되돌릴 수 없어요. 잠시 쉬는 거라면 '복용 중단' 을 쓰세요.",
+                "Its dose records and stock go too. This can't be undone. If you're just pausing, use \"Stop taking\"."
+            ))
         }
     }
 
