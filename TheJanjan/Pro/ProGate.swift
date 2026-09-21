@@ -43,10 +43,12 @@ struct ProGate: ViewModifier {
                         .offset(x: CGFloat(JanjanSpacing.xs), y: -CGFloat(JanjanSpacing.s))
                 }
             }
-            // 손가락만 막고 접근성 트리는 그대로 두면, VoiceOver 는 흐려 둔
-            // 진료 메모와 약 이름을 그대로 읽고 잠긴 토글까지 켤 수 있다
-            // (QA 2026-09-21). 눈으로 막은 것은 귀로도 막는다.
-            .accessibilityHidden(!pro.isPro)
+            // **여기서 통째로 숨기지 않는다.** 한때 `.accessibilityHidden(!pro.isPro)`
+            // 를 걸었다가 되돌렸다 - 이 문은 부분만 연 카드에도 씌워지는데
+            // (패턴 보기는 최근 7일이 무료고, 지난 진료 카드는 날짜가 남는다),
+            // 통째로 지우면 VoiceOver 사용자만 그 무료 부분을 못 본다.
+            // 소리로 새면 안 되는 것은 **흐린 내용 자체**이므로, 숨김은 그
+            // 자리에서 `accessibilityHidden(true)` 로 건다(QA 2026-09-21).
             .overlay {
                 if !pro.isPro {
                     // 아래 버튼이 눌리는 대신 페이월이 열린다. 잠긴 기능이 반쯤 동작해서

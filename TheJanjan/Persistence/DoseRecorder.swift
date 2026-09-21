@@ -56,13 +56,19 @@ enum DoseRecorder {
             onScheduledRecordToday?(slotKey)
         }
 
-        if let existing = existingRecord(
+        // 고쳐 쓸 때도 그 칸의 줄을 **전부** 본다. 한 줄만 고치면, 두 기기가
+        // 각자 남긴 날에 사용자의 정정이 안 고쳐진 옛 줄에 밀린다 - "건너뜀"
+        // 으로 고쳤는데 남아 있던 "복용함" 이 더 나중 시각이라 이겼다
+        // (QA 2026-09-21). 하나만 살리고 나머지는 걷는다.
+        let existingRecords = allRecords(
             medicationID: medicationID,
             slotKey: slotKey,
             on: targetDay,
             in: context,
             calendar: calendar
-        ) {
+        )
+        if let existing = existingRecords.first {
+            for extra in existingRecords.dropFirst() { context.delete(extra) }
             existing.statusRaw = status.rawValue
             existing.actualAt = (status == .taken) ? moment : nil
             existing.sourceRaw = source.rawValue
@@ -130,14 +136,20 @@ enum DoseRecorder {
         in context: ModelContext,
         calendar: Calendar = .current
     ) -> Bool {
-        guard let record = existingRecord(
+        // **맞는 줄을 전부 지운다.** 하나만 지우면, 두 기기가 동기화 전에
+        // 각자 기록해 줄이 둘인 날에 되돌리기가 조용히 실패했다 - 남은 줄이
+        // 여전히 "복용함" 이라 화면은 그대로 완료였고 재고도 안 돌아왔다
+        // (QA 2026-09-21). 읽는 쪽(collapsedDoses)은 이미 중복을 하나로 묶고
+        // 있었는데 쓰는 쪽만 한 줄을 봤다.
+        let records = allRecords(
             medicationID: medicationID,
             slotKey: slotKey,
             on: day,
             in: context,
             calendar: calendar
-        ) else { return false }
-        context.delete(record)
+        )
+        guard !records.isEmpty else { return false }
+        for record in records { context.delete(record) }
         return true
     }
 
@@ -169,6 +181,35 @@ enum DoseRecorder {
         )
         descriptor.fetchLimit = 1
         return (try? context.fetch(descriptor))?.first
+    }
+
+    /// 그 날 · 그 시간대 · 그 약의 기록 **전부**. 기기 간 동기화로 줄이
+    /// 둘 이상일 수 있어서, 지우거나 고쳐 쓸 때는 이쪽을 쓴다.
+    static func allRecords(
+        medicationID: UUID,
+        slotKey: String,
+        on day: Date,
+        in context: ModelContext,
+        calendar: Calendar = .current
+    ) -> [DoseEventRecord] {
+
+        let start = calendar.startOfDay(for: day)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+
+        let key: String? = slotKey
+        let scheduledKind = DoseEvent.Kind.scheduled.rawValue
+
+        let descriptor = FetchDescriptor<DoseEventRecord>(
+            predicate: #Predicate { record in
+                record.medicationID == medicationID
+                    && record.slotKey == key
+                    && record.kindRaw == scheduledKind
+                    && record.scheduledAt >= start
+                    && record.scheduledAt < end
+            },
+            sortBy: [SortDescriptor(\.scheduledAt, order: .reverse)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
     }
 
     private static func scheduleRecord(

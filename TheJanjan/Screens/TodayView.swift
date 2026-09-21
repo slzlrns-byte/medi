@@ -66,9 +66,13 @@ struct TodayView: View {
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
     private var today: Date { clock.today }
+    /// 재고를 물을 때 쓰는 기준 시각. **`today` 를 쓰면 안 된다** —
+    /// 그것은 앱을 켠 순간이라, 그 뒤에 적은 복용이 미래로 판정돼 재고에서
+    /// 빠진다(QA 2026-09-21).
+    private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     /// 약 이름을 가릴지.
     ///
     /// **Pro 여부를 보지 않는다**(QA 2026-09-19). 구독이 끝나는 순간 화면의
@@ -834,10 +838,17 @@ struct TodayView: View {
                     // (사용자 지적 2026-09-21). 자물쇠를 얹어 보여 준다.
                     if let text = shortfallText {
                         if pro.isPro {
+                            // FlowRow 는 위 정렬이라 옆 칩과 높이가 다르면
+                            // 중심선이 어긋난다(QA 2026-09-21). 둘 다 44 로.
                             PillChip(text: text, tint: .surface2)
+                                .frame(minHeight: 44)
                         } else {
                             PillChip(text: text, tint: .surface2)
+                                .frame(minHeight: 44)
                                 .blur(radius: 4)
+                                // 흐린 글자가 소리로는 그대로 읽혔다(QA 2026-09-21).
+                                // 잠긴 답 자체만 막고, 문(페이월)은 열어 둔다.
+                                .accessibilityHidden(true)
                                 .proGated(.runOutForecast)
                         }
                     }
@@ -872,7 +883,7 @@ struct TodayView: View {
                 stockEvents: stockEvents,
                 doseEvents: doseEvents,
                 nextVisit: nextVisit,
-                asOf: today
+                asOf: endOfToday
             )
             return (snapshot.shortfallDays ?? 0) > 0
         }
@@ -881,7 +892,8 @@ struct TodayView: View {
         // 약 이름은 최대 60자라, 하나뿐일 때 이름을 넣으면 줄지 않는 칩이
         // 화면 밖까지 달아난다(QA 2026-09-21). 어느 약인지는 바로 아래
         // 시간대 줄과 약 탭이 말해 주므로 여기서는 늘 개수로 센다.
-        return t("모자라는 약 \(short.count)개", "\(short.count) meds running low")
+        return t("모자라는 약 \(short.count)개",
+                 short.count == 1 ? "1 med running low" : "\(short.count) meds running low")
     }
 
     // MARK: - 기록

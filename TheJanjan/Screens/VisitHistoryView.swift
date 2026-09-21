@@ -32,7 +32,7 @@ struct VisitHistoryView: View {
     private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     /// 실제로 다녀온 진료만. 오늘 탭에서 일정만 잡아 둔 기록(약·일수·메모 없음)은
@@ -81,6 +81,12 @@ struct VisitHistoryView: View {
                 Button(t("지우기", "Delete"), role: .destructive) {
                     MedicationStore.delete(prescriptionID: record.id, in: context)
                     pendingDeletion = nil
+                    // 지운 진료가 잡아 둔 다음 진료 알림이 그날 그대로
+                    // 울렸다(QA 2026-09-21). 저장하는 쪽은 이미 다시 깐다.
+                    Task {
+                        await ReminderPlanner.rescheduleAppointments(using: context)
+                        AppServices.shared.pushWatchSnapshot()
+                    }
                 }
                 Button(t("그대로 두기", "Keep it"), role: .cancel) { pendingDeletion = nil }
             } message: { _ in
@@ -276,6 +282,11 @@ struct VisitHistoryView: View {
                     }
                 }
                 .blur(radius: isBlurred ? 5 : 0)
+                // 눈으로 뿌옇게 만든 것은 귀로도 막는다 - 블러는 소리에
+                // 아무 영향이 없어서 VoiceOver 가 진료 메모와 약 이름을
+                // 그대로 읽었다(QA 2026-09-21). 위의 날짜 줄은 그대로 둔다:
+                // 어느 진료가 잠겨 있는지는 눈으로도 귀로도 보여야 한다.
+                .accessibilityHidden(isBlurred)
 
                 // 진료일을 잘못 고르거나 개수를 잘못 셌을 때 고칠 길이
                 // 아예 없었다(QA 2026-09-21). 지우고 다시 적는 것이 고치는

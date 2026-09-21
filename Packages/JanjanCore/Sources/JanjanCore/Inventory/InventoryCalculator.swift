@@ -119,6 +119,37 @@ public enum InventoryCalculator {
         return untouched + Array(latestBySlot.values)
     }
 
+    /// 모든 약의 **정기** 복용 사건에서 기기 간 중복을 하나로 묶는다.
+    ///
+    /// `collapsedDoses` 는 약 하나를 보고 `adherenceRate` 는 안에서 같은 일을
+    /// 다시 한다. 종이의 "복용 N회 · 건너뜀 · 미기록" 만 원본을 세고 있어서,
+    /// 같은 칸에 "복약률 100%" 와 "복용 2회 · 건너뜀 1회"(=66%)가 나란히
+    /// 찍혔다(QA 2026-09-21). 그 자리가 쓸 집합을 여기서 만든다.
+    ///
+    /// 필요시(PRN)와 시간대 열쇠가 없는 줄은 묶지 않고 그대로 둔다 —
+    /// `collapsedDoses` 와 같은 판단이다.
+    static func collapsedScheduledDoses(
+        _ doseEvents: [DoseEvent],
+        calendar: Calendar = .current
+    ) -> [DoseEvent] {
+
+        var latest: [String: DoseEvent] = [:]
+        var untouched: [DoseEvent] = []
+
+        for event in doseEvents where event.kind == .scheduled {
+            guard let slotKey = event.slotKey else {
+                untouched.append(event)
+                continue
+            }
+            let day = calendar.startOfDay(for: event.scheduledAt)
+            let key = "\(event.medicationID.uuidString)|\(slotKey)|\(day.timeIntervalSinceReferenceDate)"
+            if let kept = latest[key], isLater(kept, than: event) { continue }
+            latest[key] = event
+        }
+
+        return untouched + Array(latest.values)
+    }
+
     /// `DayPlan.latestEvent` 와 같은 순서 규칙. 둘이 어긋나면 화면과 재고가 다시 갈라진다.
     private static func isLater(_ lhs: DoseEvent, than rhs: DoseEvent) -> Bool {
         if lhs.effectiveDate != rhs.effectiveDate { return lhs.effectiveDate > rhs.effectiveDate }

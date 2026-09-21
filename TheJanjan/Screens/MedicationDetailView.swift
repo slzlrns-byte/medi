@@ -40,9 +40,13 @@ struct MedicationDetailView: View {
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
     private var today: Date { clock.today }
+    /// 재고를 물을 때 쓰는 기준 시각. **`today` 를 쓰면 안 된다** —
+    /// 그것은 앱을 켠 순간이라, 그 뒤에 적은 복용이 미래로 판정돼 재고에서
+    /// 빠진다(QA 2026-09-21).
+    private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     private var record: MedicationRecord? {
@@ -271,7 +275,7 @@ struct MedicationDetailView: View {
             doseEvents: doseRecords.map(\.core),
             nextVisit: prescriptionRecords.compactMap { $0.core.nextVisitDate }
                 .filter { $0 >= today }.min(),
-            asOf: today
+            asOf: endOfToday
         )
 
         return JanjanCard {
@@ -1088,7 +1092,7 @@ private struct DoseChangeCompareSheet: View {
     private var checkpointTimeline: PatternTimeline {
         PatternTimeline.make(
             dayCount: min(max(daysSinceChange, 1), 28),
-            endingAt: today,
+            endingAt: endOfToday,
             checkIns: checkInRecords.map(\.core),
             schedules: scheduleRecords.map(\.core),
             medications: medicationRecords.map { $0.core.displayReady },

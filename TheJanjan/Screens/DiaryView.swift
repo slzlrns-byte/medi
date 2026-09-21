@@ -900,9 +900,27 @@ private struct SymptomEntrySheet: View {
 
 /// 칩을 줄바꿈해 흘려 놓는 아주 작은 레이아웃.
 /// iOS 16+ 의 Layout 프로토콜을 쓴다 — 외부 패키지를 들이지 않기 위해.
+///
+/// **줄보다 넓은 자식은 줄 폭까지 좁혀 제안한다.** 예전에는 재는 것도 놓는
+/// 것도 `.unspecified` 였다. 제안 폭이 없으면 `lineLimit(1)` 글자는 한 줄
+/// 전체를 이상 폭으로 부르고 그 폭 그대로 놓이므로, **말줄임이 일어날 조건
+/// 자체가 없었다** - 60자짜리 약 이름 칩 한 장이 카드를 뚫고 나갔고,
+/// 칩 쪽에 말줄임을 켜 둬도 아무 일도 하지 않았다(QA 2026-09-21).
+/// 줄에 들어가는 자식은 예전처럼 자기 크기를 그대로 쓴다.
 struct FlowRow: Layout {
 
     var spacing: CGFloat = 8
+
+    /// 이 자식에게 제안할 크기와, 그때의 실제 크기.
+    /// 줄보다 넓으면 줄 폭으로 잘라 다시 물어본다.
+    private func measure(_ subview: LayoutSubview, lineWidth: CGFloat) -> (CGSize, ProposedViewSize) {
+        let natural = subview.sizeThatFits(.unspecified)
+        guard lineWidth.isFinite, natural.width > lineWidth else {
+            return (natural, .unspecified)
+        }
+        let clamped = ProposedViewSize(width: lineWidth, height: nil)
+        return (subview.sizeThatFits(clamped), clamped)
+    }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
@@ -911,7 +929,7 @@ struct FlowRow: Layout {
         var totalHeight: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let (size, _) = measure(subview, lineWidth: maxWidth)
             if origin.x > 0, origin.x + size.width > maxWidth {
                 origin.x = 0
                 totalHeight += lineHeight + spacing
@@ -935,13 +953,13 @@ struct FlowRow: Layout {
         var lineHeight: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let (size, offer) = measure(subview, lineWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 x = bounds.minX
                 y += lineHeight + spacing
                 lineHeight = 0
             }
-            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: .unspecified)
+            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: offer)
             x += size.width + spacing
             lineHeight = max(lineHeight, size.height)
         }

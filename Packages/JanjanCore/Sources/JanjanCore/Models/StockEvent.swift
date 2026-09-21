@@ -69,16 +69,24 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
         )
     }
 
+    /// 진료에서 만들어진 정정은 그 처방에 매어 둔다.
+    ///
+    /// 진료를 지울 때 보충만 걷고 이 정정을 남기면, 남은 것이 **받기 전**
+    /// 개수라서 기준점이 그대로 서고 재고가 음수로 내려간다
+    /// (9/1 에 4정 세고 28정 받음 → 20일 복용 → 12정이 맞는데, 진료를 지우면
+    /// 4 − 20 = −16 이 된다). 둘은 한 사건의 두 쪽이라 함께 움직여야 한다.
     public static func correction(
         medicationID: UUID,
         setTo: Decimal,
         at date: Date,
+        prescriptionID: UUID? = nil,
         note: String? = nil
     ) -> StockEvent {
         StockEvent(
             medicationID: medicationID,
             kind: .correction(setTo: DecimalQuantity.snapToQuarter(setTo)),
             occurredAt: date,
+            prescriptionID: prescriptionID,
             note: note
         )
     }

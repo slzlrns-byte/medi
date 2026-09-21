@@ -350,3 +350,96 @@ final class InventoryCalculatorTests: XCTestCase {
         XCTAssertNil(cycle, "재고를 한 번도 세지 않았으면 총량을 지어내지 않는다")
     }
 }
+
+// MARK: - 진료 기록 삭제 (QA 2026-09-21)
+
+extension InventoryCalculatorTests {
+
+    /// 진료를 지울 때 보충만 걷고 "받기 전 남은 개수"(정정)를 남기면, 남은
+    /// 정정이 **받기 전** 수라서 기준점이 그대로 서고 재고가 음수로 내려간다.
+    /// 9/1 에 4정 세고 28정 받아 20일 먹은 사람은 12정이 맞다.
+    func testVisitDayCorrectionCarriesThePrescriptionID() {
+        let prescriptionID = UUID()
+        let visit = Fixed.date(2026, 9, 1)
+
+        let correction = StockEvent.correction(
+            medicationID: Fixed.medA,
+            setTo: 4,
+            at: visit,
+            prescriptionID: prescriptionID,
+            note: "진료일에 세어 둔 개수"
+        )
+        let refill = StockEvent.refill(
+            medicationID: Fixed.medA,
+            quantity: 28,
+            at: visit,
+            prescriptionID: prescriptionID
+        )
+
+        // 한 사건의 두 쪽이라 같은 처방에 매인다 - 이게 어긋나면 삭제가
+        // 보충만 걷어 가고 기준점을 남긴다.
+        XCTAssertEqual(correction.prescriptionID, prescriptionID)
+        XCTAssertEqual(refill.prescriptionID, prescriptionID)
+
+        let doses = (1...20).map { offset in
+            DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: Fixed.date(2026, 9, 1 + offset, 9),
+                actualAt: Fixed.date(2026, 9, 1 + offset, 9),
+                status: .taken,
+                quantity: 1,
+                kind: .scheduled,
+                slotKey: "morning"
+            )
+        }
+
+        XCTAssertEqual(
+            InventoryCalculator.remaining(
+                for: Fixed.medA,
+                stockEvents: [correction, refill],
+                doseEvents: doses,
+                asOf: Fixed.date(2026, 9, 21, 23),
+                calendar: Fixed.calendar
+            ),
+            12
+        )
+
+        // 처방으로 걸러 지우면 그 약의 재고 사건이 하나도 남지 않는다.
+        XCTAssertTrue(
+            [correction, refill].filter { $0.prescriptionID != prescriptionID }.isEmpty
+        )
+    }
+
+    /// 기기 둘이 같은 칸에 기록한 날이 있으면, 종이의 "복용 N회" 도
+    /// 복약률과 같은 집합에서 세야 한 칸에 두 숫자가 어긋나지 않는다.
+    func testCollapsedScheduledDosesMergesCrossDeviceDuplicates() {
+        let slot = "morning"
+        let scheduled = Fixed.date(2026, 9, 2, 8)
+        let duplicates = [
+            DoseEvent(medicationID: Fixed.medA, scheduledAt: scheduled,
+                      status: .skipped, quantity: 1, kind: .scheduled, slotKey: slot),
+            DoseEvent(medicationID: Fixed.medA, scheduledAt: scheduled,
+                      actualAt: Fixed.date(2026, 9, 2, 8, 5),
+                      status: .taken, quantity: 1, kind: .scheduled, slotKey: slot)
+        ]
+
+        let collapsed = InventoryCalculator.collapsedScheduledDoses(
+            duplicates, calendar: Fixed.calendar
+        )
+        XCTAssertEqual(collapsed.count, 1)
+        XCTAssertEqual(collapsed.first?.status, .taken, "가장 나중 것이 남는다")
+
+        // 필요시 약은 묶지 않는다 - 하루에 두 번 먹었으면 두 번이 사실이다.
+        let asNeeded = [
+            DoseEvent(medicationID: Fixed.medB, scheduledAt: scheduled,
+                      status: .taken, quantity: 1, kind: .asNeeded),
+            DoseEvent(medicationID: Fixed.medB, scheduledAt: scheduled,
+                      status: .taken, quantity: 1, kind: .asNeeded)
+        ]
+        XCTAssertEqual(
+            InventoryCalculator.collapsedScheduledDoses(asNeeded, calendar: Fixed.calendar).count,
+            0,
+            "정기분만 다룬다"
+        )
+    }
+}

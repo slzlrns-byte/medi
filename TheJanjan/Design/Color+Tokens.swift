@@ -61,4 +61,20 @@ extension Color {
     static func mood(_ score: Int) -> Color {
         .janjan(JanjanMood.color(forScore: score))
     }
+
+    /// 그 토큰을 바탕에 깔았을 때 그 위에서 읽히는 글자색.
+    /// 라이트·다크·테마 다섯 가지를 각각 재서 고른다.
+    static func readableOn(_ token: JanjanColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            let scheme: JanjanColorScheme = traits.userInterfaceStyle == .dark ? .dark : .light
+            let theme = JanjanTheme.current
+            let pick = token.readableText(for: scheme, theme: theme)
+            return UIColor(janjanHex: pick.hex(for: scheme, theme: theme)) ?? UIColor.label
+        })
+    }
+
+    /// 기분 색 위에서 읽히는 글자색.
+    static func readableOnMood(_ score: Int) -> Color {
+        .readableOn(JanjanMood.color(forScore: score))
+    }
 }

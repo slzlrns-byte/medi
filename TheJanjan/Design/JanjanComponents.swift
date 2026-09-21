@@ -457,10 +457,19 @@ struct StrengthUnitRow: View {
 func strengthNeedsUnit(_ text: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
-    let numeric = CharacterSet(charactersIn: "0123456789.,/·- ")
-    let hasDigit = trimmed.unicodeScalars.contains { CharacterSet.decimalDigits.contains($0) }
-    let hasUnit = trimmed.unicodeScalars.contains { !numeric.contains($0) }
-    return !(hasDigit && hasUnit)
+
+    // **숫자가 하나도 없으면 판정하지 않는다.** "반알"·"한 포"·"PRN"·"½정" 은
+    // 단위가 빠진 표기가 아니라 애초에 숫자로 세지 않는 말이다. 한때
+    // "숫자와 단위가 둘 다 있어야 한다" 로 바꿨다가 이런 표기의 저장 버튼이
+    // 영영 꺼졌다(QA 2026-09-21). 잡으려던 것은 "15" 뿐이었다.
+    guard trimmed.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) })
+    else { return false }
+
+    // 소수점·쉼표·가운뎃점·빗금까지는 숫자의 일부로 본다("0.5", "1/2").
+    // 전각 숫자도 숫자로 센다 - "２０" 만 적고 통과하면 안 된다.
+    var numeric = CharacterSet.decimalDigits
+    numeric.insert(charactersIn: ".,/·- ")
+    return trimmed.unicodeScalars.allSatisfy { numeric.contains($0) }
 }
 
 /// 눌러서 켜고 끄는 알약. 요일·시간대처럼 여러 개를 고를 때.
@@ -617,11 +626,11 @@ struct MaskedNameText: View {
                 // 블러는 글자 상자 밖으로 번진다. 예전에는 상자 경계에서
                 // 잘라 냈는데(.clipped), 그러면 뿌연 글자의 가장자리가 칼로
                 // 자른 듯 끊겼다 - 24pt 여러 줄 이름에서는 모자이크가 아니라
-                // 깨진 그림처럼 보였다(QA 2026-09-21). 번질 자리를 먼저
-                // 확보하고 다시 제자리 크기로 돌린다.
-                .padding(-Self.blurRadius)
+                // 깨진 그림처럼 보였다(QA 2026-09-21). 자르지 않고 번지게 둔다.
+                // 음수 패딩으로 자리를 넓혔다 되돌리는 방법도 써 봤는데,
+                // 레이아웃 폭은 같아도 글자가 좌우 6pt 씩 프레임 밖으로 나가
+                // 옆 칩과의 간격과 말줄임 기준 폭이 어긋난다.
                 .blur(radius: Self.blurRadius)
-                .padding(Self.blurRadius)
                 .contentShape(Rectangle())
                 .onTapGesture { isRevealed = true }
                 // VoiceOver 가 진짜 이름을 읽으면 가림이 뚫린다 - 라벨을 통째로 바꾼다.

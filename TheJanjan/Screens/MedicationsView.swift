@@ -33,7 +33,7 @@ struct MedicationsView: View {
     private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
@@ -203,14 +203,14 @@ struct MedicationsView: View {
                     stockEvents: stock,
                     doseEvents: doses,
                     nextVisit: visit,
-                    asOf: today
+                    asOf: endOfToday
                 ),
                 hasStock: stock.contains { $0.medicationID == medication.id },
                 cycle: InventoryCalculator.cycleStatus(
                     for: medication.id,
                     stockEvents: stock,
                     doseEvents: doses,
-                    asOf: today
+                    asOf: endOfToday
                 )
             )
         }
@@ -388,9 +388,7 @@ struct MedicationsView: View {
                 // 이름 자체를 블러로 가린다(사용자 결정 2026-09-16). 글자로 보려면
                 // 상세로 들어간다 - 거기서 MaskedNameText 를 누르면 보인다.
                 Text(medication.name)
-                    .padding(-MaskedNameText.blurRadius)
                     .blur(radius: MaskedNameText.blurRadius)
-                    .padding(MaskedNameText.blurRadius)
                     .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
             } else {
                 Text(medication.name)

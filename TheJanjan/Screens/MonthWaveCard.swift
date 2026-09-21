@@ -153,7 +153,15 @@ private struct MonthWaveGrid: View {
     /// 지나간(또는 오늘) 날짜를 누르면 불린다. 내보내는 그림에서는 nil 이다.
     var onSelectDay: ((Int) -> Void)? = nil
 
-    private let spacing: CGFloat = 6
+    /// 칸 사이 간격.
+    ///
+    /// 6 이었는데, 한 줄 일곱 칸이라 그 간격이 곧 칸 폭에서 빠진다.
+    /// SE(375pt)에서 카드가 주는 폭은 311pt 이므로 6 이면 칸이 39.3pt 까지
+    /// 줄어 21일을 누르려다 22일이 열렸다(QA 2026-09-21). 2 로 줄여 42.7pt 를
+    /// 만든다 - 일곱 칸을 한 줄에 놓는 한 44 는 수학적으로 나오지 않는다
+    /// (7×44 = 308 에 간격까지 더하면 311 을 넘는다). 세로는 아래에서 44 를
+    /// 확보하므로, 남는 오탭 위험은 가로 1.3pt 뿐이다.
+    private let spacing: CGFloat = 2
 
     private var weekdaySymbols: [String] {
         JanjanLanguage.current == .english
@@ -219,22 +227,29 @@ private struct MonthWaveGrid: View {
                     Button {
                         onSelectDay(cell.day)
                     } label: {
-                        body.contentShape(shape)
+                        // 그림은 정사각으로 두고, **누르는 자리는 배정된 상자
+                        // 전체**로 넓힌다. 예전에는 contentShape 가 정사각
+                        // 안쪽에만 있어서 아래 minHeight 로 벌어진 세로 여유가
+                        // 눌리지 않았다 - 칸만 커 보이고 오탭은 그대로였다
+                        // (QA 2026-09-21).
+                        body
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(Text(t("이날의 기록을 봐요.", "See this day's records.")))
                 } else {
                     body
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
             } else {
                 Color.clear
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
-        // 한 줄 일곱 칸이라 SE 에서 칸 하나가 39.3pt 까지 줄었다 - 21일을
-        // 누르려다 22일이 열렸다(QA 2026-09-21). 정사각을 유지하되 최소
-        // 높이를 44 로 잡아, 좁은 기기에서는 칸이 세로로 조금 길어진다.
-        .aspectRatio(1, contentMode: .fit)
-        .frame(maxWidth: .infinity, minHeight: 44)
     }
 
     private func isFuture(_ day: Int) -> Bool {
@@ -247,9 +262,11 @@ private struct MonthWaveGrid: View {
     }
 
     private func numberColor(_ cell: MonthWave.DayCell) -> Color {
-        guard let score = cell.moodScore else { return Color.muted.opacity(0.7) }
-        // 짙은 색 위에서는 흰 글자, 옅은 색 위에서는 먹색.
-        return abs(score) >= 2 ? Color.janjan(.surface) : Color.ink.opacity(0.55)
+        guard let score = cell.moodScore else { return Color.ink2 }
+        // 점수가 세다고 색이 어두운 것은 아니다. ±2 이상이면 흰 글자로 두었더니
+        // 옅은 연두(+2) 위의 흰 숫자가 1.65:1 이 됐다(QA 2026-09-21).
+        // 밝기를 재서 ink 와 surface 중 읽히는 쪽을 고른다.
+        return Color.readableOnMood(score)
     }
 
     private func accessibilityText(_ cell: MonthWave.DayCell) -> String {

@@ -107,6 +107,13 @@ public enum ReportComposer {
     ) -> ReportContent {
 
         let endDay = calendar.startOfDay(for: end)
+        // **"오늘까지" 는 하루의 끝까지다.** 화면이 넘기는 값은 앱을 켠 순간일
+        // 수도 있어서(JanjanClock.today 는 자정까지 갱신되지 않는다), 그 값으로
+        // 자르면 그 뒤에 적은 오늘 기록이 종이에서 통째로 빠진다 - 아침에 켜
+        // 둔 앱으로 저녁에 뽑은 리포트가 그날 복약을 한 줄도 세지 않았다
+        // (QA 2026-09-21). 창의 끝은 그 날의 마지막 순간으로 맞춘다.
+        let endMoment = calendar.date(byAdding: .day, value: 1, to: endDay)?
+            .addingTimeInterval(-1) ?? end
         let (start, anchored) = window(endingAt: end, lastVisit: lastVisit, calendar: calendar)
         let windowLength = (calendar.dateComponents([.day], from: start, to: endDay).day ?? 0) + 1
 
@@ -115,7 +122,7 @@ public enum ReportComposer {
 
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(
-            doseEvents: doseEvents, from: start, to: end, language: language
+            doseEvents: doseEvents, from: start, to: endMoment, language: language
         ))
         lines.append(contentsOf: medicationLines(
             medications: medications,
@@ -124,7 +131,7 @@ public enum ReportComposer {
             stockEvents: stockEvents,
             nextVisit: nextVisit,
             from: start,
-            to: end,
+            to: endMoment,
             language: language,
             calendar: calendar
         ))
@@ -132,7 +139,7 @@ public enum ReportComposer {
             doseChanges: doseChanges,
             medications: medications,
             from: start,
-            to: end,
+            to: endMoment,
             language: language,
             calendar: calendar
         ))
@@ -140,14 +147,14 @@ public enum ReportComposer {
             medications: medications,
             doseEvents: doseEvents,
             from: start,
-            to: end,
+            to: endMoment,
             language: language,
             calendar: calendar
         ))
         lines.append(contentsOf: moodLines(
             checkIns: checkIns,
             from: start,
-            to: end,
+            to: endMoment,
             windowLength: windowLength,
             language: language,
             calendar: calendar
@@ -157,24 +164,24 @@ public enum ReportComposer {
                 checkIns: checkIns,
                 symptomEntries: symptomEntries,
                 from: start,
-                to: end,
+                to: endMoment,
                 catalog: symptomCatalog,
                 language: language,
                 calendar: calendar
             ))
         }
         lines.append(contentsOf: dreamLines(
-            checkIns: checkIns, from: start, to: end, language: language, calendar: calendar
+            checkIns: checkIns, from: start, to: endMoment, language: language, calendar: calendar
         ))
         lines.append(contentsOf: lifestyleLines(
-            checkIns: checkIns, from: start, to: end, language: language, calendar: calendar
+            checkIns: checkIns, from: start, to: endMoment, language: language, calendar: calendar
         ))
         lines.append(contentsOf: noteLines(
             notes: medicationNotes,
             medications: medications,
             symptomEntries: symptomEntries,
             from: start,
-            to: end,
+            to: endMoment,
             language: language
         ))
         lines.append(contentsOf: questionLines(questionsKo, language: language))
@@ -211,8 +218,12 @@ public enum ReportComposer {
         let en = language == .english
         var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Medication" : "복약")]
 
-        let counted = doseEvents.filter { event in
-            event.kind == .scheduled && event.effectiveDate >= start && event.effectiveDate <= end
+        // 바로 위 줄의 복약률은 하루·시간대로 묶은 값인데 이 세 숫자만 원본을
+        // 세고 있었다. 기기 둘이 같은 칸에 기록한 날이 있으면 같은 칸에
+        // "복약률 100%" 와 "복용 2회 · 건너뜀 1회"(=66%)가 나란히 찍혔다
+        // (QA 2026-09-21). 같은 집합에서 센다.
+        let counted = InventoryCalculator.collapsedScheduledDoses(doseEvents).filter { event in
+            event.effectiveDate >= start && event.effectiveDate <= end
         }
 
         guard !counted.isEmpty else {
@@ -296,10 +307,19 @@ public enum ReportComposer {
                 parts.append(en ? "adherence \(percentText(rate))" : "복약률 \(percentText(rate))")
             }
             // 재고를 한 번도 세지 않았으면 0정이라고 말하지 않는다.
+            //
+            // **음수도 숫자로 적지 않는다.** 앱 화면은 음수를 0 으로 깎고
+            // "다시 세어 주세요" 를 띄우는데 종이만 그대로 찍어서, 진료실에
+            // "남은 개수 -16정" 이 나갈 수 있었다(QA 2026-09-21). 기록이
+            // 어긋났다는 사실을 숫자 대신 말한다.
             if stockEvents.contains(where: { $0.medicationID == medication.id }) {
-                parts.append(en
-                    ? "\(DecimalQuantity.display(snapshot.remaining)) left"
-                    : "남은 개수 \(DecimalQuantity.display(snapshot.remaining))정")
+                if snapshot.remaining < 0 {
+                    parts.append(en ? "stock needs recounting" : "남은 개수 확인 필요")
+                } else {
+                    parts.append(en
+                        ? "\(DecimalQuantity.display(snapshot.remaining)) left"
+                        : "남은 개수 \(DecimalQuantity.display(snapshot.remaining))정")
+                }
             }
             lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
 

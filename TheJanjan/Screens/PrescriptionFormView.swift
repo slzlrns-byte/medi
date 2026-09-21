@@ -25,8 +25,14 @@ struct PrescriptionFormView: View {
     @Query private var scheduleRecords: [ScheduleRecord]
     @Query private var stockRecords: [StockEventRecord]
 
+    /// 처음 열릴 때의 처방일수. `hasEdits` 가 "손댔는지" 를 이 값과 견준다.
+    static let defaultDaysSupplied = 28
+
     @State private var visitDate = Date()
-    @State private var daysSupplied = 28
+    @State private var daysSupplied = defaultDaysSupplied
+    /// 폼이 열릴 때의 값. 닫을 때 달라졌는지 보려고 들고 있는다.
+    private let initialVisitDate: Date
+    private let initialNextVisitDate: Date
     @State private var hasNextVisit = true
     @State private var nextVisitDate = Date()
     @State private var clinicNote = ""
@@ -56,10 +62,13 @@ struct PrescriptionFormView: View {
     init(onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
         let today = Date()
+        let suggested = Calendar.current.date(
+            byAdding: .day, value: Self.defaultDaysSupplied, to: today
+        ) ?? today
         _visitDate = State(initialValue: today)
-        _nextVisitDate = State(
-            initialValue: Calendar.current.date(byAdding: .day, value: 28, to: today) ?? today
-        )
+        _nextVisitDate = State(initialValue: suggested)
+        initialVisitDate = today
+        initialNextVisitDate = suggested
     }
 
     private var activeMedications: [Medication] {
@@ -68,7 +77,7 @@ struct PrescriptionFormView: View {
 
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
@@ -133,11 +142,19 @@ struct PrescriptionFormView: View {
     }
 
     /// 닫으면 사라질 것이 있는지.
+    ///
+    /// 약을 고른 것만 세다가, 진료일과 처방일수만 고쳐 둔 사람이 아무 말도
+    /// 못 듣고 전부 잃었다(QA 2026-09-21). 처음 열렸을 때와 달라진 것이
+    /// 하나라도 있으면 묻는다.
     private var hasEdits: Bool {
         !refills.isEmpty
             || !leftovers.isEmpty
             || !doseEdits.isEmpty
             || !clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || daysSupplied != Self.defaultDaysSupplied
+            || !Calendar.current.isDate(visitDate, inSameDayAs: initialVisitDate)
+            || !hasNextVisit
+            || !Calendar.current.isDate(nextVisitDate, inSameDayAs: initialNextVisitDate)
     }
 
     // MARK: - 카드
@@ -145,9 +162,14 @@ struct PrescriptionFormView: View {
     private var visitCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+                // 아직 오지 않은 날은 고를 수 없다. 미래로 적으면 재고 사건이
+                // 전부 미래가 되어 받아 온 약이 한 알도 안 늘고, 그 진료는
+                // 지난 진료 목록에도 안 떠서 지울 길조차 없었다
+                // (QA 2026-09-21). 용량 변경은 이미 같은 방어가 있다.
                 DatePicker(
                     t("진료 받은 날", "Visit date"),
                     selection: $visitDate,
+                    in: ...Date(),
                     displayedComponents: .date
                 )
                 .janjanBody(15)

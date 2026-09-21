@@ -52,7 +52,7 @@ struct ReportView: View {
     private var today: Date { clock.today }
     private var endOfToday: Date { clock.endOfToday }
 
-    /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
     /// PDF 내보내기 내용에는 적용하지 않는다 — 진료실에서 보여 줄 종이라서 이름이 그대로 실린다.
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
@@ -186,7 +186,7 @@ struct ReportView: View {
     private var patternTimeline: PatternTimeline {
         PatternTimeline.make(
             dayCount: 28,
-            endingAt: today,
+            endingAt: endOfToday,
             checkIns: checkIns,
             schedules: schedules,
             medications: medications,
@@ -290,7 +290,7 @@ struct ReportView: View {
             for: medication.id,
             stockEvents: stock,
             doseEvents: doses,
-            asOf: today
+            asOf: endOfToday
         )
 
         return HStack {
@@ -298,10 +298,14 @@ struct ReportView: View {
                 .janjanBody(15)
                 .foregroundStyle(Color.ink2)
             Spacer()
-            // 한 번도 세지 않았으면 0정이라고 말하지 않는다.
-            Text(counted
-                ? t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining))
-                : t("재고 미기록", "Stock not tracked"))
+            // 한 번도 세지 않았으면 0정이라고 말하지 않는다. 음수도 적지
+            // 않는다 - 약 탭은 0 으로 깎는데 여기만 "-16정" 을 보여 주면
+            // 같은 앱이 두 말을 한다(QA 2026-09-21).
+            Text(!counted
+                 ? t("재고 미기록", "Stock not tracked")
+                 : (remaining < 0
+                    ? t("확인 필요", "Needs recount")
+                    : t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining))))
                 .janjanBody(15, weight: counted ? .medium : .light)
                 .foregroundStyle(counted ? Color.ink : Color.muted)
                 .monospacedDigit()
@@ -445,7 +449,7 @@ struct ReportView: View {
         exportError = nil
 
         let content = ReportComposer.make(
-            endingAt: today,
+            endingAt: endOfToday,
             medications: medications,
             schedules: schedules,
             doseEvents: doses,

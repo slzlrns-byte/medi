@@ -442,6 +442,25 @@ public enum JanjanColor: String, Sendable, CaseIterable {
 }
 
 /// 0…1 로 정규화된 색. 앱 계층에서 Color / UIColor 로 감쌀 때 쓴다.
+extension JanjanColor {
+
+    /// 이 색을 바탕에 깔았을 때 그 위에 얹을 글자색.
+    ///
+    /// **밝기로 고른다.** 기분 칸의 날짜 숫자는 예전에 점수의 절댓값으로
+    /// 골랐는데(±2 이상이면 흰 글자), 점수가 세다고 색이 어두운 것이
+    /// 아니라서 옅은 연두(+2) 위에 흰 글자가 얹혀 1.65:1 이 됐다
+    /// (QA 2026-09-21). ink 와 surface 중 대비가 큰 쪽을 그때그때 고른다.
+    public func readableText(for scheme: JanjanColorScheme, theme: JanjanTheme = .standard) -> JanjanColor {
+        let background = JanjanRGB(hex: hex(for: scheme, theme: theme))?.relativeLuminance ?? 0.5
+        let ink = JanjanRGB(hex: JanjanColor.ink.hex(for: scheme, theme: theme))?.relativeLuminance ?? 0
+        let surface = JanjanRGB(hex: JanjanColor.surface.hex(for: scheme, theme: theme))?.relativeLuminance ?? 1
+        func contrast(_ a: Double, _ b: Double) -> Double {
+            (max(a, b) + 0.05) / (min(a, b) + 0.05)
+        }
+        return contrast(background, ink) >= contrast(background, surface) ? .ink : .surface
+    }
+}
+
 public struct JanjanRGB: Hashable, Sendable {
 
     public let red: Double
@@ -454,6 +473,14 @@ public struct JanjanRGB: Hashable, Sendable {
         self.green = green
         self.blue = blue
         self.alpha = alpha
+    }
+
+    /// WCAG 상대 휘도. 대비비를 잴 때 쓴다.
+    public var relativeLuminance: Double {
+        func channel(_ value: Double) -> Double {
+            value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
     }
 
     /// "#RRGGBB" 또는 "RRGGBB" 또는 "#RRGGBBAA" 를 받는다. 그 밖의 형식이면 nil.
