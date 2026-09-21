@@ -440,7 +440,13 @@ struct ReportView: View {
             checkIns: checkIns,
             medicationNotes: medicationNotes,
             symptomEntries: symptomEntries,
-            doseChanges: doseChangeRecords.map(\.core),
+            // 용량 변경 구역도 Pro 다. 앱에서 "어디서 어디로" 를 잠가 놓고
+            // 종이에 화살표를 그대로 찍으면 자물쇠 옆에 문을 하나 더 내는
+            // 셈이다(2026-09-21). 화살표만 빼고 "15mg" 만 남기지는 않는다 -
+            // "용량 변경" 이라는 제목 아래 숫자 하나는 의사가 읽을 수 없다.
+            // 무료에서는 구역 자체가 생기지 않는다. 바꾼 내용은 어차피
+            // 처방한 쪽이 알고 있다(사용자 판단).
+            doseChanges: pro.isPro ? doseChangeRecords.map(\.core) : [],
             lastVisit: lastVisit,
             // 다음 진료 기준 "N일 모자랍니다" 는 소진 예측(Pro)과 같은 계산이다.
             // PDF 가 무료가 되면서 이 줄이 유료 기능의 뒷문이 되지 않게,
