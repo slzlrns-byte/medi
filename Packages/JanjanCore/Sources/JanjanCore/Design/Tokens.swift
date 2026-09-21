@@ -172,7 +172,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .muted: return "#6A6B66"
         case .line: return "#E6E6E4"
         case .line2: return "#D4D4D1"
-        case .outline: return "#94948D"
+        case .outline: return "#87877F"
         case .sage:
             switch theme {
             case .sky: return "#C9DCE4"
@@ -310,7 +310,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
         case .muted: return "#8E8F8A"
         case .line: return "#2E2F2C"
         case .line2: return "#3B3C39"
-        case .outline: return "#6B6C67"
+        case .outline: return "#73746E"
         case .sage:
             switch theme {
             case .sky: return "#21333B"

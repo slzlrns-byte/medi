@@ -91,7 +91,7 @@ final class TokensTests: XCTestCase {
         for theme in JanjanTheme.allCases {
             for isDark in [false, true] {
                 let outline = isDark ? JanjanColor.outline.darkHex(theme) : JanjanColor.outline.lightHex(theme)
-                for surface in [JanjanColor.surface, .fog] {
+                for surface in [JanjanColor.surface, .fog, .surface2] {
                     let bg = isDark ? surface.darkHex(theme) : surface.lightHex(theme)
                     XCTAssertGreaterThanOrEqual(
                         contrast(bg, outline), 3,
