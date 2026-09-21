@@ -163,21 +163,15 @@ struct ReportView: View {
         ReportComposer.window(endingAt: today, lastVisit: lastVisit)
     }
 
-    private var overallAdherence: Decimal? {
-        InventoryCalculator.adherenceRate(
+    /// **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21).
+    /// 종이와 같은 계산을 쓴다 - 한 화면 안에서 두 숫자가 달라지면 안 된다.
+    private var adherence: InventoryCalculator.PrescriptionAdherence? {
+        InventoryCalculator.prescriptionAdherence(
+            prescriptions: prescriptionRecords.map(\.core),
+            stockEvents: stock,
             doseEvents: doses,
-            from: reportWindow.start,
-            to: endOfToday
-        )
-    }
-
-    /// 복약률 옆에 붙는 표본. 비율 혼자 두면 5일 열어 5번 누른 사람과
-    /// 28일 내내 챙긴 사람이 똑같이 100% 로 보인다.
-    private var answeredDays: Int {
-        InventoryCalculator.answeredDayCount(
-            doseEvents: doses,
-            from: reportWindow.start,
-            to: endOfToday
+            medications: medicationRecords.map { $0.core.displayReady },
+            asOf: endOfToday
         )
     }
 
@@ -237,22 +231,35 @@ struct ReportView: View {
                     .buttonStyle(.plain)
                 }
 
-                if let rate = overallAdherence {
-                    let percent = DecimalQuantity.floorToInt(rate * 100)
+                if let adherence {
+                    let percent = DecimalQuantity.floorToInt(adherence.rate * 100)
                     Text(t("복약률 \(percent)%", "Adherence \(percent)%"))
                         .janjanDisplay(30)
                         .foregroundStyle(Color.ink)
                         .monospacedDigit()
-                    adherenceBar(fraction: (rate as NSDecimalNumber).doubleValue)
+                    adherenceBar(fraction: (adherence.rate as NSDecimalNumber).doubleValue)
+                    // 비율만 두지 않는다 - 무엇으로 잰 숫자인지 같이 적는다.
+                    Text(t(
+                        "받은 \(DecimalQuantity.display(adherence.received))정 중 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 · 복용 기록 \(DecimalQuantity.display(adherence.taken))정",
+                        "\(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far, from \(DecimalQuantity.display(adherence.received)) received"
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text(t("아직 셀 기록이 없어요.", "No counted records yet."))
+                    // 셀 근거가 없으면 숫자를 지어내지 않는다.
+                    Text(t("진료와 받아 온 개수를 적어 두면 복약률이 나와요.",
+                           "Log a visit and how many pills you received, and adherence appears here."))
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(t("건너뜀도 정상적인 선택으로 함께 세요.", "Skipped doses are counted too, as a normal choice."))
+                Text(t("기록하지 않은 복용은 복용한 것으로 세지 않아요. 나중에 채워 넣으면 그때 반영돼요.",
+                       "A dose you didn't record isn't counted as taken. Fill it in later and it counts then."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
         }
@@ -472,6 +479,7 @@ struct ReportView: View {
             // 둔 글자이고, 광고를 끝까지 보고 받은 종이에서 구역이 조용히
             // 빠지는 것은 교환 조건을 바꾸는 일이다(2026-09-21).
             doseChanges: doseChangeRecords.map(\.core),
+            prescriptions: prescriptionRecords.map(\.core),
             lastVisit: lastVisit,
             // 다음 진료 기준 "N일 모자랍니다" 는 소진 예측(Pro)과 같은 계산이다.
             // PDF 가 무료가 되면서 이 줄이 유료 기능의 뒷문이 되지 않게,

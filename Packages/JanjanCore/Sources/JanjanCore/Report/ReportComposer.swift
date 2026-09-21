@@ -95,6 +95,9 @@ public enum ReportComposer {
         medicationNotes: [MedicationNote] = [],
         symptomEntries: [SymptomEntry] = [],
         doseChanges: [DoseChange] = [],
+        /// 복약률의 분모가 여기서 나온다 - 진료에서 받은 알 수는 저장된
+        /// 사실이라 나중에 요일을 고쳐도 변하지 않는다.
+        prescriptions: [Prescription] = [],
         lastVisit: Date? = nil,
         nextVisit: Date? = nil,
         questionsKo: String = "",
@@ -122,7 +125,14 @@ public enum ReportComposer {
 
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(
-            doseEvents: doseEvents, from: start, to: endMoment, language: language
+            doseEvents: doseEvents,
+            prescriptions: prescriptions,
+            stockEvents: stockEvents,
+            medications: medications,
+            from: start,
+            to: endMoment,
+            language: language,
+            calendar: calendar
         ))
         lines.append(contentsOf: medicationLines(
             medications: medications,
@@ -210,9 +220,13 @@ public enum ReportComposer {
 
     private static func adherenceLines(
         doseEvents: [DoseEvent],
+        prescriptions: [Prescription],
+        stockEvents: [StockEvent],
+        medications: [Medication],
         from start: Date,
         to end: Date,
-        language: JanjanLanguage
+        language: JanjanLanguage,
+        calendar: Calendar
     ) -> [ReportContent.Line] {
 
         let en = language == .english
@@ -238,18 +252,38 @@ public enum ReportComposer {
         let skipped = counted.filter { $0.status == .skipped }.count
         let unrecorded = counted.filter { $0.status == .unrecorded }.count
 
-        // 비율에는 **표본이 늘 붙는다.** 미기록을 분모에서 빼기로 한 이상
-        // (사용자 결정 2026-09-21) 5일 열어 5번 누른 사람도 100% 라서,
-        // 며칠치로 잰 숫자인지 모르면 읽는 사람이 판단할 수 없다.
-        if let rate = InventoryCalculator.adherenceRate(doseEvents: doseEvents, from: start, to: end) {
-            let answeredDays = InventoryCalculator.answeredDayCount(
-                doseEvents: doseEvents, from: start, to: end
-            )
+        // **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21). 분모가
+        // 처방에서 나오므로 요일을 고쳐도 지난 숫자가 흔들리지 않는다.
+        // 셀 근거(진료 기록)가 없으면 숫자를 지어내지 않고 그렇게 적는다.
+        if let adherence = InventoryCalculator.prescriptionAdherence(
+            prescriptions: prescriptions,
+            stockEvents: stockEvents,
+            doseEvents: doseEvents,
+            medications: medications,
+            asOf: end,
+            calendar: calendar
+        ) {
             lines.append(.init(
                 style: .body,
                 text: en
-                    ? "Adherence \(percentText(rate)) (from \(answeredDays) day\(answeredDays == 1 ? "" : "s") answered)"
-                    : "복약률 \(percentText(rate)) (답한 날 \(answeredDays)일 기준)"
+                    ? "Adherence \(percentText(adherence.rate))"
+                    : "복약률 \(percentText(adherence.rate))"
+            ))
+            // 비율만 두지 않는다 - 무엇으로 잰 숫자인지 같이 적어야
+            // 읽는 사람이 판단할 수 있다.
+            let day = monthDayText(adherence.visitDate, language: language, calendar: calendar)
+            lines.append(.init(
+                style: .caption,
+                text: en
+                    ? "\(day) visit · \(DecimalQuantity.display(adherence.received)) received · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far recorded as taken"
+                    : "\(day) 진료 · 받은 \(DecimalQuantity.display(adherence.received))정 중 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 · 복용 기록 \(DecimalQuantity.display(adherence.taken))정"
+            ))
+        } else {
+            lines.append(.init(
+                style: .caption,
+                text: en
+                    ? "Adherence needs a visit record — log a visit and how many pills you received."
+                    : "복약률은 진료 기록이 있어야 셀 수 있어요. 진료와 받아 온 개수를 적어 두면 나와요."
             ))
         }
         lines.append(.init(
@@ -261,8 +295,8 @@ public enum ReportComposer {
         lines.append(.init(
             style: .caption,
             text: en
-                ? "Adherence counts answered doses only. Skipped is a choice not to take; unrecorded has no answer and is left out of the rate."
-                : "복약률은 답한 예정분만 셉니다. 건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답이 없어 비율에서 빠집니다."
+                ? "Skipped is a choice not to take; unrecorded is a scheduled dose with no answer. A dose not recorded is not counted as taken."
+                : "건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답하지 않은 예정분입니다. 기록하지 않은 복용은 복용한 것으로 세지 않습니다."
         ))
         return lines
     }

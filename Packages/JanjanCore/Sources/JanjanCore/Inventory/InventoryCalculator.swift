@@ -210,22 +210,12 @@ public enum InventoryCalculator {
 
     // MARK: - 복약률
 
-    /// 기간 안의 복약률 = **복용함 ÷ (복용함 + 건너뜀)**.
-    ///
-    /// **모르는 날은 분모에서도 뺀다**(사용자 결정 2026-09-21).
-    /// 미기록은 "안 먹었다" 가 아니라 "답이 없다" 이고, 그 둘을 섞으면 앱이
-    /// 모르는 것을 안 먹은 것으로 바꿔 말하게 된다. 요일을 넓히기만 해도
-    /// 앱이 지난 4주의 안 먹는 날을 "빠트림" 으로 채워 100% 가 42% 로
-    /// 내려갔던 것이 그 결과다 - 한 번도 안 빠트린 사람의 숫자였다.
+    /// 기간 안의 복약률 = 복용함 ÷ (복용함 + 건너뜀 + 미기록).
     ///
     /// 정기 예정분(`kind == .scheduled`)만 센다. 필요시 약은 안 먹는 게 정상이라
     /// 분모에 넣으면 복약률이 근거 없이 내려간다.
     ///
-    /// **비율만 보이면 안 된다.** 5일 열어 5번 누른 사람도 100% 다. 그래서
-    /// 화면과 종이는 `answeredDayCount` 를 함께 적어 "28일 중 12일 기록" 을
-    /// 같이 보여 준다 - 비율에 표본이 붙어야 읽는 사람이 판단할 수 있다.
-    ///
-    /// - Returns: 0…1 사이 비율. 답한 사건이 하나도 없으면 nil.
+    /// - Returns: 0…1 사이 비율. 셀 사건이 하나도 없으면 nil.
     public static func adherenceRate(
         doseEvents: [DoseEvent],
         medicationID: UUID? = nil,
@@ -256,35 +246,125 @@ public enum InventoryCalculator {
             latest[key] = event
         }
 
-        // 답한 것만 센다. 미기록(앱이 채운 것과 사용자가 "기억나지 않아요" 를
-        // 고른 것 둘 다)은 양쪽 어디에도 들어가지 않는다.
-        let answered = latest.values.filter { $0.status == .taken || $0.status == .skipped }
-        guard !answered.isEmpty else { return nil }
-        let taken = answered.filter { $0.status == .taken }.count
-        return Decimal(taken) / Decimal(answered.count)
+        let total = latest.count
+        guard total > 0 else { return nil }
+        let taken = latest.values.filter { $0.status == .taken }.count
+        return Decimal(taken) / Decimal(total)
     }
 
-    /// 그 기간에 **답이 남은 날**이 며칠인지. 복약률 옆에 붙는 표본 크기다.
+    // MARK: - 진료 기준 복약률
+
+    /// 한 진료에서 받은 약으로 잰 복약률.
+    public struct PrescriptionAdherence: Hashable, Sendable {
+        /// 진료 받은 날.
+        public let visitDate: Date
+        /// 그 진료 이후 지난 날 수.
+        public let elapsedDays: Int
+        /// 그 진료에서 받은 알 수(정기 약만).
+        public let received: Decimal
+        /// 지금까지 먹었어야 할 알 수.
+        public let expected: Decimal
+        /// 먹었다고 기록된 알 수.
+        public let taken: Decimal
+        /// 0…1. `expected` 가 0 이면 만들지 않는다.
+        public let rate: Decimal
+    }
+
+    /// **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21).
     ///
-    /// 비율만 적으면 5일 열어 5번 누른 사람과 28일 내내 챙긴 사람이 똑같이
-    /// 100% 로 보인다. 그 종이를 읽는 사람이 구별할 수 있어야 한다.
-    public static func answeredDayCount(
+    /// 예전에는 시간대 칸을 셌다 - "예정된 칸 중 몇 칸에 복용함이 찍혔나".
+    /// 그런데 그 예정은 저장해 둔 것이 아니라 **지금의 요일로 매번 다시
+    /// 그린 것**이라, 월·수·금 먹던 사람이 "매일" 로 바꾸기만 해도 앱이 지난
+    /// 4주의 화·목·토·일을 빠트림으로 채워 100% 가 42% 로 내려갔다.
+    /// 한 번도 안 빠트린 사람의 숫자였고 그것이 진료실로 나갔다.
+    ///
+    /// 진료에서 **받은 알 수**는 저장된 사실이라 나중에 무엇을 고쳐도 변하지
+    /// 않는다. 그래서 분모를 거기서 만든다:
+    ///
+    ///     하루치 = 받은 알 수 ÷ 처방일수
+    ///     먹었어야 할 = 하루치 × min(진료 이후 지난 날, 처방일수)
+    ///     복약률 = 먹었다고 기록된 알 수 ÷ 먹었어야 할
+    ///
+    /// **기록하지 않은 날은 안 먹은 것으로 센다.** 분모는 처방이 정하므로
+    /// 기록이 없으면 분자에 안 들어갈 뿐이다. 나중에 그 날을 채우면 분자가
+    /// 올라가 비율이 따라 오른다 - "기록 빼먹은 날은 복약 안 한 걸로 하고,
+    /// 이후에 기록하면 집계" 가 그대로 성립한다.
+    ///
+    /// **필요시 약은 빼고 센다.** 안 먹는 것이 정상이라 분모에 넣으면 비율이
+    /// 근거 없이 내려간다.
+    ///
+    /// - Returns: 진료 기록이 없거나, 받은 약이 없거나, 진료 당일이면 nil.
+    ///   그때는 숫자를 지어내지 말고 화면이 안내 문구를 대신 보여 준다.
+    public static func prescriptionAdherence(
+        prescriptions: [Prescription],
+        stockEvents: [StockEvent],
         doseEvents: [DoseEvent],
+        medications: [Medication],
         medicationID: UUID? = nil,
-        from start: Date,
-        to end: Date,
+        asOf: Date,
         calendar: Calendar = .current
-    ) -> Int {
-        var days: Set<Date> = []
-        for event in doseEvents {
+    ) -> PrescriptionAdherence? {
+
+        // 가장 나중에 다녀온 진료. 오늘 안에 적은 것도 든다.
+        guard let visit = prescriptions
+            .filter({ calendar.startOfDay(for: $0.visitDate) <= calendar.startOfDay(for: asOf) })
+            .filter({ $0.daysSupplied > 0 })
+            .max(by: { $0.visitDate < $1.visitDate })
+        else { return nil }
+
+        let visitDay = calendar.startOfDay(for: visit.visitDate)
+        let today = calendar.startOfDay(for: asOf)
+        let elapsed = calendar.dateComponents([.day], from: visitDay, to: today).day ?? 0
+        // 진료 당일은 아직 셀 것이 없다. 하루가 지나야 하루치를 묻는다.
+        guard elapsed > 0 else { return nil }
+
+        let countedDays = min(elapsed, visit.daysSupplied)
+
+        // 필요시 약은 빼고, 이 진료에 매인 보충만 약별로 모은다.
+        var scheduledKinds: [UUID: Medication.Kind] = [:]
+        for medication in medications { scheduledKinds[medication.id] = medication.kind }
+
+        var received: [UUID: Decimal] = [:]
+        for event in stockEvents where event.prescriptionID == visit.id {
+            guard case .refill(let quantity) = event.kind, quantity > 0 else { continue }
             if let medicationID, event.medicationID != medicationID { continue }
-            guard event.kind == .scheduled else { continue }
-            guard event.status == .taken || event.status == .skipped else { continue }
-            let when = event.effectiveDate
-            guard when >= start, when <= end else { continue }
-            days.insert(calendar.startOfDay(for: event.scheduledAt))
+            if scheduledKinds[event.medicationID] == .asNeeded { continue }
+            received[event.medicationID, default: 0] += quantity
         }
-        return days.count
+        guard !received.isEmpty else { return nil }
+
+        let dayRatio = Decimal(countedDays) / Decimal(visit.daysSupplied)
+        var expected: Decimal = 0
+        var receivedTotal: Decimal = 0
+        for (_, quantity) in received {
+            receivedTotal += quantity
+            expected += quantity * dayRatio
+        }
+        guard expected > 0 else { return nil }
+
+        // 진료일 이후 기록된 복용. 기기 간 중복은 하나로 묶는다.
+        let visitStart = visitDay
+        var taken: Decimal = 0
+        for event in collapsedScheduledDoses(doseEvents, calendar: calendar) {
+            guard event.status == .taken else { continue }
+            guard received[event.medicationID] != nil else { continue }
+            let when = event.effectiveDate
+            guard when >= visitStart, when <= asOf else { continue }
+            taken += event.quantity
+        }
+
+        // 100% 를 넘겨 적지 않는다. 더 먹었다는 뜻일 수도 있지만 대개는
+        // 기록이 겹친 것이고, "복약률 120%" 는 읽는 사람에게 오류로 보인다.
+        let rate = min(DecimalQuantity.round(taken / expected, scale: 4), 1)
+
+        return PrescriptionAdherence(
+            visitDate: visit.visitDate,
+            elapsedDays: elapsed,
+            received: DecimalQuantity.round(receivedTotal, scale: 2),
+            expected: DecimalQuantity.round(expected, scale: 2),
+            taken: DecimalQuantity.round(taken, scale: 2),
+            rate: max(rate, 0)
+        )
     }
 
     /// 최근 4주(28일) 복약률. 소진 예측이 쓰는 기본값이다.
