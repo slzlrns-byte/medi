@@ -274,18 +274,16 @@ struct DiaryView: View {
                 // 좋은/나쁜을 색으로 편 가르지 않는다. 전부 같은 회색 칩.
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(Catalogs.emotions.words) { word in
-                        let isOn = record.emotionWords.contains(word.id)
-                        Button {
+                        // 알약 모양은 같지만 PillChip 은 28pt 라벨이고 TogglePill 은 44pt
+                        // 손잡이다. 같은 화면의 술·담배·눈금은 이미 TogglePill 인데
+                        // 칩 격자만 남아 있어, 수십 개가 깔린 줄에서 옆 것이
+                        // 켜졌다(QA 2026-09-21). 색 규칙은 둘이 똑같다.
+                        TogglePill(
+                            text: word.name(JanjanLanguage.current),
+                            isOn: record.emotionWords.contains(word.id)
+                        ) {
                             toggle(word.id, in: record)
-                        } label: {
-                            PillChip(
-                                text: word.name(JanjanLanguage.current),
-                                tint: isOn ? .ink : .surface2,
-                                textTint: isOn ? .surface : .ink2
-                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
                     }
                 }
             }
@@ -420,18 +418,12 @@ struct DiaryView: View {
 
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(ActivityTag.presets) { tag in
-                        let isOn = record.activities.contains(tag.id)
-                        Button {
+                        TogglePill(
+                            text: tag.name(JanjanLanguage.current),
+                            isOn: record.activities.contains(tag.id)
+                        ) {
                             toggleActivity(tag.id, in: record)
-                        } label: {
-                            PillChip(
-                                text: tag.name(JanjanLanguage.current),
-                                tint: isOn ? .ink : .surface2,
-                                textTint: isOn ? .surface : .ink2
-                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
                     }
                 }
             }
@@ -830,22 +822,16 @@ private struct SymptomEntrySheet: View {
 
                 FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                     ForEach(Catalogs.symptoms.symptoms(inGroup: group.id)) { item in
-                        let isOn = selectedIDs.contains(item.id)
-                        Button {
-                            if isOn {
+                        TogglePill(
+                            text: item.name(JanjanLanguage.current),
+                            isOn: selectedIDs.contains(item.id)
+                        ) {
+                            if selectedIDs.contains(item.id) {
                                 selectedIDs.remove(item.id)
                             } else {
                                 selectedIDs.insert(item.id)
                             }
-                        } label: {
-                            PillChip(
-                                text: item.name(JanjanLanguage.current),
-                                tint: isOn ? .ink : .surface2,
-                                textTint: isOn ? .surface : .ink2
-                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
                     }
                 }
             }

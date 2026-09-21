@@ -119,13 +119,10 @@ struct MedicationsView: View {
             }
             .sheet(isPresented: $isShowingPrescription) {
                 NavigationStack {
+                    // 진료일·처방일수·약별 개수·남은 개수·용량 변경·메모까지
+                    // 다 적어 놓고 손가락이 미끄러지면 전부 날아갔다
+                    // (QA 2026-09-21). 적은 것이 있으면 닫기를 한 번 거친다.
                     PrescriptionFormView { isShowingPrescription = false }
-                        .toolbar {
-                            ToolbarItem(placement: .topBarLeading) {
-                                Button(t("닫기", "Close")) { isShowingPrescription = false }
-                                    .foregroundStyle(Color.ink)
-                            }
-                        }
                 }
             }
             .sheet(isPresented: $isShowingVisitHistory) {

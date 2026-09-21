@@ -63,6 +63,7 @@ struct PillFinderView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
+        .keyboardDoneBar()
         .navigationTitle(t("약 모양으로 찾기", "Find by appearance"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $picked) { candidate in

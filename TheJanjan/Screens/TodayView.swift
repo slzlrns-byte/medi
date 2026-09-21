@@ -46,6 +46,8 @@ struct TodayView: View {
     /// 약별로 고른 필요시 개수. 고르지 않은 약은 `asNeededQuantity(for:)` 가
     /// 가장 최근 기록에서 기본값을 찾는다.
     @State private var asNeededQuantities: [UUID: Decimal] = [:]
+    /// 지우기 직전의 필요시 기록. 확인을 한 번 거친다.
+    @State private var pendingAsNeededDeletion: DoseEventRecord?
 
     /// 개수 선택지. 0.25 단위까지 허용하는 저장 규칙과 달리 화면에서 고르는 값은
     /// 이 넷으로 좁힌다 - 필요시 약에서 실제로 쓰이는 값이 대체로 이 안에 있다.
@@ -219,6 +221,24 @@ struct TodayView: View {
                     "이 시간대의 오늘 기록이 지워지고, 다시 답할 수 있게 돼요.",
                     "Today's entries for this slot are removed, and you can answer again."
                 ))
+            }
+            // 필요시 기록도 같은 규칙으로. 이 줄의 X 만 바로 지우고 있었다.
+            .confirmationDialog(
+                t("이 기록을 지울까요?", "Delete this record?"),
+                isPresented: Binding(
+                    get: { pendingAsNeededDeletion != nil },
+                    set: { if !$0 { pendingAsNeededDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingAsNeededDeletion
+            ) { event in
+                Button(t("지우기", "Delete"), role: .destructive) {
+                    deleteAsNeededEvent(event)
+                    pendingAsNeededDeletion = nil
+                }
+                Button(t("그대로 두기", "Keep it"), role: .cancel) { pendingAsNeededDeletion = nil }
+            } message: { _ in
+                Text(t("남은 개수도 함께 되돌아가요.", "The remaining count goes back too."))
             }
             .sheet(item: $openSlot) { selection in
                 if let line = plan.first(where: { $0.slotKey == selection.id }) {
@@ -693,7 +713,10 @@ struct TodayView: View {
                 .foregroundStyle(Color.ink2)
             Spacer(minLength: 0)
             Button {
-                deleteAsNeededEvent(event)
+                // 다른 카드의 같은 X 는 전부 한 번 묻는다. 이 줄만 바로
+                // 지웠고, 하필 왼쪽 가린 이름을 펼치는 자리와 8pt 붙어
+                // 있었다(QA 2026-09-21). 비상약 기록도 재고를 움직인다.
+                pendingAsNeededDeletion = event
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .regular))
@@ -919,6 +942,7 @@ private struct NextVisitSheet: View {
 
     @State private var date = Date()
     @State private var didLoad = false
+    @State private var isConfirmingClear = false
 
     /// 이미 잡혀 있는 가장 가까운 다음 진료.
     private var existing: Date? {
@@ -958,7 +982,11 @@ private struct NextVisitSheet: View {
                     BlackPillButton(title: t("저장", "Save")) { save() }
 
                     if existing != nil {
-                        WhitePillButton(title: t("미정으로 되돌리기", "Clear the date")) { clear() }
+                        // 저장 바로 아래 16pt 에 있는 되돌릴 수 없는 손잡이다
+                        // (QA 2026-09-21). 한 번 묻고 간다.
+                        WhitePillButton(title: t("미정으로 되돌리기", "Clear the date")) {
+                            isConfirmingClear = true
+                        }
                     }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
@@ -967,6 +995,17 @@ private struct NextVisitSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            .confirmationDialog(
+                t("다음 진료를 미정으로 되돌릴까요?", "Clear the next visit date?"),
+                isPresented: $isConfirmingClear,
+                titleVisibility: .visible
+            ) {
+                Button(t("되돌리기", "Clear"), role: .destructive) { clear() }
+                Button(t("그대로 두기", "Keep it"), role: .cancel) {}
+            } message: {
+                Text(t("잡아 둔 날짜와 진료 알림이 지워져요.",
+                       "The date and its reminder are removed."))
+            }
             .navigationTitle(t("다음 진료", "Next visit"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1271,7 +1310,12 @@ private struct UnrecordedSlotsSheet: View {
                             .janjanBody(13, weight: .medium)
                             .foregroundStyle(Color.ink2)
                             .underline()
-                            .frame(minHeight: 44, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: 44)
+                            // frame 만으로는 글자 밖 투명한 자리가 안 눌린다 -
+                            // 이 앱이 다른 데서는 이미 아는 규칙인데 여기만
+                            // 빠져 있었다(QA 2026-09-21).
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

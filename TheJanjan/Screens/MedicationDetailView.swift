@@ -25,6 +25,8 @@ struct MedicationDetailView: View {
 
     @State private var composing: MedicationNote.Kind?
     @State private var isShowingDoseChangeSheet = false
+    /// 지우기 직전의 필요시 기록. 확인을 한 번 거친다.
+    @State private var pendingAsNeededDeletion: DoseEventRecord?
     /// 용량 변경 이력에서 최신 하나 말고 나머지도 펴 둘지.
     @State private var isShowingOlderDoseChanges = false
     @State private var pendingDoseChangeDeletion: DoseChangeRecord?
@@ -112,6 +114,24 @@ struct MedicationDetailView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            t("이 기록을 지울까요?", "Delete this record?"),
+            isPresented: Binding(
+                get: { pendingAsNeededDeletion != nil },
+                set: { if !$0 { pendingAsNeededDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingAsNeededDeletion
+        ) { record in
+            Button(t("지우기", "Delete"), role: .destructive) {
+                context.delete(record)
+                try? context.save()
+                pendingAsNeededDeletion = nil
+            }
+            Button(t("그대로 두기", "Keep it"), role: .cancel) { pendingAsNeededDeletion = nil }
+        } message: { _ in
+            Text(t("남은 개수도 함께 되돌아가요.", "The remaining count goes back too."))
         }
         .sheet(item: $composing) { kind in
             MedicationNoteComposer(kind: kind) { text, symptomID in
@@ -226,7 +246,7 @@ struct MedicationDetailView: View {
                                 .foregroundStyle(Color.janjan(.peachInk))
                         }
                         .padding(.horizontal, CGFloat(JanjanSpacing.s))
-                        .frame(minHeight: 36)
+                        .frame(minHeight: 44)
                         .background(
                             Capsule(style: .continuous).fill(Color.janjan(.peach))
                         )
@@ -352,8 +372,9 @@ struct MedicationDetailView: View {
                 .monospacedDigit()
             Spacer(minLength: 0)
             Button {
-                context.delete(record)
-                try? context.save()
+                // 같은 카드의 메모·용량 변경은 한 번 묻는데 이 줄만 바로
+                // 지웠다(QA 2026-09-21). 필요시 기록도 재고를 움직인다.
+                pendingAsNeededDeletion = record
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .regular))
@@ -809,18 +830,10 @@ private struct MedicationNoteComposer: View {
 
                             FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
                                 ForEach(Catalogs.symptoms.symptoms) { item in
-                                    let isOn = symptomID == item.id
-                                    Button {
-                                        symptomID = isOn ? nil : item.id
-                                    } label: {
-                                        PillChip(
-                                            text: item.name(lang),
-                                            tint: isOn ? .ink : .surface2,
-                                            textTint: isOn ? .surface : .ink2
-                                        )
+                                    // 28pt 칩이 아니라 44pt 손잡이로(QA 2026-09-21).
+                                    TogglePill(text: item.name(lang), isOn: symptomID == item.id) {
+                                        symptomID = (symptomID == item.id) ? nil : item.id
                                     }
-                                    .buttonStyle(.plain)
-                                    .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
                                 }
                             }
                         }
@@ -1414,6 +1427,9 @@ private struct StockRecountSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            // decimalPad 에는 리턴 키가 없어서, 손잡이가 없으면 키보드가
+            // 비교 문구를 덮은 채 안 내려간다(QA 2026-09-21).
+            .keyboardDoneBar()
             .navigationTitle(t("다시 세기", "Count again"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

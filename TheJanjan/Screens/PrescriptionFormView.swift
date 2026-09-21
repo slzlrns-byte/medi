@@ -18,6 +18,7 @@ struct PrescriptionFormView: View {
     let onSaved: () -> Void
 
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var pro: ProStore
 
     @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
@@ -41,6 +42,7 @@ struct PrescriptionFormView: View {
     @State private var isShowingNewMedication = false
     /// 이번 진료에서 용량이 바뀐 약. 손잡이를 켠 약만 여기 있다.
     @State private var doseEdits: [UUID: DoseEdit] = [:]
+    @State private var isConfirmingDiscard = false
 
     /// 진료에서 들은 용량 변경 하나. 표기와 1회 개수를 따로 든다 —
     /// "10mg 에서 15mg" 과 "아침 1정에서 2정" 은 둘 다 "용량이 바뀌었다" 이고,
@@ -106,8 +108,36 @@ struct PrescriptionFormView: View {
         // 입력칸이 여럿인 화면인데 키보드를 내릴 길이 없었다 - 한 번 적고
         // 나면 키보드가 저장 버튼을 덮은 채였다(사용자, TestFlight 17).
         .keyboardDoneBar()
+        // 다 적어 놓고 손가락이 미끄러지면 전부 날아갔다(QA 2026-09-21).
+        // 빈 폼은 그대로 쓸어내려 닫을 수 있게 둔다 - 적은 것이 없으면
+        // 물을 이유도 없다.
+        .interactiveDismissDisabled(hasEdits)
         .navigationTitle(t("진료 기록", "Log a visit"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(t("닫기", "Close")) {
+                    if hasEdits { isConfirmingDiscard = true } else { dismiss() }
+                }
+                .foregroundStyle(Color.ink)
+            }
+        }
+        .confirmationDialog(
+            t("적던 내용을 버릴까요?", "Discard what you've entered?"),
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button(t("버리기", "Discard"), role: .destructive) { dismiss() }
+            Button(t("계속 적기", "Keep editing"), role: .cancel) {}
+        }
+    }
+
+    /// 닫으면 사라질 것이 있는지.
+    private var hasEdits: Bool {
+        !refills.isEmpty
+            || !leftovers.isEmpty
+            || !doseEdits.isEmpty
+            || !clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - 카드

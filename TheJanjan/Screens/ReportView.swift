@@ -220,7 +220,7 @@ struct ReportView: View {
                         }
                         .foregroundStyle(Color.ink2)
                         .padding(.horizontal, CGFloat(JanjanSpacing.s))
-                        .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 1)
+                        .frame(minHeight: 44)
                         .background(Capsule(style: .continuous).fill(Color.janjan(.surface2)))
                         .contentShape(Capsule(style: .continuous))
                     }
@@ -328,6 +328,18 @@ struct ReportView: View {
                 // 만드는 동안은 눌리지 않는다는 것이 눈에도 보여야 한다.
                 .opacity(isExporting ? 0.4 : 1)
                 .disabled(isExporting)
+
+                // 흐려지는 것만으로는 "멈췄다" 와 구별되지 않는다. 기록이
+                // 많으면 그리는 데 한 박자 걸리는데 그동안 아무 말이
+                // 없었다(QA 2026-09-21).
+                if isExporting {
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        ProgressView().controlSize(.small).tint(Color.ink2)
+                        Text(t("한 장으로 만들고 있어요…", "Putting it on one page…"))
+                            .janjanBody(12)
+                            .foregroundStyle(Color.ink2)
+                    }
+                }
 
                 Text(t(
                     "만든 파일은 직접 공유할 때만 기기 밖으로 나가요.",
