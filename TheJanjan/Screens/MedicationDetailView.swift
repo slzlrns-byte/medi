@@ -490,7 +490,8 @@ struct MedicationDetailView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityExpanded(isShowingOlderDoseChanges)
+                    .accessibilityValue(Text(isShowingOlderDoseChanges
+                                             ? t("펼쳐짐", "Expanded") : t("접힘", "Collapsed")))
                 }
 
                 // 용량이 실제로 바뀐 바로 그때. 적어 둔 것이 없으면 권하지 않는다.

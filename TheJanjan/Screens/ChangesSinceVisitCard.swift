@@ -102,7 +102,10 @@ struct ChangesSinceVisitCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityExpanded(isExpanded)
+        // SwiftUI 에는 accessibilityExpanded 가 없다(UIKit 쪽 API 다).
+        // 상태는 값으로, 다음에 일어날 일은 힌트로 나눠 말한다 - 힌트만
+        // 있으면 지금 펼쳐져 있는지를 끝까지 들어야 알 수 있다.
+        .accessibilityValue(Text(isExpanded ? t("펼쳐짐", "Expanded") : t("접힘", "Collapsed")))
         .accessibilityHint(Text(isExpanded ? t("눌러서 접습니다", "Tap to collapse")
                                            : t("눌러서 펼칩니다", "Tap to expand")))
     }

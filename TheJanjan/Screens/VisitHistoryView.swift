@@ -121,7 +121,7 @@ struct VisitHistoryView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityExpanded(isShowingOlder)
+        .accessibilityValue(Text(isShowingOlder ? t("펼쳐짐", "Expanded") : t("접힘", "Collapsed")))
     }
 
     /// 접힌 줄에 적는 말.
