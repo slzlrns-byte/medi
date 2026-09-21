@@ -239,9 +239,14 @@ struct ReportView: View {
                         .monospacedDigit()
                     adherenceBar(fraction: (adherence.rate as NSDecimalNumber).doubleValue)
                     // 비율만 두지 않는다 - 무엇으로 잰 숫자인지 같이 적는다.
+                    // 종이와 **같은 문장**을 쓴다. 화면만 진료일을 빼 두면 같은
+                    // 숫자를 두고 두 곳이 다른 말을 한다(QA 2026-09-21).
+                    let visitDay = ReportComposer.monthDayText(
+                        adherence.visitDate, language: JanjanLanguage.current
+                    )
                     Text(t(
-                        "약 \(adherence.items.count)종 · 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 중 복용 기록 \(DecimalQuantity.display(adherence.taken))정",
-                        "\(adherence.items.count) medication\(adherence.items.count == 1 ? "" : "s") · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far"
+                        "\(visitDay) 진료 · 약 \(adherence.items.count)종 · 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 중 복용 기록 \(DecimalQuantity.display(adherence.taken))정",
+                        "\(visitDay) visit · \(adherence.items.count) medication\(adherence.items.count == 1 ? "" : "s") · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far"
                     ))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)

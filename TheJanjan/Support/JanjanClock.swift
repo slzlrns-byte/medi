@@ -28,11 +28,19 @@ final class JanjanClock: ObservableObject {
     /// 그럴 때는 `endOfToday` 와 비교한다.
     @Published private(set) var today: Date = Date()
 
-    /// 오늘이 끝나는 순간(내일 0시). `< endOfToday` 가 "오늘까지" 다.
+    /// 오늘이 끝나는 순간(오늘 23:59:59). `< endOfToday` 가 "오늘까지" 다.
+    ///
+    /// **내일 0시가 아니다**(2026-09-21 수정). 이 값을 받는 쪽들은 "오늘 안의
+    /// 어떤 순간" 으로 보고 `startOfDay` 를 다시 건다. 내일 0시를 주면 그
+    /// startOfDay 가 내일이라 하루가 통째로 밀렸다 - 복약률의 경과일이 하루 더
+    /// 세어져 꼬박 먹은 사람이 95% 로 내려갔고, 진료를 적자마자 "복약률 0%" 가
+    /// 떴으며(진료 당일 가드가 무력해졌다), 종이 머리글의 기간이 아직 오지 않은
+    /// 날로 끝났다(QA 2026-09-21).
     var endOfToday: Date {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: today)
-        return calendar.date(byAdding: .day, value: 1, to: start) ?? today
+        return calendar.date(byAdding: .day, value: 1, to: start)?
+            .addingTimeInterval(-1) ?? today
     }
 
     private var observers: [NSObjectProtocol] = []

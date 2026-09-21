@@ -320,7 +320,12 @@ public enum ReportComposer {
         let en = language == .english
         var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Medications" : "약")]
 
-        let listed = medications.filter { $0.status == .active }
+        // 끊은 약도 **복약률 평균에 들어갔으면** 여기 싣는다. 평균이 한쪽 때문에
+        // 크게 내려갔는데 그 약이 종이에 없으면, 읽는 사람이 "복약률 40% · 약 2종"
+        // 밑에 약이 하나뿐인 것을 보게 된다 - 40% 가 어디서 왔는지 확인할 길이
+        // 없다(QA 2026-09-21).
+        let counted = Set(adherence?.items.map(\.medicationID) ?? [])
+        let listed = medications.filter { $0.status == .active || counted.contains($0.id) }
         guard !listed.isEmpty else {
             lines.append(.init(
                 style: .body,
@@ -344,6 +349,14 @@ public enum ReportComposer {
             if medication.kind == .asNeeded {
                 parts.append(medication.kind.label(language))
             }
+            if medication.status == .stopped {
+                if let stoppedAt = medication.stoppedAt {
+                    let day = monthDayText(stoppedAt, language: language, calendar: calendar)
+                    parts.append(en ? "stopped \(day)" : "중단 \(day)")
+                } else {
+                    parts.append(en ? "stopped" : "중단")
+                }
+            }
             if let item = adherence?.items.first(where: { $0.medicationID == medication.id }) {
                 parts.append(en ? "adherence \(percentText(item.rate))" : "복약률 \(percentText(item.rate))")
             }
@@ -364,7 +377,8 @@ public enum ReportComposer {
             }
             lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
 
-            if let shortfall = snapshot.shortfallDays, shortfall > 0 {
+            // 끊은 약은 모자랄 일이 없다. 복약률 때문에 실렸을 뿐이다.
+            if medication.status == .active, let shortfall = snapshot.shortfallDays, shortfall > 0 {
                 lines.append(.init(
                     style: .caption,
                     text: en

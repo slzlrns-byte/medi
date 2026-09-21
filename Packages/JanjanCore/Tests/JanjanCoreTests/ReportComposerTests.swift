@@ -25,6 +25,7 @@ final class ReportComposerTests: XCTestCase {
         stock: [StockEvent] = [],
         checkIns: [CheckIn] = [],
         doseChanges: [DoseChange] = [],
+        prescriptions: [Prescription] = [],
         lastVisit: Date? = nil,
         nextVisit: Date? = nil,
         questions: String = ""
@@ -37,6 +38,7 @@ final class ReportComposerTests: XCTestCase {
             stockEvents: stock,
             checkIns: checkIns,
             doseChanges: doseChanges,
+            prescriptions: prescriptions,
             lastVisit: lastVisit,
             nextVisit: nextVisit,
             questionsKo: questions,
@@ -245,7 +247,37 @@ final class ReportComposerTests: XCTestCase {
         let report = content(doses: Fixed.workedExampleDoses())
         // 14 복용 · 2 건너뜀 · 1 미기록.
         XCTAssertTrue(texts(report).contains("복용 14회 · 건너뜀 2회 · 미기록 1회"))
-        XCTAssertTrue(texts(report).contains("복약률 82%"))
+    }
+
+    /// 복약률은 **진료에서 받은 약**에서 나온다. 진료 기록이 없으면 세 숫자는
+    /// 그대로 적되 비율은 지어내지 않는다(사용자 결정 2026-09-21).
+    func testAdherenceNeedsAVisitRecord() {
+        let report = content(doses: Fixed.workedExampleDoses())
+        XCTAssertFalse(texts(report).contains { $0.hasPrefix("복약률") })
+        XCTAssertTrue(texts(report).contains(
+            "복약률은 진료 기록이 있어야 셀 수 있어요. 진료와 받아 온 개수를 적어 두면 나와요."
+        ))
+    }
+
+    /// 8/1 에 28일치 28정을 받고 8/17 저녁에 뽑는다. 분모는 진료 다음 날부터
+    /// 어제까지의 16일치(16정)이고, 분자는 그 16일 안의 복용 기록 14정이다.
+    /// 8/15·8/16 건너뜀, 8/17 미기록은 분자에 들어가지 않는다.
+    func testAdherenceComesFromWhatTheVisitGave() {
+        let visit = Prescription(visitDate: Fixed.date(2026, 8, 1, 10), daysSupplied: 28)
+        let report = content(
+            doses: Fixed.workedExampleDoses(),
+            stock: [StockEvent.refill(
+                medicationID: Fixed.medA,
+                quantity: 28,
+                at: Fixed.date(2026, 8, 1, 10),
+                prescriptionID: visit.id
+            )],
+            prescriptions: [visit]
+        )
+        XCTAssertTrue(texts(report).contains("복약률 87%"), "14 ÷ 16 = 87.5% → 87%")
+        XCTAssertTrue(texts(report).contains(
+            "8월 1일 진료 · 약 1종 · 지금까지 16정 예정 중 복용 기록 14정 (약별 복약률의 평균)"
+        ))
     }
 
     func testPercentRoundsDownNotUp() {

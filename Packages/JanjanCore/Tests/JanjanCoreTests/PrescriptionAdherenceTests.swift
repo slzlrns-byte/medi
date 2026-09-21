@@ -166,6 +166,34 @@ final class PrescriptionAdherenceTests: XCTestCase {
         XCTAssertEqual(result?.expected, 28, "28일치를 넘겨 세지 않는다")
     }
 
+    /// **분자도 분모가 선 날들만 본다.** 28일치를 받고 40일이 지났으면,
+    /// 분모는 28일치에서 멈추고 분자도 그 28일 안의 기록만 센다. 예전에는
+    /// 분자만 계속 자라 "받은 28정 예정 중 복용 기록 40정" 이 찍혔고
+    /// 비율이 100% 에 붙어 버렸다(QA 2026-09-21).
+    func testTakenDoesNotKeepGrowingPastTheSupply() {
+        // 9/1 에 28일치. 앞 14일은 다 먹고, 처방이 끝난 뒤로도 계속 먹었다.
+        let after = (1...12).map { day -> DoseEvent in
+            let at = Fixed.date(2026, 10, day, 8, 0)
+            return DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: at,
+                actualAt: at,
+                status: .taken,
+                quantity: 1,
+                kind: .scheduled,
+                slotKey: DoseSlot.morning.storageKey
+            )
+        }
+        let result = rate(
+            doses: (1...14).map { taken(day: $0) } + after,
+            asOf: Fixed.date(2026, 10, 12, 23, 0)
+        )
+
+        XCTAssertEqual(result?.expected, 28)
+        XCTAssertEqual(result?.taken, 14, "처방 기간 밖의 복용은 분자에 들어가지 않는다")
+        XCTAssertEqual(result?.rate, Decimal(string: "0.5"))
+    }
+
     /// 더 먹었다고 100% 를 넘겨 적지 않는다.
     func testRateNeverExceedsOneHundred() {
         let doses = (2...21).map { taken(day: $0, quantity: 2) }   // 예정의 두 배
@@ -196,8 +224,8 @@ extension PrescriptionAdherenceTests {
             refill(42, medicationID: Fixed.medA),
             refill(14, medicationID: Fixed.medB)
         ]
-        // 14일 내내 A 만 먹었다.
-        let doses = (2...15).map { taken(day: $0, quantity: 3, medicationID: Fixed.medA) }
+        // 14일(9/1~9/14) 내내 A 만 먹었다.
+        let doses = (1...14).map { taken(day: $0, quantity: 3, medicationID: Fixed.medA) }
 
         let result = InventoryCalculator.prescriptionAdherence(
             prescriptions: [twoMedPrescription()],
@@ -226,8 +254,8 @@ extension PrescriptionAdherenceTests {
             refill(28, medicationID: Fixed.medA),
             refill(28, medicationID: Fixed.medB)
         ]
-        // A 만 꼬박 먹었다. B 는 한 번도 안 먹고 9/15 에 끊었다.
-        let doses = (2...29).map { taken(day: $0, medicationID: Fixed.medA) }
+        // A 만 꼬박 먹었다(9/1~9/28). B 는 한 번도 안 먹고 9/15 에 끊었다.
+        let doses = (1...28).map { taken(day: $0, medicationID: Fixed.medA) }
 
         let result = InventoryCalculator.prescriptionAdherence(
             prescriptions: [prescription()],

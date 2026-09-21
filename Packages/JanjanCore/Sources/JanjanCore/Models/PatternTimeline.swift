@@ -72,6 +72,10 @@ public struct PatternTimeline: Hashable, Sendable {
             latestByDay[day] = checkIn
         }
 
+        // 되살리기 전의 **원래 상태**를 들고 있는다. 시간대로 거를 때 필요하다.
+        var medicationsByID: [UUID: Medication] = [:]
+        for medication in medications { medicationsByID[medication.id] = medication }
+
         var days: [Day] = []
         for offset in stride(from: dayCount - 1, through: 0, by: -1) {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: endDay) else { continue }
@@ -96,7 +100,24 @@ public struct PatternTimeline: Hashable, Sendable {
                 doseEvents: doseEvents,
                 calendar: calendar
             )
-            let entries = lines.flatMap(\.entries)
+            // 되살리기는 **날 단위**라 끊은 날의 저녁 시간대까지 함께 살아난다.
+            // 아침에 먹고 낮에 끊은 약이 그날 저녁도 예정에 있었던 것으로 세어져
+            // 그래프의 분모가 하루치 더 붙었다(QA 2026-09-21). 시간대로 한 번 더
+            // 거른다 - "기록 없이 지나간 시간대" 가 쓰는 규칙과 같게 맞춘다.
+            let entries = lines.flatMap { line -> [DayPlan.Entry] in
+                let plannedAt = line.time.date(on: date, calendar: calendar)
+                return line.entries.filter { entry in
+                    guard let medication = medicationsByID[entry.medicationID] else { return true }
+                    if medication.status == .stopped {
+                        guard let stoppedAt = medication.stoppedAt else { return true }
+                        return stoppedAt > plannedAt
+                    }
+                    // 끊었다가 다시 먹는 약은 쉬었던 구간의 침묵도 예정이 아니다.
+                    if let stoppedAt = medication.stoppedAt, let resumedAt = medication.resumedAt,
+                       stoppedAt <= plannedAt, plannedAt < resumedAt { return false }
+                    return true
+                }
+            }
             let checkIn = latestByDay[date]
             days.append(Day(
                 date: date,

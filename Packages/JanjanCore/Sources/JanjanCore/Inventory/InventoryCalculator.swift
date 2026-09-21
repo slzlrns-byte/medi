@@ -322,9 +322,14 @@ public enum InventoryCalculator {
     /// 않는다. 그래서 분모를 거기서 만든다:
     ///
     ///     하루치 = 받은 알 수 ÷ 처방일수
-    ///     먹었어야 할 = 하루치 × min(진료 이후 지난 날, 처방일수, 중단까지의 날)
-    ///     약별 복약률 = 먹었다고 기록된 알 수 ÷ 먹었어야 할
+    ///     센 날 = min(진료 이후 지난 날, 처방일수, 중단까지의 날)
+    ///     먹었어야 할 = 하루치 × 센 날
+    ///     약별 복약률 = **그 날들 안의** 복용 기록 알 수 ÷ 먹었어야 할
     ///     전체 복약률 = 약별 복약률의 **평균**
+    ///
+    /// **분자와 분모는 같은 날들을 본다.** 분자만 오늘까지 열어 두면 28일치를
+    /// 받고 40일이 지난 사람의 비율이 100% 에 붙고, 캡션이 "받은 28정 예정 중
+    /// 복용 기록 40정" 이라고 적는다(QA 2026-09-21).
     ///
     /// **알 수로 가중하지 않는다.** 합으로 나누면 하루 세 번 먹는 약이 한 번
     /// 먹는 약보다 세 배 무거워진다. 약 두 개 중 하나를 꼬박 먹고 하나를
@@ -381,14 +386,13 @@ public enum InventoryCalculator {
         }
         guard !received.isEmpty else { return nil }
 
-        // 약별로 기록된 복용 알 수. 기기 간 중복은 하나로 묶는다.
-        var takenByID: [UUID: Decimal] = [:]
+        // 이 진료에 매인 약들의 복용 기록만 모은다. 기기 간 중복은 하나로 묶고,
+        // 날짜로 자르는 일은 약별로 한다 - 약마다 분모가 서는 날이 다르다.
+        var recordsByID: [UUID: [DoseEvent]] = [:]
         for event in collapsedScheduledDoses(doseEvents, calendar: calendar) {
             guard event.status == .taken else { continue }
             guard received[event.medicationID] != nil else { continue }
-            let when = event.effectiveDate
-            guard when >= visitDay, when <= asOf else { continue }
-            takenByID[event.medicationID, default: 0] += event.quantity
+            recordsByID[event.medicationID, default: []].append(event)
         }
 
         var items: [PrescriptionAdherence.Item] = []
@@ -403,9 +407,21 @@ public enum InventoryCalculator {
             }
             guard days > 0 else { continue }
 
+            // **분자도 분모와 같은 날들만 본다**(QA 2026-09-21). 예전에는
+            // 분자가 `asOf` 까지 열려 있었다. 그러면 28일치를 받고 40일이
+            // 지난 사람은 분모가 28일치에서 멈춘 채 분자만 계속 자라
+            // 비율이 100% 에 붙고, 캡션이 "받은 28정 예정 중 복용 기록 40정"
+            // 이라고 적는다. 끊은 약도 마찬가지로 분모는 끊은 날 앞에서
+            // 멈추는데 분자는 끊은 날 아침 약까지 세어 한 칸씩 어긋났다.
+            let windowEnd = calendar.date(byAdding: .day, value: days, to: visitDay) ?? asOf
+            let taken = (recordsByID[id] ?? []).reduce(Decimal(0)) { sum, event in
+                let when = event.effectiveDate
+                guard when >= visitDay, when < windowEnd, when <= asOf else { return sum }
+                return sum + event.quantity
+            }
+
             let expected = quantity * Decimal(days) / Decimal(visit.daysSupplied)
             guard expected > 0 else { continue }
-            let taken = takenByID[id] ?? 0
             // 100% 를 넘겨 적지 않는다. 더 먹었다는 뜻일 수도 있지만 대개는
             // 기록이 겹친 것이고, "복약률 120%" 는 읽는 사람에게 오류로 보인다.
             let rate = min(max(DecimalQuantity.round(taken / expected, scale: 4), 0), 1)
