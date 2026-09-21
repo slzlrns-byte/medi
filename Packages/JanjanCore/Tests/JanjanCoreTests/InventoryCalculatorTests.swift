@@ -517,7 +517,9 @@ extension InventoryCalculatorTests {
     func testCorrectionStillWinsAsTheBaseline() {
         let stock: [StockEvent] = [
             .refill(medicationID: Fixed.medA, quantity: 28, at: Fixed.date(2026, 8, 1, 10)),
-            .correction(medicationID: Fixed.medA, setTo: 10, at: Fixed.date(2026, 8, 10, 10))
+            // 그날 21시 복용보다 **뒤**에 맞춘다. 낮에 맞추면 그날 저녁 약이
+            // 정정 뒤로 들어가 한 알 더 빠진다.
+            .correction(medicationID: Fixed.medA, setTo: 10, at: Fixed.date(2026, 8, 10, 23))
         ]
         let doses = (2...20).map { day in
             DoseEvent(

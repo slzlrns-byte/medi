@@ -581,14 +581,75 @@ private struct DayDoseEditSheet: View {
     private var lang: JanjanLanguage { .current }
     private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
+    /// 그날의 계획 + **그날 기록이 남은 줄**.
+    ///
+    /// `DayPlan` 은 지금 상태만 본다. 그래서 약을 끊거나 요일을 줄이면 그 날의
+    /// 줄이 계획에서 통째로 사라져, 바로 위 요약 카드는 "복용 1 · 건너뜀 1" 이라고
+    /// 하는데 여기서는 "이날은 예정된 약이 없었어요" 가 떴다 - 잘못 눌린 건너뜀을
+    /// 고칠 길이 사라진다. 이 시트는 **고치는 자리**이므로 기록이 있으면 무조건
+    /// 줄을 세운다(QA 2026-09-21).
     private var lines: [DayPlan.SlotLine] {
-        DayPlan.slots(
+        let medications = medicationRecords.map { $0.core.displayReady }
+        let events = doseRecords.map(\.core)
+        let dayStart = calendar.startOfDay(for: date)
+
+        // 그날 아직 중단 전이었던 약은 되살려 놓고 계획을 세운다
+        // ("기록 없이 지나간 시간대" 와 같은 규칙).
+        let dayMedications = medications.map { medication -> Medication in
+            guard medication.status == .stopped,
+                  let stoppedAt = medication.stoppedAt,
+                  stoppedAt > dayStart else { return medication }
+            var revived = medication
+            revived.status = .active
+            return revived
+        }
+        let planned = DayPlan.slots(
             on: date,
             schedules: scheduleRecords.map(\.core),
-            medications: medicationRecords.map { $0.core.displayReady },
-            doseEvents: doseRecords.map(\.core),
+            medications: dayMedications,
+            doseEvents: events,
             calendar: calendar
         )
+
+        var covered = Set<String>()
+        for line in planned {
+            for entry in line.entries { covered.insert("\(line.slotKey)|\(entry.medicationID)") }
+        }
+
+        var namesByID: [UUID: String] = [:]
+        for medication in medications { namesByID[medication.id] = medication.displayTitle }
+
+        var extras: [String: [DayPlan.Entry]] = [:]
+        var slotByKey: [String: DoseSlot] = [:]
+        for event in events {
+            guard event.kind == .scheduled else { continue }
+            guard calendar.isDate(event.scheduledAt, inSameDayAs: date) else { continue }
+            guard let slotKey = event.slotKey, let slot = DoseSlot(storageKey: slotKey) else { continue }
+            let key = "\(slotKey)|\(event.medicationID)"
+            guard !covered.contains(key) else { continue }
+            covered.insert(key)
+            slotByKey[slotKey] = slot
+            extras[slotKey, default: []].append(DayPlan.Entry(
+                id: event.id,
+                medicationID: event.medicationID,
+                medicationName: namesByID[event.medicationID] ?? t("지운 약", "a deleted medication"),
+                dose: event.quantity,
+                status: event.status,
+                eventID: event.id,
+                source: event.source
+            ))
+        }
+        guard !extras.isEmpty else { return planned }
+
+        var merged: [DayPlan.SlotLine] = planned.map { line in
+            guard let added = extras.removeValue(forKey: line.slotKey) else { return line }
+            return DayPlan.SlotLine(slot: line.slot, time: line.time, entries: line.entries + added)
+        }
+        for (key, entries) in extras {
+            guard let slot = slotByKey[key] else { continue }
+            merged.append(DayPlan.SlotLine(slot: slot, time: slot.defaultTime, entries: entries))
+        }
+        return merged.sorted { $0.time < $1.time }
     }
 
     var body: some View {

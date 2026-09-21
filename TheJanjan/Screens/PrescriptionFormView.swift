@@ -247,7 +247,8 @@ struct PrescriptionFormView: View {
         }
         .sheet(isPresented: $isShowingNewMedication) {
             NavigationStack {
-                MedicationFormView { isShowingNewMedication = false }
+                // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
+                MedicationFormView(skipsStock: true) { isShowingNewMedication = false }
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(t("닫기", "Close")) { isShowingNewMedication = false }

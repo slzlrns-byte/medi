@@ -253,7 +253,8 @@ final class ReportComposerTests: XCTestCase {
     /// 그대로 적되 비율은 지어내지 않는다(사용자 결정 2026-09-21).
     func testAdherenceNeedsAVisitRecord() {
         let report = content(doses: Fixed.workedExampleDoses())
-        XCTAssertFalse(texts(report).contains { $0.hasPrefix("복약률") })
+        // 안내 문구도 "복약률" 로 시작하므로 **비율이 찍혔는지**를 묻는다.
+        XCTAssertFalse(texts(report).contains { $0.contains("%") && $0.hasPrefix("복약률 ") })
         XCTAssertTrue(texts(report).contains(
             "복약률은 진료 기록이 있어야 셀 수 있어요. 진료와 받아 온 개수를 적어 두면 나와요."
         ))

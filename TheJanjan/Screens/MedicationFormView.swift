@@ -49,15 +49,26 @@ struct MedicationFormView: View {
     /// 고치러 들어올 때의 요일. 바뀌었는지 이 값과 견준다.
     private let originalWeekdays: Set<Weekday>
 
+    /// 재고 칸을 아예 두지 않는 길. 진료 기록 안에서 연 등록 폼이 그렇다 -
+    /// 바로 아래에 "받아 온 개수" 가 있어서 같은 숫자를 두 번 적게 되고,
+    /// 등록 정정이 보충보다 **나중** 이라 기준점이 되어 받아 온 개수가
+    /// 통째로 무시됐다(QA 2026-09-21).
+    private let skipsStock: Bool
+
 
     private var lang: JanjanLanguage { .current }
 
     /// - Parameter prefill: 약봉투 스캔이 읽어 온 값. 채워만 두고 사용자가 고칠 수 있다 —
     ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
-    init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
+    init(
+        prefill: PharmacyLabelParser.Candidate? = nil,
+        skipsStock: Bool = false,
+        onSaved: @escaping () -> Void
+    ) {
         self.onSaved = onSaved
         self.editingID = nil
         self.originalWeekdays = []
+        self.skipsStock = skipsStock
         _name = State(initialValue: prefill?.name ?? "")
         _strength = State(initialValue: prefill?.strengthText ?? "")
     }
@@ -66,6 +77,7 @@ struct MedicationFormView: View {
     init(existing: Existing) {
         self.onSaved = {}
         self.editingID = existing.medication.id
+        self.skipsStock = false
         _name = State(initialValue: existing.medication.name)
         _strength = State(initialValue: existing.medication.strengthText)
         _purpose = State(initialValue: existing.medication.purposeLine)
@@ -179,7 +191,7 @@ struct MedicationFormView: View {
                 // 재고는 "세어 본 사건" 이 쌓여 만들어지는 값이라 고치기에서
                 // 숫자 하나로 덮으면 기준점이 끊긴다. 다시 세는 일은 상세
                 // 화면의 "다시 세기" 가 맡는다.
-                if !isEditing {
+                if !isEditing, !skipsStock {
                     stockCard
                 }
                 if isEditing {
@@ -593,7 +605,7 @@ struct MedicationFormView: View {
     /// 재고 칸을 아직 못 받은 상태인지. 고치기 화면에는 이 칸이 없다
     /// (재고는 "다시 세기" 가 맡는다).
     private var needsStock: Bool {
-        !isEditing && initialStock == nil
+        !isEditing && !skipsStock && initialStock == nil
     }
 
     /// "1.5", "1,5" 둘 다 받는다. 숫자가 아니면 재고를 적지 않은 것으로 본다.

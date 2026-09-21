@@ -188,6 +188,13 @@ struct MedicationDetailView: View {
         ) { entry in
             Button(t("지우기", "Delete"), role: .destructive) { deleteDoseChange(entry) }
             Button(t("취소", "Cancel"), role: .cancel) { pendingDoseChangeDeletion = nil }
+        } message: { _ in
+            // 1회 개수는 어디에도 되돌릴 근거가 없다(변경 전 값을 안 적어
+            // 둔다). 용량 표기만 되돌아간다고 미리 말한다(QA 2026-09-21).
+            Text(t(
+                "용량 표기는 이 변경 전으로 돌아가요. 시간대별 1회 개수는 그대로 남으니, 달라졌다면 '약 고치기' 에서 맞춰 주세요.",
+                "The strength goes back to what it was before this change. The per-dose amounts stay as they are — adjust them in 'Edit medication' if needed."
+            ))
         }
         .confirmationDialog(
             t("이 메모를 지울까요?", "Delete this note?"),
@@ -793,10 +800,30 @@ struct MedicationDetailView: View {
     }
 
     private func deleteDoseChange(_ entry: DoseChangeRecord) {
+        // 지우기 **전에** 읽는다. 지운 객체의 속성을 들여다보는 것은
+        // SwiftData 에서 안전하지 않다.
         let deletedID = entry.id
+        let removed = entry.core
+        let remaining = doseChangeRecords
+            .filter { $0.medicationID == medicationID && $0.id != deletedID }
+            .map(\.core)
+
         context.delete(entry)
         pendingDoseChangeDeletion = nil
-        refreshStrengthText(excluding: deletedID)
+
+        let latest = remaining.max { lhs, rhs in
+            if lhs.changedAt != rhs.changedAt { return lhs.changedAt < rhs.changedAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+        if let latest {
+            record?.strengthText = latest.toText
+        } else if record?.strengthText == removed.toText, !removed.fromText.isEmpty {
+            // **마지막 변경을 지웠으면 그 앞의 표기로 되돌린다**(QA 2026-09-21).
+            // 예전에는 "남은 변경이 없으면 손대지 않는다" 였다. 그래서 잘못
+            // 적은 "10mg → 15mg" 을 지우면 이력은 비는데 머리글은 15mg 으로
+            // 남아, 되돌릴 손잡이가 앱 어디에도 없었다.
+            record?.strengthText = removed.fromText
+        }
         try? context.save()
     }
 
