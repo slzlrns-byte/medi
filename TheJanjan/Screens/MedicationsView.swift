@@ -40,6 +40,9 @@ struct MedicationsView: View {
             ScrollView {
                 LazyVStack(spacing: CGFloat(JanjanSpacing.s)) {
                     prescriptionCard
+                    // 약에서 바로 변동 내역을 볼 수 있게(사용자 요청 2026-09-21).
+                    // 지난 진료가 없으면 스스로 그리지 않는다.
+                    ChangesSinceVisitCard()
                     if sections.isEmpty {
                         emptyCard
                     }

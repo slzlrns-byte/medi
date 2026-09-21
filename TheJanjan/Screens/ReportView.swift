@@ -38,6 +38,7 @@ struct ReportView: View {
     @StateObject private var rewarded = RewardedAdLoader()
     /// 광고를 도중에 닫았을 때 조용히 아무 일도 안 일어나면 고장으로 보인다.
     @State private var didSkipAd = false
+    @State private var isShowingVisitHistory = false
     /// 질문 칸의 키보드를 "완료" 로 내리기 위한 초점(사용자 요청 2026-09-19).
     @FocusState private var isEditingQuestions: Bool
 
@@ -70,6 +71,7 @@ struct ReportView: View {
                             ProMomentNote(moment: .patternReady)
                         }
                     }
+                    ChangesSinceVisitCard()
                     perMedicationCard
                     askDoctorCard
                     exportCard
@@ -85,6 +87,9 @@ struct ReportView: View {
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(TapGesture().onEnded { isEditingQuestions = false })
             .navigationTitle(t("진료 준비", "Visit prep"))
+            .sheet(isPresented: $isShowingVisitHistory) {
+                VisitHistoryView()
+            }
             .sheet(item: $exportURL) { file in
                 ShareSheet(items: [file.url])
                     .onDisappear {
@@ -193,9 +198,33 @@ struct ReportView: View {
     private var adherenceCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                Text(reportWindow.anchoredToVisit ? t("지난 진료 이후", "Since your last visit") : t("지난 4주", "Past 4 weeks"))
-                    .janjanBody(13, weight: .medium)
-                    .foregroundStyle(Color.muted)
+                HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(reportWindow.anchoredToVisit ? t("지난 진료 이후", "Since your last visit") : t("지난 4주", "Past 4 weeks"))
+                        .janjanBody(13, weight: .medium)
+                        .foregroundStyle(Color.muted)
+
+                    Spacer(minLength: CGFloat(JanjanSpacing.xs))
+
+                    // 이 숫자가 "지난 진료 이후" 라고 적혀 있는데, 정작 그 진료가
+                    // 무엇이었는지 보러 갈 길이 약 탭 안에만 있었다
+                    // (사용자 요청 2026-09-21). 숫자 옆에 둔다.
+                    Button {
+                        isShowingVisitHistory = true
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(t("지난 진료 보기", "Past visits"))
+                                .janjanBody(12, weight: .medium)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.ink2)
+                        .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                        .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 1)
+                        .background(Capsule(style: .continuous).fill(Color.janjan(.surface2)))
+                        .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 if let rate = overallAdherence {
                     let percent = DecimalQuantity.floorToInt(rate * 100)
