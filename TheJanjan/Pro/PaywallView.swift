@@ -176,33 +176,56 @@ struct PaywallView: View {
             if let yearly = pro.yearlyProduct {
                 planCard(
                     plan: .yearly,
-                    title: t("연간 · \(yearly.displayPrice) / 년", "Yearly · \(yearly.displayPrice) / yr"),
-                    subtitle: pro.yearlyMonthlyEquivalentText.map { t("월 \($0) 꼴", "≈ \($0) / mo") },
-                    tag: pro.isYearlyTrialEligible ? t("7일 무료 체험", "7-day free trial") : nil
+                    name: t("연간", "Yearly"),
+                    meaning: t("구독 · 해마다 갱신", "Subscription · renews yearly"),
+                    price: t("\(yearly.displayPrice) / 년", "\(yearly.displayPrice) / yr"),
+                    note: pro.yearlyMonthlyEquivalentText.map { t("월 \($0) 꼴", "≈ \($0) / mo") },
+                    tag: pro.isYearlyTrialEligible ? t("7일 무료", "7 days free") : nil
                 )
             }
             if let monthly = pro.monthlyProduct {
                 planCard(
                     plan: .monthly,
-                    title: t("월간 · \(monthly.displayPrice) / 월", "Monthly · \(monthly.displayPrice) / mo"),
-                    subtitle: nil,
+                    name: t("월간", "Monthly"),
+                    meaning: t("구독 · 달마다 갱신", "Subscription · renews monthly"),
+                    price: t("\(monthly.displayPrice) / 월", "\(monthly.displayPrice) / mo"),
+                    note: nil,
                     tag: nil
                 )
             }
-            // 평생 이용권(2026-09-19 결정). 구독이 아니라는 것이 이 줄의 핵심 정보라
-            // 부제로 또박또박 말한다 - "한 번 결제" 를 크게 파는 화면은 만들지 않는다.
+            // 평생 이용권(2026-09-19 결정). 구독이 아니라는 것이 이 줄의 핵심
+            // 정보다 - "한 번 결제" 를 크게 파는 화면은 만들지 않되, 구독 둘과
+            // 헷갈리지는 않게 한다.
             if let lifetime = pro.lifetimeProduct {
                 planCard(
                     plan: .lifetime,
-                    title: t("평생 · \(lifetime.displayPrice)", "Lifetime · \(lifetime.displayPrice)"),
-                    subtitle: t("한 번 결제 · 구독 아님", "One-time purchase · not a subscription"),
+                    name: t("평생", "Lifetime"),
+                    meaning: t("한 번 결제 · 구독 아님", "One-time · not a subscription"),
+                    price: lifetime.displayPrice,
+                    note: t("갱신 없음", "No renewal"),
                     tag: nil
                 )
             }
         }
     }
 
-    private func planCard(plan: Plan, title: String, subtitle: String?, tag: String?) -> some View {
+    /// 상품 한 줄.
+    ///
+    /// 예전에는 "연간 · ₩19,900 / 년" 처럼 이름과 가격을 한 문장에 붙여 두었다.
+    /// 세 줄이 전부 같은 모양의 긴 문장이 되어 무엇이 다른지 한눈에 안 들어왔다
+    /// (사용자 지적 2026-09-21). 이름은 왼쪽, 가격은 오른쪽으로 갈라 세로로
+    /// 훑을 수 있게 한다 - 이름 셋을 먼저 비교하고, 그다음 가격 셋을 비교한다.
+    ///
+    /// 가운데 한 줄은 **그것이 무엇인지**를 말한다. 구독인지 아닌지는 이 화면에서
+    /// 가장 중요한 차이인데, 예전에는 평생 줄에만 작게 적혀 있었다.
+    private func planCard(
+        plan: Plan,
+        name: String,
+        meaning: String,
+        price: String,
+        note: String?,
+        tag: String?
+    ) -> some View {
         let isSelected = selectedPlan == plan
 
         return Button {
@@ -211,45 +234,62 @@ struct PaywallView: View {
             HStack(spacing: CGFloat(JanjanSpacing.s)) {
                 radio(isSelected: isSelected)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .janjanBody(15, weight: .semibold)
-                        .foregroundStyle(Color.ink)
-                    if let subtitle {
-                        Text(subtitle)
-                            .janjanBody(11)
-                            .foregroundStyle(Color.muted)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        Text(name)
+                            .janjanDisplay(19)
+                            .foregroundStyle(Color.ink)
+                        if let tag {
+                            Text(tag)
+                                .janjanBody(11, weight: .semibold)
+                                .foregroundStyle(Color.janjan(.lavInk))
+                                .padding(.horizontal, CGFloat(JanjanSpacing.xs))
+                                .padding(.vertical, 2)
+                                .background(Capsule(style: .continuous).fill(Color.janjan(.lav)))
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
                     }
+                    Text(meaning)
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
                 }
 
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
 
-                if let tag {
-                    Text(tag)
-                        .janjanBody(11, weight: .semibold)
-                        .foregroundStyle(Color.janjan(.lavInk))
-                        .padding(.horizontal, CGFloat(JanjanSpacing.s))
-                        .padding(.vertical, CGFloat(JanjanSpacing.xxs) + 1)
-                        .background(Capsule(style: .continuous).fill(Color.janjan(.lav)))
-                        .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(price)
+                        .janjanBody(16, weight: .semibold)
+                        .foregroundStyle(Color.ink)
+                        .monospacedDigit()
+                    if let note {
+                        Text(note)
+                            .janjanBody(11)
+                            .foregroundStyle(Color.muted)
+                            .monospacedDigit()
+                    }
                 }
+                .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .padding(.vertical, CGFloat(JanjanSpacing.s) + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
-                    .fill(Color.surface)
+                    // 고른 줄은 테두리만이 아니라 바탕도 조금 달라진다. 테두리
+                    // 굵기 0.5 차이는 밝은 곳에서 잘 안 보인다.
+                    .fill(isSelected ? Color.janjan(.surface2) : Color.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
                     .strokeBorder(
                         isSelected ? Color.ink : Color.hairline,
-                        lineWidth: isSelected ? 1.5 : 1
+                        lineWidth: isSelected ? 2 : 1
                     )
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("\(name), \(meaning), \(price)"))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
 
