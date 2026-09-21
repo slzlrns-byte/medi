@@ -284,7 +284,13 @@ struct MedicalDisclaimer: View {
 }
 
 /// 흰 카드 안에 들어가는 한 줄 입력칸.
-/// 테두리를 그리지 않고 라벨과 여백으로만 나눈다 — 화면에 선을 늘리지 않기 위해서다.
+///
+/// 예전에는 테두리도 바탕도 없이 라벨과 여백으로만 나눴다 — 화면에 선을
+/// 늘리지 않으려는 뜻이었는데, 흰 카드 위의 맨 글자는 **입력칸으로 보이지
+/// 않았다.** "뭐가 버튼인지 어디가 입력이 되는지도 모르겠고"(사용자,
+/// TestFlight 17). 그래서 연회색 바탕을 깐다 — 선을 긋지 않으면서도
+/// 누를 자리가 어디까지인지 눈에 보인다. 용량 변경 시트가 이미 같은
+/// 모양을 쓰고 있었으니, 앱 안에서 입력칸은 이제 하나로 보인다.
 struct JanjanField: View {
 
     let label: String
@@ -303,9 +309,101 @@ struct JanjanField: View {
                 .keyboardType(keyboard)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                // 한 줄 입력칸도 누르는 자리는 44pt 를 지킨다.
+                .frame(minHeight: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                        .fill(Color.janjan(.surface2))
+                )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+/// 키보드를 내리는 한 줄.
+///
+/// `FocusState` 로 하려면 입력칸을 가진 화면마다 상태를 만들고 칸마다 이어
+/// 줘야 하는데, 입력칸이 `JanjanField` 안에 들어 있어서 화면 쪽에서는 잡을
+/// 수가 없다. 첫 응답자에게 바로 말하면 어느 칸이 열려 있든 같은 한 줄로 닫힌다.
+enum JanjanKeyboard {
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
+
+/// 입력칸이 있는 화면에 붙이는 키보드 손잡이.
+///
+/// 키보드 위에 "완료" 를 놓고, 스크롤로도 내려갈 수 있게 한다. 예전에는
+/// 진료 기록 화면에 둘 다 없어서 한 번 입력하고 나면 키보드가 화면을 덮은
+/// 채 저장 버튼까지 가릴 수 없었다(사용자, TestFlight 17).
+///
+/// **화면마다 한 번만** 붙인다 - 칸마다 붙이면 같은 막대가 여러 개 쌓인다.
+struct KeyboardDoneBar: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(t("완료", "Done")) { JanjanKeyboard.dismiss() }
+                        .janjanBody(16, weight: .medium)
+                        .foregroundStyle(Color.ink)
+                }
+            }
+    }
+}
+
+extension View {
+    /// 키보드 위 "완료" 와 스크롤로 내리기. 입력칸이 있는 화면에 한 번 붙인다.
+    func keyboardDoneBar() -> some View { modifier(KeyboardDoneBar()) }
+}
+
+/// 숫자만 적힌 용량 칸 아래에 뜨는 단위 고르개.
+///
+/// "모든 약 용량 부분에는 단위가 붙어야 돼"(사용자 2026-09-21). 단위를 앱이
+/// 대신 지어내면 10정을 10mg 이라고 적는 일이 생기므로 붙여 주지는 않는다 —
+/// 대신 한 번 누르면 붙게 해서, 적는 쪽이 수고롭지 않게 한다.
+struct StrengthUnitRow: View {
+
+    @Binding var text: String
+
+    /// 정신과 처방에서 실제로 쓰이는 것만. 목록이 길면 고르는 데가 아니라
+    /// 읽는 데가 된다.
+    private static let units = ["mg", "mcg", "mL"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(t("단위까지 적어 주세요. 용량이면 10mg, 개수면 2개처럼요.",
+                   "Add the unit too — 10mg for a strength, 2 pills for a count."))
+                .janjanBody(12)
+                .foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                ForEach(Self.units + [t("정", "tabs"), t("개", "pills")], id: \.self) { unit in
+                    TogglePill(text: unit, isOn: false, minWidth: 0, fillsRow: true) {
+                        text = text.trimmingCharacters(in: .whitespacesAndNewlines) + unit
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 용량 표기에 단위가 빠졌는지. 빈 칸은 괜찮다 — 용량은 선택이다.
+///
+/// 소수점·쉼표·가운뎃점·빗금까지는 숫자의 일부로 본다("0.5", "1/2").
+func strengthNeedsUnit(_ text: String) -> Bool {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return false }
+    let numeric = CharacterSet(charactersIn: "0123456789.,/·- ")
+    return trimmed.unicodeScalars.allSatisfy { numeric.contains($0) }
 }
 
 /// 눌러서 켜고 끄는 알약. 요일·시간대처럼 여러 개를 고를 때.

@@ -201,6 +201,38 @@ struct MedicationDetailView: View {
                         .foregroundStyle(Color.muted)
                         .padding(.top, CGFloat(JanjanSpacing.xxs))
                 }
+
+                // 이미 저장된 "10" 은 앱이 고쳐 줄 수 없다 - mg 인지 정인지
+                // 아는 사람은 적은 쪽뿐이라, 단위를 대신 붙이면 약 정보를
+                // 지어내는 셈이 된다. 대신 한 번 눌러 고칠 수 있게 짚어 둔다
+                // ("앱 내의 모든 약 용량 부분에는 단위가 붙어야 돼", 2026-09-21).
+                if strengthNeedsUnit(medication.strengthText) {
+                    NavigationLink {
+                        MedicationFormView(existing: MedicationFormView.Existing(
+                            medication: medication,
+                            schedules: mySchedules
+                        ))
+                    } label: {
+                        HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
+                            Text(t("용량에 단위가 없어요. 눌러서 적어 주세요.",
+                                   "This dose has no unit. Tap to add one."))
+                                .janjanBody(12)
+                                .foregroundStyle(Color.janjan(.peachInk))
+                                .multilineTextAlignment(.leading)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.janjan(.peachInk))
+                        }
+                        .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                        .frame(minHeight: 36)
+                        .background(
+                            Capsule(style: .continuous).fill(Color.janjan(.peach))
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, CGFloat(JanjanSpacing.xxs))
+                }
             }
         }
     }
@@ -413,11 +445,15 @@ struct MedicationDetailView: View {
     private func doseChangeRow(_ entry: DoseChangeRecord, showsProBadge: Bool) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(doseChangeDayText(entry.changedAt)) · \(entry.core.arrowTextKo)")
-                        .janjanBody(15)
-                        .foregroundStyle(Color.ink2)
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                    // 날짜는 작게 위로, 용량은 크게 아래로. 한 줄에 "9월 21일 ·
+                    // 10mg → 15mg" 으로 붙여 놓으니 "날짜랑 숫자랑 혼재되어
+                    // 있어서 헷갈려"(사용자, TestFlight 17) 는 말이 나왔다.
+                    Text(doseChangeDayText(entry.changedAt))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
                         .monospacedDigit()
+                    doseArrow(entry.core)
                     if let note = entry.note, !note.isEmpty {
                         Text(note)
                             .janjanBody(12)
@@ -440,10 +476,40 @@ struct MedicationDetailView: View {
                 .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
             }
 
-            WhitePillButton(title: t("약 변경 보기", "See the change")) {
+            WhitePillButton(title: pro.isPro
+                            ? t("약 변경 보기", "See the change")
+                            : t("바뀌기 전 용량 보기", "See the dose before")) {
                 comparingChange = entry
             }
             .proGated(.doseChangeCompare, showsBadge: showsProBadge)
+        }
+    }
+
+    /// 바뀐 용량 한 줄.
+    ///
+    /// **무엇이 Pro 인지 다시 그었다.** 잠가 둔 것이 전후 비교 시트뿐이라
+    /// 무료 사용자에게도 "10mg → 15mg" 이 그대로 보이고 있었는데, 사용자가
+    /// 파는 것은 비교 화면이 아니라 **바뀌었다는 사실 자체**다(2026-09-21).
+    /// 그래서 무료는 지금 용량만 본다 - 그건 약 정보라 가릴 것이 아니다.
+    /// 어디서 어디로 바뀌었는지는 Pro 가 본다.
+    @ViewBuilder
+    private func doseArrow(_ change: DoseChange) -> some View {
+        if pro.isPro, !change.fromText.isEmpty {
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(change.fromText)
+                    .janjanBody(15)
+                    .foregroundStyle(Color.muted)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.janjan(.line2))
+                Text(change.toText)
+                    .janjanBody(17, weight: .medium)
+                    .foregroundStyle(Color.ink)
+            }
+        } else {
+            Text(change.toText)
+                .janjanBody(17, weight: .medium)
+                .foregroundStyle(Color.ink)
         }
     }
 
@@ -790,6 +856,14 @@ private struct DoseChangeSheet: View {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
                             doseField(label: t("이전", "Previous"), placeholder: "10mg", text: $fromText)
                             doseField(label: t("새 용량", "New dose"), placeholder: "15mg", text: $toText)
+
+                            // 단위 없이 "10 → 15" 로 남으면 mg 인지 정인지
+                            // 나중에 아무도 알 수 없다(사용자 지적 2026-09-21).
+                            if strengthNeedsUnit(toText) {
+                                StrengthUnitRow(text: $toText)
+                            } else if strengthNeedsUnit(fromText) {
+                                StrengthUnitRow(text: $fromText)
+                            }
                         }
                     }
 
@@ -816,6 +890,7 @@ private struct DoseChangeSheet: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            .keyboardDoneBar()
             .navigationTitle(t("용량 변경", "Dose changes"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

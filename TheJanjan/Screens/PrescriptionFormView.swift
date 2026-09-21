@@ -103,6 +103,9 @@ struct PrescriptionFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
+        // 입력칸이 여럿인 화면인데 키보드를 내릴 길이 없었다 - 한 번 적고
+        // 나면 키보드가 저장 버튼을 덮은 채였다(사용자, TestFlight 17).
+        .keyboardDoneBar()
         .navigationTitle(t("진료 기록", "Log a visit"))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -174,7 +177,7 @@ struct PrescriptionFormView: View {
                     .janjanBody(12, weight: .medium)
                     .foregroundStyle(Color.muted)
 
-                Text(t("이름을 누르면 이번 처방에 넣거나 빼요.", "Tap a name to add it to or remove it from this prescription."))
+                Text(t("이번에 받아 온 약을 골라 주세요.", "Choose the ones you picked up this time."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -205,10 +208,7 @@ struct PrescriptionFormView: View {
 
     private func medicationRow(_ medication: Medication) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                togglePill(for: medication)
-                Spacer(minLength: 0)
-            }
+            selectRow(for: medication)
 
             if let quantity = refills[medication.id] {
                 // VoiceOver 가 가린 이름을 소리 내어 읽으면 가림이 뚫린다 -
@@ -273,6 +273,15 @@ struct PrescriptionFormView: View {
                     )
                 )
 
+                // 여기서 숫자만 적으면 "10 → 15" 가 이력에 남는다. 그게 mg 인지
+                // 정인지는 나중에 아무도 알 수 없다(사용자 지적 2026-09-21).
+                if strengthNeedsUnit(edit.strengthText) {
+                    StrengthUnitRow(text: Binding(
+                        get: { doseEdits[medication.id]?.strengthText ?? "" },
+                        set: { doseEdits[medication.id]?.strengthText = $0 }
+                    ))
+                }
+
                 if let perIntake = edit.perIntake {
                     VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                         Text(t("한 번에 먹는 개수", "Pills per dose"))
@@ -329,32 +338,48 @@ struct PrescriptionFormView: View {
         }
     }
 
-    /// 이 알약은 눌러서 이번 처방에 포함시키는 손잡이다 - 이름 자리에 따로 탭을
-    /// 두면 손잡이 전체의 탭(선택 · 해제)과 겹친다. 그래서 `MaskedNameText` 대신
-    /// 가려졌을 때는 점 표기만 보여 주고, 다시 눌러 보이게 하는 동작은 두지 않는다
+    /// 이번 처방에 넣을지 고르는 줄.
+    ///
+    /// 예전에는 이름이 적힌 알약 하나였는데, 알약은 이 화면에서 요일 고르개와
+    /// 모양이 같아서 "뭐가 버튼인지 모르겠다"(사용자, TestFlight 17) 는 말이
+    /// 나왔다. 체크 동그라미를 앞에 세우면 고르는 자리라는 것이 한눈에 보이고,
+    /// 켜짐/꺼짐도 색이 아니라 모양으로 말한다.
+    ///
+    /// 이름 자리에 따로 탭을 두지 않는 것은 그대로다 - 줄 전체가 손잡이라서
+    /// 겹친다. 가려졌을 때는 점 표기만 보여 주고 눌러서 보이게 하지 않는다
     /// (약 목록 행과 같은 판단 - `MedicationsView.medicationNameText` 참고).
-    @ViewBuilder
-    private func togglePill(for medication: Medication) -> some View {
-        if masksNames {
-            // 여러 약이 전부 점이면 어느 것을 고르는지 알 수 없다. 목록 행과 같은
-            // 규칙으로 용도 한 줄이 있으면 그것으로 부르고, 그것도 없으면
-            // 용량 표기를 붙인다 - "10mg" 은 약 이름이 아니라서 가림이 뚫리지
-            // 않으면서, 점 두 개를 서로 다른 것으로 만들어 준다(QA 2026-09-19).
-            TogglePill(
-                text: maskedLabel(for: medication),
-                isOn: refills[medication.id] != nil
-            ) {
-                toggle(medication)
+    private func selectRow(for medication: Medication) -> some View {
+        let isOn = refills[medication.id] != nil
+        // 여러 약이 전부 점이면 어느 것을 고르는지 알 수 없다. 목록 행과 같은
+        // 규칙으로 용도 한 줄이 있으면 그것으로 부르고, 그것도 없으면
+        // 용량 표기를 붙인다 - "10mg" 은 약 이름이 아니라서 가림이 뚫리지
+        // 않으면서, 점 두 개를 서로 다른 것으로 만들어 준다(QA 2026-09-19).
+        let title = masksNames ? maskedLabel(for: medication) : medication.displayTitle
+
+        return Button {
+            toggle(medication)
+        } label: {
+            HStack(spacing: CGFloat(JanjanSpacing.s)) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(Color.janjan(isOn ? .ink : .line2))
+                Text(title)
+                    .janjanBody(15, weight: isOn ? .medium : .regular)
+                    .foregroundStyle(Color.janjan(isOn ? .ink : .ink2))
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
             }
-            .accessibilityLabel(Text(maskedSpokenLabel(for: medication)))
-        } else {
-            TogglePill(
-                text: medication.displayTitle,
-                isOn: refills[medication.id] != nil
-            ) {
-                toggle(medication)
-            }
+            .padding(.horizontal, CGFloat(JanjanSpacing.s))
+            .frame(minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                    .fill(Color.janjan(isOn ? .surface2 : .surface))
+            )
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(masksNames ? maskedSpokenLabel(for: medication) : medication.displayTitle))
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
     }
 
     /// VoiceOver 가 이 약을 부르는 말. 가렸으면 이름 대신 용도로 부른다 -
@@ -385,14 +410,30 @@ struct PrescriptionFormView: View {
         return t("가려진 약 이름", "Hidden medication name")
     }
 
+    /// 진료에서 들은 말을 적는 칸.
+    ///
+    /// 한 줄짜리였는데, 여기 적히는 것은 대개 한 줄이 아니다("다음에 안 좋으면
+    /// 올리자고 하셨고, 술은 피하라고" ). 여러 줄로 늘어나게 두고, 연회색
+    /// 바탕으로 입력칸임을 보이게 한다.
     private var noteCard: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                JanjanField(
-                    label: t("진료 메모 (선택)", "Visit note (optional)"),
-                    placeholder: t("예: 용량 절반으로", "e.g. Cut the dose in half"),
-                    text: $clinicNote
+                Text(t("진료 메모 (선택)", "Visit note (optional)"))
+                    .janjanBody(12, weight: .medium)
+                    .foregroundStyle(Color.muted)
+                TextField(
+                    t("예: 다음에 안 좋으면 용량 올리기로", "e.g. Raise the dose next time if it's still bad"),
+                    text: $clinicNote,
+                    axis: .vertical
                 )
+                    .janjanBody(16)
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(3...8)
+                    .padding(CGFloat(JanjanSpacing.s))
+                    .background(
+                        RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                            .fill(Color.janjan(.surface2))
+                    )
                 Text(t("진료 시 들었던 내용을 메모로 남겨요.", "Note down what you heard at the visit."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
