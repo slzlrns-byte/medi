@@ -391,8 +391,10 @@ struct MedicationDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                ForEach(mine) { entry in
-                    doseChangeRow(entry)
+                ForEach(Array(mine.enumerated()), id: \.element.id) { index, entry in
+                    // 배지는 맨 위 한 줄에만. 변경이 셋이면 자물쇠도 셋이
+                    // 되어 카드가 잠금 표시로 뒤덮인다(TestFlight 17 화면).
+                    doseChangeRow(entry, showsProBadge: index == 0)
                 }
 
                 // 용량이 실제로 바뀐 바로 그때. 적어 둔 것이 없으면 권하지 않는다.
@@ -408,7 +410,7 @@ struct MedicationDetailView: View {
         }
     }
 
-    private func doseChangeRow(_ entry: DoseChangeRecord) -> some View {
+    private func doseChangeRow(_ entry: DoseChangeRecord, showsProBadge: Bool) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -441,7 +443,7 @@ struct MedicationDetailView: View {
             WhitePillButton(title: t("약 변경 보기", "See the change")) {
                 comparingChange = entry
             }
-            .proGated(.doseChangeCompare)
+            .proGated(.doseChangeCompare, showsBadge: showsProBadge)
         }
     }
 
@@ -644,13 +646,13 @@ struct MedicationDetailView: View {
     }
 }
 
-/// "9월 3일" 처럼 용량 변경 날짜를 짧게 적는 서식. 용량 변경 줄과 전후 비교
-/// 시트 머리글이 같은 서식을 쓰도록 파일 안에서 함께 둔다.
+/// 용량 변경 날짜. **리포트와 같은 서식을 쓴다.**
+///
+/// 예전에는 여기서 따로 만들어(`setLocalizedDateFormatFromTemplate("Md")`)
+/// 화면에는 "9. 21." 이, 같은 날이 종이에는 "9월 21일" 로 찍혔다. 둘을
+/// 나란히 놓고 보는 사람이 다른 날인 줄 안다(TestFlight 17 화면).
 private func doseChangeDayText(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: JanjanLanguage.current.localeIdentifier)
-    formatter.setLocalizedDateFormatFromTemplate("Md")
-    return formatter.string(from: date)
+    ReportComposer.monthDayText(date, language: JanjanLanguage.current)
 }
 
 /// 메모 한 줄을 받는 시트. 증상 카탈로그와 이어 두는 것은 선택이다.

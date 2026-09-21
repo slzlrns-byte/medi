@@ -27,6 +27,10 @@ struct ProBadge: View {
 struct ProGate: ViewModifier {
 
     let feature: ProFeature
+    /// 자물쇠 알약을 그릴지. 같은 기능의 버튼이 목록으로 여러 개 설 때
+    /// 첫 줄에만 달려고 끈다 - 줄마다 배지가 붙으면 목록이 잠금 표시로
+    /// 뒤덮인다(지난 진료 기록이 이미 같은 판단을 했다).
+    var showsBadge: Bool = true
 
     @EnvironmentObject private var pro: ProStore
     @State private var isShowingPaywall = false
@@ -34,7 +38,7 @@ struct ProGate: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .topTrailing) {
-                if !pro.isPro {
+                if !pro.isPro, showsBadge {
                     ProBadge()
                         .offset(x: CGFloat(JanjanSpacing.xs), y: -CGFloat(JanjanSpacing.s))
                 }
@@ -65,8 +69,8 @@ struct ProGate: ViewModifier {
 extension View {
 
     /// Pro 기능임을 표시하고, 무료 사용자가 누르면 페이월을 올린다.
-    func proGated(_ feature: ProFeature) -> some View {
-        modifier(ProGate(feature: feature))
+    func proGated(_ feature: ProFeature, showsBadge: Bool = true) -> some View {
+        modifier(ProGate(feature: feature, showsBadge: showsBadge))
     }
 }
 
