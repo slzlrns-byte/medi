@@ -99,10 +99,32 @@ struct SettingsView: View {
                     .foregroundStyle(Color.muted)
             }
 
-            Button(t("Pro 알아보기", "Learn about Pro")) {
+            // 예전에는 "Pro 알아보기" 라는 맨 글자 한 줄이었다. 바로 아래
+            // "구매 복원" 과 생김새가 같아서, 여기가 결제하는 자리인지
+            // 알 수가 없었다(사용자 지적 2026-09-21).
+            //
+            // 값을 줄에 띄우고 꺾쇠를 붙인다. 설정의 다른 줄들과 같은
+            // 문법이라 튀지 않으면서, 돈이 드는 자리라는 것은 분명해진다.
+            // 광고 카드를 만들지는 않는다 - 유도 지점은 설계가 정한 세 곳뿐이고
+            // 설정은 사용자가 스스로 찾아오는 자리다.
+            Button {
                 isShowingPaywall = true
+            } label: {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(pro.isPro ? t("Pro 기능 보기", "See what Pro includes")
+                                   : t("Pro 시작하기", "Get Pro"))
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: CGFloat(JanjanSpacing.xs))
+                    if let price = proEntryPriceText {
+                        Text(price)
+                            .foregroundStyle(Color.muted)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.janjan(.line2))
+                }
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(Color.ink)
 
             Button(t("구매 복원", "Restore purchase")) {
                 Task { await pro.restore() }
@@ -123,6 +145,20 @@ struct SettingsView: View {
         } footer: {
             Text(proFooterKo)
         }
+    }
+
+    /// 설정의 Pro 줄에 띄우는 값. **가장 싸게 시작하는 한 번의 결제**를 적는다 -
+    /// 월간이 있으면 그것, 없으면 연간. 값은 언제나 애플이 준 문자열 그대로다.
+    /// 이미 Pro 면 살 것이 없으므로 적지 않는다.
+    private var proEntryPriceText: String? {
+        guard !pro.isPro else { return nil }
+        if let monthly = pro.monthlyProduct {
+            return t("월 \(monthly.displayPrice)부터", "from \(monthly.displayPrice) / mo")
+        }
+        if let yearly = pro.yearlyProduct {
+            return t("연 \(yearly.displayPrice)부터", "from \(yearly.displayPrice) / yr")
+        }
+        return nil
     }
 
     private var proFooterKo: String {
