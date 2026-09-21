@@ -1092,7 +1092,9 @@ private struct DoseChangeCompareSheet: View {
     private var checkpointTimeline: PatternTimeline {
         PatternTimeline.make(
             dayCount: min(max(daysSinceChange, 1), 28),
-            endingAt: endOfToday,
+            // 이 시트의 today 는 Date() 라 늘 살아 있는 값이다 -
+            // JanjanClock 의 굳은 값이 아니므로 그대로 쓴다.
+            endingAt: today,
             checkIns: checkInRecords.map(\.core),
             schedules: scheduleRecords.map(\.core),
             medications: medicationRecords.map { $0.core.displayReady },

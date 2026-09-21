@@ -405,9 +405,11 @@ extension InventoryCalculatorTests {
         )
 
         // 처방으로 걸러 지우면 그 약의 재고 사건이 하나도 남지 않는다.
-        XCTAssertTrue(
-            [correction, refill].filter { $0.prescriptionID != prescriptionID }.isEmpty
-        )
+        let survivors = [correction, refill].filter { event in
+            guard let owner = event.prescriptionID else { return true }
+            return owner != prescriptionID
+        }
+        XCTAssertTrue(survivors.isEmpty)
     }
 
     /// 기기 둘이 같은 칸에 기록한 날이 있으면, 종이의 "복용 N회" 도
