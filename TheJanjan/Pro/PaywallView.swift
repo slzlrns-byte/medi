@@ -51,6 +51,11 @@ struct PaywallView: View {
             // 구매·복원이 끝나면 조용히 닫는다. 축하 화면은 두지 않는다.
             if isPro { dismiss() }
         }
+        // 고른 것이 화면에 없으면 아무것도 안 골라진 페이월이 되고, 큰 버튼을
+        // 눌러도 buy() 가 조용히 빠져나간다. 갱신 고지에서는 금액까지 사라진다
+        // (3.1.2). 상품 목록이 올 때마다 실제로 그려진 첫 줄로 맞춘다.
+        .onChange(of: pro.products) { _, _ in alignSelection() }
+        .onAppear { alignSelection() }
     }
 
     // MARK: - 위쪽
@@ -316,8 +321,29 @@ struct PaywallView: View {
         BlackPillButton(
             title: ctaTitle,
             isBusy: pro.isLoading,
+            // 고른 상품을 실제로 살 수 없으면 눌러도 아무 일이 없다.
+            // 죽은 버튼을 살아 있는 것처럼 보이게 두지 않는다.
+            isEnabled: selectedProduct != nil,
             action: buy
         )
+    }
+
+    /// 지금 고른 줄에 해당하는 상품. 없으면 그 줄은 화면에 그려지지도 않는다.
+    private var selectedProduct: Product? {
+        switch selectedPlan {
+        case .yearly: return pro.yearlyProduct
+        case .monthly: return pro.monthlyProduct
+        case .lifetime: return pro.lifetimeProduct
+        }
+    }
+
+    /// 고른 줄이 화면에 없으면 있는 줄로 옮긴다. 상품이 하나도 없을 때는
+    /// `loadingCard` 가 대신 서므로 건드리지 않는다.
+    private func alignSelection() {
+        guard selectedProduct == nil else { return }
+        if pro.yearlyProduct != nil { selectedPlan = .yearly }
+        else if pro.monthlyProduct != nil { selectedPlan = .monthly }
+        else if pro.lifetimeProduct != nil { selectedPlan = .lifetime }
     }
 
     /// 체험을 받을 수 있을 때만 "무료" 라고 쓴다. 못 받는 계정에 무료라고 쓰면 3.1.2 위반이다.
@@ -329,13 +355,7 @@ struct PaywallView: View {
     }
 
     private func buy() {
-        let product: Product?
-        switch selectedPlan {
-        case .yearly: product = pro.yearlyProduct
-        case .monthly: product = pro.monthlyProduct
-        case .lifetime: product = pro.lifetimeProduct
-        }
-        guard let product else { return }
+        guard let product = selectedProduct else { return }
         Task { await pro.purchase(product) }
     }
 
@@ -388,9 +408,17 @@ struct PaywallView: View {
                 Button {
                     Task { await pro.restore() }
                 } label: {
-                    underlined(t("구매 복원", "Restore purchase"))
+                    // 심사자가 가장 먼저 누르는 버튼이다. 몇 초 걸리는 동안
+                    // 아무 반응이 없으면 고장 난 것으로 보인다.
+                    underlined(pro.isLoading
+                               ? t("복원하는 중…", "Restoring…")
+                               : t("구매 복원", "Restore purchase"))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(pro.isLoading)
+                .opacity(pro.isLoading ? 0.5 : 1)
 
                 separator
                 externalLink(t("이용약관", "Terms of Use"), Janjan.termsURLString)
@@ -418,7 +446,11 @@ struct PaywallView: View {
     private func externalLink(_ title: String, _ urlString: String) -> some View {
         if let url = URL(string: urlString) {
             Link(destination: url) {
+                // 12pt 글자 높이(약 15pt)만 눌리면 옆 링크가 대신 열린다.
+                // 심사에서 반드시 눌러 보는 자리라 여기부터 44pt 를 지킨다.
                 underlined(title)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .foregroundStyle(Color.ink2)
         }

@@ -26,6 +26,7 @@ struct VisitHistoryView: View {
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
     private var today: Date { clock.today }
+    private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
@@ -36,7 +37,8 @@ struct VisitHistoryView: View {
     private var visits: [PrescriptionRecord] {
         prescriptionRecords
             .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
-            .filter { $0.visitDate <= today }
+            // 오늘 낮에 적은 진료가 빠지지 않게 하루의 끝과 견준다.
+            .filter { $0.visitDate < endOfToday }
     }
 
     var body: some View {
@@ -98,10 +100,23 @@ struct VisitHistoryView: View {
         .buttonStyle(.plain)
     }
 
+    /// 접힌 줄에 적는 말.
+    ///
+    /// 무료에게 "지난 기록 9개 더 보기" 라고 적어 놓고 펴면 하나만 읽히는 일이
+    /// 없게, 읽히는 수와 잠긴 수를 나눠 적는다(QA 2026-09-21).
     private var olderCountText: String {
-        let count = visits.count - 1
-        return t("지난 기록 \(count)개 더 보기",
-                 count == 1 ? "1 earlier visit" : "\(count) earlier visits")
+        let older = visits.count - 1
+        let readable = max(clearIDs.count - 1, 0)
+        let locked = older - readable
+        if locked > 0, readable > 0 {
+            return t("지난 기록 \(readable)개 더 보기 · \(locked)개는 Pro",
+                     "\(readable) more · \(locked) in Pro")
+        }
+        if locked > 0 {
+            return t("지난 기록 \(locked)개 (Pro)", "\(locked) earlier visits (Pro)")
+        }
+        return t("지난 기록 \(older)개 더 보기",
+                 older == 1 ? "1 earlier visit" : "\(older) earlier visits")
     }
 
     /// 한 달치 진료 묶음. 회차를 죽 늘어놓는 것보다 달로 끊어 주면
@@ -141,9 +156,17 @@ struct VisitHistoryView: View {
     }
 
     /// 세 회차째부터. 무료에게는 날짜만 남기고 내용이 흐려지며, 누르면 페이월이 열린다.
-    /// 배지가 카드마다 붙지 않게 묶음마다 문 하나만 단다.
+    ///
+    /// **배지는 통틀어 하나뿐이다.** 묶음마다 달았더니 넉 달 다닌 사람의 화면이
+    /// 자물쇠 넉 장으로 덮였다(QA 2026-09-21) - 바로 앞에서 용량 변경 카드가
+    /// 고친 것과 같은 병이다. 문(탭 → 페이월)은 잠긴 묶음마다 그대로 두고,
+    /// 표시만 첫 잠긴 묶음에 남긴다.
     private var olderSection: some View {
         let clear = clearIDs
+        let firstLockedGroupID = olderGroups.first { group in
+            group.records.contains { !clear.contains($0.id) }
+        }?.id
+
         return VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
             ForEach(olderGroups) { group in
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
@@ -163,7 +186,7 @@ struct VisitHistoryView: View {
                                 visitCard(record, isBlurred: true)
                             }
                         }
-                        .proGated(.visitHistory)
+                        .proGated(.visitHistory, showsBadge: group.id == firstLockedGroupID)
                     }
                 }
             }

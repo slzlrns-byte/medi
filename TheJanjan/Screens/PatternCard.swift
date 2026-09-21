@@ -27,6 +27,11 @@ struct PatternCard: View {
 
     private var lang: JanjanLanguage { .current }
 
+    /// 줄 이름이 앉는 칸의 폭. **막대와 날짜 눈금이 같은 값을 써야 한다** -
+    /// 예전에는 이름 칸만 영어에서 넓히고(30→46) 눈금은 30 으로 두어,
+    /// 영어판에서만 날짜가 막대와 16pt 어긋났다(QA 2026-09-21).
+    private var labelWidth: CGFloat { lang == .english ? 46 : 30 }
+
     var body: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
@@ -101,7 +106,7 @@ struct PatternCard: View {
                 .lineLimit(1)
                 // 한국어 라벨은 두 글자라 30 이면 되지만 "Doses" 는 넘쳐서
                 // "Dose / s" 로 꺾였다(영어 캡처 2026-09-20).
-                .frame(width: lang == .english ? 46 : 30, alignment: .leading)
+                .frame(width: labelWidth, alignment: .leading)
             HStack(spacing: spacing) {
                 ForEach(timeline.days, id: \.date) { day in
                     mark(day)
@@ -153,7 +158,7 @@ struct PatternCard: View {
     /// 처음·가운데·오늘 세 눈금만 적는다. 스물여덟 개를 다 적으면 그림이 죽는다.
     private var axis: some View {
         HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-            Color.clear.frame(width: 30, height: 1)
+            Color.clear.frame(width: labelWidth, height: 1)
             HStack {
                 if let first = timeline.days.first?.date {
                     Text(shortDate(first))

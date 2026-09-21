@@ -21,7 +21,19 @@ final class JanjanClock: ObservableObject {
     static let shared = JanjanClock()
 
     /// 지금 화면이 "오늘" 로 삼는 날. 자정에 한 번 바뀐다.
+    ///
+    /// **시각까지 든 값이다.** 앱을 켠 그 순간이지 자정이 아니다. 그래서
+    /// "오늘 안에 있는가" 를 `<= today` 로 물으면 안 된다 - 오전에 켜 둔 앱에서
+    /// 오후에 적은 기록이 미래로 판정돼 목록에서 사라진다(QA 2026-09-21).
+    /// 그럴 때는 `endOfToday` 와 비교한다.
     @Published private(set) var today: Date = Date()
+
+    /// 오늘이 끝나는 순간(내일 0시). `< endOfToday` 가 "오늘까지" 다.
+    var endOfToday: Date {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: today)
+        return calendar.date(byAdding: .day, value: 1, to: start) ?? today
+    }
 
     private var observers: [NSObjectProtocol] = []
 

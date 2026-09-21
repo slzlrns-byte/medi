@@ -20,8 +20,6 @@ struct ChangesSinceVisitCard: View {
     @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
     private var prescriptionRecords: [PrescriptionRecord]
 
-    @EnvironmentObject private var pro: ProStore
-
     @State private var isExpanded = false
 
     private var lang: JanjanLanguage { .current }
@@ -126,10 +124,7 @@ struct ChangesSinceVisitCard: View {
                     .janjanBody(15, weight: .medium)
                     .foregroundStyle(Color.ink)
                 if let change = row.change {
-                    // 무엇으로 바뀌었는지(지금 용량)는 약 정보라 늘 보이고,
-                    // **어디서** 바뀌었는지는 Pro 가 본다 - 약 상세의 변경
-                    // 이력과 같은 선이다(사용자 결정 2026-09-21).
-                    Text(pro.isPro ? change.arrowTextKo : change.toText)
+                    Text(change.arrowTextKo)
                         .janjanBody(13)
                         .foregroundStyle(Color.ink2)
                     if let note = change.note?.trimmingCharacters(in: .whitespacesAndNewlines),

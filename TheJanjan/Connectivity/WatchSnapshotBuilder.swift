@@ -28,7 +28,7 @@ enum WatchSnapshotBuilder {
             isPro: isPro,
             themeRaw: JanjanTheme.current.rawValue,
             language: JanjanLanguage.current,
-            maskNames: isPro && JanjanPrivacy.hidesNames
+            maskNames: JanjanPrivacy.hidesNames
         )
     }
 

@@ -419,9 +419,18 @@ struct MedicationDetailView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("용량 변경", "Dose changes"))
-                    .janjanBody(15, weight: .medium)
-                    .foregroundStyle(Color.ink)
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(t("용량 변경", "Dose changes"))
+                        .janjanBody(15, weight: .medium)
+                        .foregroundStyle(Color.ink)
+                    // 적어 두는 것도 다시 읽는 것도 무료다. 잠긴 것은 아래
+                    // 줄마다 붙은 "약 변경 보기"(전후 비교) 하나뿐이라,
+                    // 자물쇠도 여기 하나만 둔다.
+                    if !pro.isPro, !mine.isEmpty {
+                        ProBadge()
+                    }
+                    Spacer(minLength: 0)
+                }
 
                 if mine.isEmpty {
                     Text(t("용량이 바뀌면 여기 적어 두세요. 리포트에 함께 실려요.", "Write it down here when the dose changes. It goes into the report too."))
@@ -435,8 +444,8 @@ struct MedicationDetailView: View {
                 // 보러 온 사람에게 3년치 이력을 펼쳐 놓을 이유가 없다.
                 // 배지는 맨 위 한 줄에만 - 변경이 셋이면 자물쇠도 셋이 되어
                 // 카드가 잠금 표시로 뒤덮인다(TestFlight 17 화면).
-                ForEach(Array(shownDoseChanges(mine).enumerated()), id: \.element.id) { index, entry in
-                    doseChangeRow(entry, showsProBadge: index == 0)
+                ForEach(shownDoseChanges(mine)) { entry in
+                    doseChangeRow(entry)
                 }
 
                 if older > 0 {
@@ -473,7 +482,7 @@ struct MedicationDetailView: View {
         }
     }
 
-    private func doseChangeRow(_ entry: DoseChangeRecord, showsProBadge: Bool) -> some View {
+    private func doseChangeRow(_ entry: DoseChangeRecord) -> some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xs)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
@@ -507,12 +516,14 @@ struct MedicationDetailView: View {
                 .accessibilityLabel(Text(t("이 용량 변경 기록 지우기", "Delete this dose change record")))
             }
 
-            WhitePillButton(title: pro.isPro
-                            ? t("약 변경 보기", "See the change")
-                            : t("바뀌기 전 용량 보기", "See the dose before")) {
+            WhitePillButton(title: t("약 변경 보기", "See the change")) {
                 comparingChange = entry
             }
-            .proGated(.doseChangeCompare, showsBadge: showsProBadge)
+            // 배지는 줄에 달지 않는다 - 줄마다 붙으면 카드가 잠금 표시로
+            // 뒤덮이고, 첫 줄에만 달면 "배지 없는 줄을 눌렀는데 페이월이
+            // 뜨는" 일이 생긴다. 문은 줄마다 그대로 두고 표시는 카드 머리에
+            // 하나만 둔다.
+            .proGated(.doseChangeCompare, showsBadge: false)
         }
     }
 
@@ -523,14 +534,14 @@ struct MedicationDetailView: View {
 
     /// 바뀐 용량 한 줄.
     ///
-    /// **무엇이 Pro 인지 다시 그었다.** 잠가 둔 것이 전후 비교 시트뿐이라
-    /// 무료 사용자에게도 "10mg → 15mg" 이 그대로 보이고 있었는데, 사용자가
-    /// 파는 것은 비교 화면이 아니라 **바뀌었다는 사실 자체**다(2026-09-21).
-    /// 그래서 무료는 지금 용량만 본다 - 그건 약 정보라 가릴 것이 아니다.
-    /// 어디서 어디로 바뀌었는지는 Pro 가 본다.
+    /// **화살표는 잠그지 않는다.** 한때 "어디서 어디로" 를 Pro 로 옮겼다가
+    /// 되돌렸다 - 이 숫자는 앱이 계산해 준 것이 아니라 사용자가 "적어 두기"
+    /// 에서 직접 친 글자다(2026-09-21). 받아 놓고 다시 보려면 돈을 내라고
+    /// 하는 모양이 된다. 파는 것은 전후 비교 시트 - 바꾼 날 앞뒤 2주의
+    /// 기분·수면·복약을 모아 주는 그 계산이다.
     @ViewBuilder
     private func doseArrow(_ change: DoseChange) -> some View {
-        if pro.isPro, !change.fromText.isEmpty {
+        if !change.fromText.isEmpty {
             HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                 Text(change.fromText)
                     .janjanBody(15)
@@ -890,15 +901,19 @@ private struct DoseChangeSheet: View {
 
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                            doseField(label: t("이전", "Previous"), placeholder: "10mg", text: $fromText)
-                            doseField(label: t("새 용량", "New dose"), placeholder: "15mg", text: $toText)
-
                             // 단위 없이 "10 → 15" 로 남으면 mg 인지 정인지
                             // 나중에 아무도 알 수 없다(사용자 지적 2026-09-21).
+                            // 고르개는 **고칠 칸 바로 아래**에 둔다 - 한 자리에서
+                            // 번갈아 그렸더니 "새 용량" 밑에 뜬 것이 "이전" 칸을
+                            // 고쳤다(QA 2026-09-21).
+                            doseField(label: t("이전", "Previous"), placeholder: "10mg", text: $fromText)
+                            if strengthNeedsUnit(fromText) {
+                                StrengthUnitRow(text: $fromText)
+                            }
+
+                            doseField(label: t("새 용량", "New dose"), placeholder: "15mg", text: $toText)
                             if strengthNeedsUnit(toText) {
                                 StrengthUnitRow(text: $toText)
-                            } else if strengthNeedsUnit(fromText) {
-                                StrengthUnitRow(text: $fromText)
                             }
                         }
                     }

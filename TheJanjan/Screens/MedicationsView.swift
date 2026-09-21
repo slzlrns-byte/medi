@@ -30,6 +30,7 @@ struct MedicationsView: View {
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
     private var today: Date { clock.today }
+    private var endOfToday: Date { clock.endOfToday }
     private var lang: JanjanLanguage { .current }
 
     /// 약 이름 가리기가 실제로 적용되는지. Pro 가 아니면 켜져 있어도 아무 일도 하지 않는다.
@@ -238,12 +239,29 @@ struct MedicationsView: View {
     ///
     /// 검은 원 버튼은 화면당 하나(약 추가)라서 여기서는 흰 알약을 쓴다(설계 02절).
     /// 다음 진료까지 못 버티는 복용 중 약의 개수. 진료일이 없으면 nil(계산 불가).
+    /// 이 숫자는 소진 예측(Pro)의 답이다. 약 줄에서는 잠기고, 오늘 화면에서는
+    /// 흐려지고, 종이에서는 `nextVisit: pro.isPro ? … : nil` 로 아예 빠지는
+    /// 바로 그 계산인데 이 카드만 그대로 읽어 주고 있었다(QA 2026-09-21).
     private var shortageCount: Int? {
-        guard nextVisit != nil else { return nil }
+        guard pro.isPro, nextVisit != nil else { return nil }
         let count = rows.filter {
             $0.medication.status == .active && ($0.snapshot.shortfallDays ?? 0) > 0
         }.count
         return count
+    }
+
+    /// 모자라는 약 줄이 비었을 때 그 자리에 서는 말.
+    private var shortageNoticeText: String {
+        if nextVisit == nil {
+            return t("진료일과 받아 온 개수를 적어 두면 남은 날짜를 셀 수 있어요.",
+                     "Add a visit date and how many pills you picked up to count the days left.")
+        }
+        guard pro.isPro else {
+            return t("다음 진료까지 버틸 수 있는지는 Pro 에서 계산해 드려요.",
+                     "Pro works out whether this lasts until your next visit.")
+        }
+        return t("다음 진료 전에 모자라는 약이 없어요.",
+                 "No medication runs short before the next visit.")
     }
 
     private var prescriptionCard: some View {
@@ -272,9 +290,9 @@ struct MedicationsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
-                    Text(nextVisit == nil
-                         ? t("진료일과 받아 온 개수를 적어 두면 소진 예측이 켜져요.", "Add a visit date and how many pills you picked up, and running-low forecasts turn on.")
-                         : t("다음 진료 전에 모자라는 약이 없어요.", "No medication runs short before the next visit."))
+                    // 무료에게 "적어 두면 켜져요" 라고만 말하면, 돈이 아니라
+                    // 입력만 하면 되는 줄 안다. 다 적어도 안 켜진다(QA 2026-09-21).
+                    Text(shortageNoticeText)
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -314,7 +332,7 @@ struct MedicationsView: View {
     private var hasVisitHistory: Bool {
         prescriptionRecords.contains {
             !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty)
-                && $0.visitDate <= today
+                && $0.visitDate < endOfToday
         }
     }
 

@@ -377,6 +377,15 @@ struct StrengthUnitRow: View {
     /// 읽는 데가 된다.
     private static let units = ["mg", "mcg", "mL"]
 
+    /// 단위를 붙인 표기. `mg` 는 붙여 쓰고 `tabs` 같은 단어형은 띄운다 -
+    /// "10tabs" 는 영어로 읽히지 않는다(QA 2026-09-21).
+    private func appending(_ unit: String, to text: String) -> String {
+        let base = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let needsSpace = unit.unicodeScalars.allSatisfy { CharacterSet.letters.contains($0) }
+            && unit.count > 3
+        return needsSpace ? "\(base) \(unit)" : base + unit
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
             Text(t("단위까지 적어 주세요. 용량이면 10mg, 개수면 2개처럼요.",
@@ -387,9 +396,31 @@ struct StrengthUnitRow: View {
 
             HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                 ForEach(Self.units + [t("정", "tabs"), t("개", "pills")], id: \.self) { unit in
-                    TogglePill(text: unit, isOn: false, minWidth: 0, fillsRow: true) {
-                        text = text.trimmingCharacters(in: .whitespacesAndNewlines) + unit
+                    // **입력칸과 같은 바탕을 쓰지 않는다.** 둘 다 surface2 였을 때
+                    // 방금 바탕을 깔아 구분한 입력칸과 그 아래 알약이 한 덩어리로
+                    // 보였다(QA 2026-09-21). 누르는 것은 흰 면에 테두리를 준다.
+                    Button {
+                        text = appending(unit, to: text)
+                    } label: {
+                        Text(unit)
+                            .janjanBody(14, weight: .medium)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .foregroundStyle(Color.ink)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.janjan(.surface))
+                            )
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .strokeBorder(Color.janjan(.line2), lineWidth: 1)
+                            )
+                            .contentShape(Capsule(style: .continuous))
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(t("단위 \(unit) 붙이기", "Add unit \(unit)")))
                 }
             }
         }
@@ -399,11 +430,17 @@ struct StrengthUnitRow: View {
 /// 용량 표기에 단위가 빠졌는지. 빈 칸은 괜찮다 — 용량은 선택이다.
 ///
 /// 소수점·쉼표·가운뎃점·빗금까지는 숫자의 일부로 본다("0.5", "1/2").
+///
+/// **숫자와 단위가 둘 다 있어야 통과한다.** 예전에는 "숫자만 있는가" 만 물어서
+/// `"mg"` 한 마디가 단위 있음으로 통과했고, 목록에 "약 이름 mg" 가 남았다
+/// (QA 2026-09-21).
 func strengthNeedsUnit(_ text: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
     let numeric = CharacterSet(charactersIn: "0123456789.,/·- ")
-    return trimmed.unicodeScalars.allSatisfy { numeric.contains($0) }
+    let hasDigit = trimmed.unicodeScalars.contains { CharacterSet.decimalDigits.contains($0) }
+    let hasUnit = trimmed.unicodeScalars.contains { !numeric.contains($0) }
+    return !(hasDigit && hasUnit)
 }
 
 /// 눌러서 켜고 끄는 알약. 요일·시간대처럼 여러 개를 고를 때.

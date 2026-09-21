@@ -43,6 +43,10 @@ struct ProGate: ViewModifier {
                         .offset(x: CGFloat(JanjanSpacing.xs), y: -CGFloat(JanjanSpacing.s))
                 }
             }
+            // 손가락만 막고 접근성 트리는 그대로 두면, VoiceOver 는 흐려 둔
+            // 진료 메모와 약 이름을 그대로 읽고 잠긴 토글까지 켤 수 있다
+            // (QA 2026-09-21). 눈으로 막은 것은 귀로도 막는다.
+            .accessibilityHidden(!pro.isPro)
             .overlay {
                 if !pro.isPro {
                     // 아래 버튼이 눌리는 대신 페이월이 열린다. 잠긴 기능이 반쯤 동작해서
