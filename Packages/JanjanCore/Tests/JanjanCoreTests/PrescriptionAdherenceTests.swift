@@ -172,3 +172,97 @@ final class PrescriptionAdherenceTests: XCTestCase {
         XCTAssertEqual(rate(doses: doses)?.rate, 1)
     }
 }
+
+// MARK: - 약별 평균 (사용자 결정 2026-09-21)
+
+extension PrescriptionAdherenceTests {
+
+    private func twoMedPrescription() -> Prescription {
+        Prescription(
+            id: prescriptionID,
+            visitDate: visitDay,
+            daysSupplied: 14,
+            medicationIDs: [Fixed.medA, Fixed.medB]
+        )
+    }
+
+    /// 하나는 꼬박 먹고 하나는 통째로 건너뛰면 **50%** 다.
+    ///
+    /// 알 수로 가중하면 하루 세 번 먹는 약이 한 번 먹는 약보다 세 배
+    /// 무거워진다. 약 두 개 중 하나를 안 먹은 것은 그냥 절반이다.
+    func testOverallRateAveragesEachMedication() {
+        // 약 A 는 하루 3정(14일에 42정), 약 B 는 하루 1정(14정).
+        let stock = [
+            refill(42, medicationID: Fixed.medA),
+            refill(14, medicationID: Fixed.medB)
+        ]
+        // 14일 내내 A 만 먹었다.
+        let doses = (2...15).map { taken(day: $0, quantity: 3, medicationID: Fixed.medA) }
+
+        let result = InventoryCalculator.prescriptionAdherence(
+            prescriptions: [twoMedPrescription()],
+            stockEvents: stock,
+            doseEvents: doses,
+            medications: [medication(), medication(id: Fixed.medB)],
+            asOf: Fixed.date(2026, 9, 15, 23, 0),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(result?.items.count, 2)
+        XCTAssertEqual(result?.rate, Decimal(string: "0.5"), "100% 와 0% 의 평균")
+
+        // 알 수로 가중했다면 42/56 = 75% 가 나왔을 것이다.
+        XCTAssertNotEqual(result?.rate, Decimal(42) / Decimal(56))
+    }
+
+    /// 2주 내내 건너뛰다가 끊은 약은 그 2주에 대해 0% 다.
+    /// 끊은 뒤로는 분모가 더 자라지 않는다.
+    func testStoppedMedicationCountsUpToTheDayItStopped() {
+        var stopped = medication(id: Fixed.medB)
+        stopped.status = .stopped
+        stopped.stoppedAt = Fixed.date(2026, 9, 15, 12, 0)   // 14일 뒤
+
+        let stock = [
+            refill(28, medicationID: Fixed.medA),
+            refill(28, medicationID: Fixed.medB)
+        ]
+        // A 만 꼬박 먹었다. B 는 한 번도 안 먹고 9/15 에 끊었다.
+        let doses = (2...29).map { taken(day: $0, medicationID: Fixed.medA) }
+
+        let result = InventoryCalculator.prescriptionAdherence(
+            prescriptions: [prescription()],
+            stockEvents: stock,
+            doseEvents: doses,
+            medications: [medication(), stopped],
+            asOf: Fixed.date(2026, 9, 29, 23, 0),
+            calendar: calendar
+        )
+
+        let b = result?.items.first { $0.medicationID == Fixed.medB }
+        XCTAssertEqual(b?.rate, 0, "2주 내내 건너뛴 약은 0% 다")
+        // 끊은 날까지 14일치 = 28 × 14/28 = 14정.
+        XCTAssertEqual(b?.expected, 14, "끊은 뒤로는 분모가 자라지 않는다")
+
+        let a = result?.items.first { $0.medicationID == Fixed.medA }
+        XCTAssertEqual(a?.rate, 1)
+        XCTAssertEqual(result?.rate, Decimal(string: "0.5"))
+    }
+
+    /// 진료 당일에 끊은 약은 셀 것이 없어 아예 빠진다.
+    func testMedicationStoppedOnTheVisitDayIsLeftOut() {
+        var stopped = medication(id: Fixed.medB)
+        stopped.status = .stopped
+        stopped.stoppedAt = visitDay
+
+        let result = InventoryCalculator.prescriptionAdherence(
+            prescriptions: [prescription()],
+            stockEvents: [refill(28), refill(28, medicationID: Fixed.medB)],
+            doseEvents: (2...19).map { taken(day: $0) },
+            medications: [medication(), stopped],
+            asOf: Fixed.date(2026, 9, 21, 23, 0),
+            calendar: calendar
+        )
+        XCTAssertEqual(result?.items.count, 1)
+        XCTAssertEqual(result?.rate, Decimal(string: "0.9"))
+    }
+}

@@ -123,12 +123,21 @@ public enum ReportComposer {
         // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
         let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
 
+        // 복약률은 한 번만 센다. "복약" 구역과 약별 줄이 같은 값을 나눠 쓴다 -
+        // 한 종이 안에서 두 숫자가 다른 규칙으로 서면 안 된다.
+        let adherence = InventoryCalculator.prescriptionAdherence(
+            prescriptions: prescriptions,
+            stockEvents: stockEvents,
+            doseEvents: doseEvents,
+            medications: medications,
+            asOf: endMoment,
+            calendar: calendar
+        )
+
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(
             doseEvents: doseEvents,
-            prescriptions: prescriptions,
-            stockEvents: stockEvents,
-            medications: medications,
+            adherence: adherence,
             from: start,
             to: endMoment,
             language: language,
@@ -139,6 +148,7 @@ public enum ReportComposer {
             schedules: schedules,
             doseEvents: doseEvents,
             stockEvents: stockEvents,
+            adherence: adherence,
             nextVisit: nextVisit,
             from: start,
             to: endMoment,
@@ -220,9 +230,7 @@ public enum ReportComposer {
 
     private static func adherenceLines(
         doseEvents: [DoseEvent],
-        prescriptions: [Prescription],
-        stockEvents: [StockEvent],
-        medications: [Medication],
+        adherence: InventoryCalculator.PrescriptionAdherence?,
         from start: Date,
         to end: Date,
         language: JanjanLanguage,
@@ -255,14 +263,7 @@ public enum ReportComposer {
         // **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21). 분모가
         // 처방에서 나오므로 요일을 고쳐도 지난 숫자가 흔들리지 않는다.
         // 셀 근거(진료 기록)가 없으면 숫자를 지어내지 않고 그렇게 적는다.
-        if let adherence = InventoryCalculator.prescriptionAdherence(
-            prescriptions: prescriptions,
-            stockEvents: stockEvents,
-            doseEvents: doseEvents,
-            medications: medications,
-            asOf: end,
-            calendar: calendar
-        ) {
+        if let adherence {
             lines.append(.init(
                 style: .body,
                 text: en
@@ -275,8 +276,8 @@ public enum ReportComposer {
             lines.append(.init(
                 style: .caption,
                 text: en
-                    ? "\(day) visit · \(DecimalQuantity.display(adherence.received)) received · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far recorded as taken"
-                    : "\(day) 진료 · 받은 \(DecimalQuantity.display(adherence.received))정 중 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 · 복용 기록 \(DecimalQuantity.display(adherence.taken))정"
+                    ? "\(day) visit · \(adherence.items.count) medication\(adherence.items.count == 1 ? "" : "s") · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far recorded as taken (average of each medication's rate)"
+                    : "\(day) 진료 · 약 \(adherence.items.count)종 · 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 중 복용 기록 \(DecimalQuantity.display(adherence.taken))정 (약별 복약률의 평균)"
             ))
         } else {
             lines.append(.init(
@@ -306,6 +307,9 @@ public enum ReportComposer {
         schedules: [Schedule],
         doseEvents: [DoseEvent],
         stockEvents: [StockEvent],
+        /// 약별 복약률. 위 "복약" 구역과 같은 계산에서 나온다 - 한 종이 안에서
+        /// 두 숫자가 다른 규칙으로 서면 안 된다.
+        adherence: InventoryCalculator.PrescriptionAdherence?,
         nextVisit: Date?,
         from start: Date,
         to end: Date,
@@ -340,13 +344,8 @@ public enum ReportComposer {
             if medication.kind == .asNeeded {
                 parts.append(medication.kind.label(language))
             }
-            if let rate = InventoryCalculator.adherenceRate(
-                doseEvents: doseEvents,
-                medicationID: medication.id,
-                from: start,
-                to: end
-            ) {
-                parts.append(en ? "adherence \(percentText(rate))" : "복약률 \(percentText(rate))")
+            if let item = adherence?.items.first(where: { $0.medicationID == medication.id }) {
+                parts.append(en ? "adherence \(percentText(item.rate))" : "복약률 \(percentText(item.rate))")
             }
             // 재고를 한 번도 세지 않았으면 0정이라고 말하지 않는다.
             //

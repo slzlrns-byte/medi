@@ -467,14 +467,22 @@ struct MedicationFormView: View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 JanjanField(
-                    label: t("지금 남은 개수 (선택)", "Pills on hand (optional)"),
+                    label: t("지금 남은 개수", "Pills on hand"),
                     placeholder: t("예: 28", "e.g. 28"),
                     keyboard: .decimalPad,
                     text: $stockText
                 )
-                Text(t("세어 본 개수를 적으면 이 시점이 기준이 돼요. 비워 두면 재고를 세지 않아요.", "Enter the count you've checked and this moment becomes the baseline. Leave it blank to skip tracking stock."))
+                // **비워 둘 수 없다**(사용자 결정 2026-09-21). 이 값이 재고의
+                // 기준점을 세운다. 없으면 셈이 0 에서 시작해 그 앞의 복용까지
+                // 빼 버려서, 한 달 먹고 28정을 받은 사람의 남은 개수가
+                // −2정이 됐다. 0 도 답이다 - 지금 하나도 없으면 0 을 적는다.
+                Text(needsStock
+                     ? t("지금 가진 개수를 적어 주세요. 하나도 없으면 0 이라고 적어도 돼요.",
+                         "Enter how many you have now. If you have none, 0 is a valid answer.")
+                     : t("세어 본 개수가 재고의 기준이 돼요. 나중에 '다시 세기' 로 고칠 수 있어요.",
+                         "The count you enter becomes the baseline. You can correct it later with 'Count again'."))
                     .janjanBody(12)
-                    .foregroundStyle(Color.muted)
+                    .foregroundStyle(needsStock ? Color.janjan(.peachInk) : Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -498,6 +506,9 @@ struct MedicationFormView: View {
         // 두니 결국 "15" 가 남았다("용량 15 mg 이런 식으로 해야지", 2026-09-21).
         // 고르개가 바로 아래 있으니 막혀도 한 번 누르면 풀린다.
         guard !strengthNeedsUnit(strength) else { return false }
+        // 재고 기준점이 없으면 남은 개수 계산이 0 에서 시작해 그 앞의 복용까지
+        // 빼 버린다(QA 2026-09-21). 새로 등록할 때는 반드시 받는다.
+        guard !needsStock else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
@@ -531,6 +542,12 @@ struct MedicationFormView: View {
         } else {
             weekdays.insert(day)
         }
+    }
+
+    /// 재고 칸을 아직 못 받은 상태인지. 고치기 화면에는 이 칸이 없다
+    /// (재고는 "다시 세기" 가 맡는다).
+    private var needsStock: Bool {
+        !isEditing && initialStock == nil
     }
 
     /// "1.5", "1,5" 둘 다 받는다. 숫자가 아니면 재고를 적지 않은 것으로 본다.

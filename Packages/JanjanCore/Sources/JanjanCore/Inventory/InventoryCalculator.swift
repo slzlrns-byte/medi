@@ -276,17 +276,37 @@ public enum InventoryCalculator {
 
     /// 한 진료에서 받은 약으로 잰 복약률.
     public struct PrescriptionAdherence: Hashable, Sendable {
+
+        /// 약 하나의 몫.
+        public struct Item: Hashable, Sendable {
+            public let medicationID: UUID
+            /// 그 진료에서 받은 알 수.
+            public let received: Decimal
+            /// 지금까지 먹었어야 할 알 수.
+            public let expected: Decimal
+            /// 먹었다고 기록된 알 수.
+            public let taken: Decimal
+            /// 0…1.
+            public let rate: Decimal
+        }
+
         /// 진료 받은 날.
         public let visitDate: Date
         /// 그 진료 이후 지난 날 수.
         public let elapsedDays: Int
-        /// 그 진료에서 받은 알 수(정기 약만).
+        /// 약별 몫. 화면과 종이가 약마다 따로 적을 때 쓴다.
+        public let items: [Item]
+        /// 그 진료에서 받은 알 수 합(정기 약만).
         public let received: Decimal
-        /// 지금까지 먹었어야 할 알 수.
+        /// 지금까지 먹었어야 할 알 수 합.
         public let expected: Decimal
-        /// 먹었다고 기록된 알 수.
+        /// 먹었다고 기록된 알 수 합.
         public let taken: Decimal
-        /// 0…1. `expected` 가 0 이면 만들지 않는다.
+        /// **약별 복약률의 평균**. 0…1.
+        ///
+        /// 알 수로 가중하지 않는다(사용자 결정 2026-09-21) - 그러면 하루 세
+        /// 번 먹는 약이 한 번 먹는 약보다 세 배 무거워진다. 약 두 개 중
+        /// 하나를 꼬박 먹고 하나를 통째로 건너뛰었으면 그건 50% 다.
         public let rate: Decimal
     }
 
@@ -302,8 +322,16 @@ public enum InventoryCalculator {
     /// 않는다. 그래서 분모를 거기서 만든다:
     ///
     ///     하루치 = 받은 알 수 ÷ 처방일수
-    ///     먹었어야 할 = 하루치 × min(진료 이후 지난 날, 처방일수)
-    ///     복약률 = 먹었다고 기록된 알 수 ÷ 먹었어야 할
+    ///     먹었어야 할 = 하루치 × min(진료 이후 지난 날, 처방일수, 중단까지의 날)
+    ///     약별 복약률 = 먹었다고 기록된 알 수 ÷ 먹었어야 할
+    ///     전체 복약률 = 약별 복약률의 **평균**
+    ///
+    /// **알 수로 가중하지 않는다.** 합으로 나누면 하루 세 번 먹는 약이 한 번
+    /// 먹는 약보다 세 배 무거워진다. 약 두 개 중 하나를 꼬박 먹고 하나를
+    /// 통째로 건너뛰었으면 그건 50% 다(사용자 결정 2026-09-21).
+    ///
+    /// **중단한 약도 중단 전까지는 센다.** 2주 내내 건너뛰다가 끊은 약은
+    /// 그 2주에 대해 0% 이고, 끊은 뒤로는 분모가 더 늘지 않는다.
     ///
     /// **기록하지 않은 날은 안 먹은 것으로 센다.** 분모는 처방이 정하므로
     /// 기록이 없으면 분자에 안 들어갈 뿐이다. 나중에 그 날을 채우면 분자가
@@ -341,49 +369,67 @@ public enum InventoryCalculator {
         let countedDays = min(elapsed, visit.daysSupplied)
 
         // 필요시 약은 빼고, 이 진료에 매인 보충만 약별로 모은다.
-        var scheduledKinds: [UUID: Medication.Kind] = [:]
-        for medication in medications { scheduledKinds[medication.id] = medication.kind }
+        var byID: [UUID: Medication] = [:]
+        for medication in medications { byID[medication.id] = medication }
 
         var received: [UUID: Decimal] = [:]
         for event in stockEvents where event.prescriptionID == visit.id {
             guard case .refill(let quantity) = event.kind, quantity > 0 else { continue }
             if let medicationID, event.medicationID != medicationID { continue }
-            if scheduledKinds[event.medicationID] == .asNeeded { continue }
+            if byID[event.medicationID]?.kind == .asNeeded { continue }
             received[event.medicationID, default: 0] += quantity
         }
         guard !received.isEmpty else { return nil }
 
-        let dayRatio = Decimal(countedDays) / Decimal(visit.daysSupplied)
-        var expected: Decimal = 0
-        var receivedTotal: Decimal = 0
-        for (_, quantity) in received {
-            receivedTotal += quantity
-            expected += quantity * dayRatio
-        }
-        guard expected > 0 else { return nil }
-
-        // 진료일 이후 기록된 복용. 기기 간 중복은 하나로 묶는다.
-        let visitStart = visitDay
-        var taken: Decimal = 0
+        // 약별로 기록된 복용 알 수. 기기 간 중복은 하나로 묶는다.
+        var takenByID: [UUID: Decimal] = [:]
         for event in collapsedScheduledDoses(doseEvents, calendar: calendar) {
             guard event.status == .taken else { continue }
             guard received[event.medicationID] != nil else { continue }
             let when = event.effectiveDate
-            guard when >= visitStart, when <= asOf else { continue }
-            taken += event.quantity
+            guard when >= visitDay, when <= asOf else { continue }
+            takenByID[event.medicationID, default: 0] += event.quantity
         }
 
-        // 100% 를 넘겨 적지 않는다. 더 먹었다는 뜻일 수도 있지만 대개는
-        // 기록이 겹친 것이고, "복약률 120%" 는 읽는 사람에게 오류로 보인다.
-        let rate = min(DecimalQuantity.round(taken / expected, scale: 4), 1)
+        var items: [PrescriptionAdherence.Item] = []
+        for (id, quantity) in received {
+            // 끊은 약은 **끊은 날까지만** 분모가 자란다. 그 전의 침묵은
+            // 여전히 안 먹은 것으로 센다(사용자 결정 2026-09-21).
+            var days = countedDays
+            if byID[id]?.status == .stopped, let stoppedAt = byID[id]?.stoppedAt {
+                let stoppedDay = calendar.startOfDay(for: stoppedAt)
+                let untilStop = calendar.dateComponents([.day], from: visitDay, to: stoppedDay).day ?? 0
+                days = min(days, max(untilStop, 0))
+            }
+            guard days > 0 else { continue }
+
+            let expected = quantity * Decimal(days) / Decimal(visit.daysSupplied)
+            guard expected > 0 else { continue }
+            let taken = takenByID[id] ?? 0
+            // 100% 를 넘겨 적지 않는다. 더 먹었다는 뜻일 수도 있지만 대개는
+            // 기록이 겹친 것이고, "복약률 120%" 는 읽는 사람에게 오류로 보인다.
+            let rate = min(max(DecimalQuantity.round(taken / expected, scale: 4), 0), 1)
+            items.append(PrescriptionAdherence.Item(
+                medicationID: id,
+                received: DecimalQuantity.round(quantity, scale: 2),
+                expected: DecimalQuantity.round(expected, scale: 2),
+                taken: DecimalQuantity.round(taken, scale: 2),
+                rate: rate
+            ))
+        }
+        guard !items.isEmpty else { return nil }
+
+        // **약별 비율의 평균.** 알 수로 가중하지 않는다.
+        let average = items.reduce(Decimal(0)) { $0 + $1.rate } / Decimal(items.count)
 
         return PrescriptionAdherence(
             visitDate: visit.visitDate,
             elapsedDays: elapsed,
-            received: DecimalQuantity.round(receivedTotal, scale: 2),
-            expected: DecimalQuantity.round(expected, scale: 2),
-            taken: DecimalQuantity.round(taken, scale: 2),
-            rate: max(rate, 0)
+            items: items.sorted { $0.medicationID.uuidString < $1.medicationID.uuidString },
+            received: DecimalQuantity.round(items.reduce(Decimal(0)) { $0 + $1.received }, scale: 2),
+            expected: DecimalQuantity.round(items.reduce(Decimal(0)) { $0 + $1.expected }, scale: 2),
+            taken: DecimalQuantity.round(items.reduce(Decimal(0)) { $0 + $1.taken }, scale: 2),
+            rate: DecimalQuantity.round(average, scale: 4)
         )
     }
 

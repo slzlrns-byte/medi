@@ -240,8 +240,8 @@ struct ReportView: View {
                     adherenceBar(fraction: (adherence.rate as NSDecimalNumber).doubleValue)
                     // 비율만 두지 않는다 - 무엇으로 잰 숫자인지 같이 적는다.
                     Text(t(
-                        "받은 \(DecimalQuantity.display(adherence.received))정 중 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 · 복용 기록 \(DecimalQuantity.display(adherence.taken))정",
-                        "\(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far, from \(DecimalQuantity.display(adherence.received)) received"
+                        "약 \(adherence.items.count)종 · 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 중 복용 기록 \(DecimalQuantity.display(adherence.taken))정",
+                        "\(adherence.items.count) medication\(adherence.items.count == 1 ? "" : "s") · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far"
                     ))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
@@ -255,8 +255,8 @@ struct ReportView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(t("기록하지 않은 복용은 복용한 것으로 세지 않아요. 나중에 채워 넣으면 그때 반영돼요.",
-                       "A dose you didn't record isn't counted as taken. Fill it in later and it counts then."))
+                Text(t("약마다 복약률을 내서 평균을 냈어요. 기록하지 않은 복용은 복용한 것으로 세지 않고, 나중에 채워 넣으면 그때 반영돼요.",
+                       "Each medication's rate is averaged. A dose you didn't record isn't counted as taken; fill it in later and it counts then."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
