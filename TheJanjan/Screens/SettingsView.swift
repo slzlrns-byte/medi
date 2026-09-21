@@ -313,7 +313,7 @@ struct SettingsView: View {
             )
         default:
             return t(
-                "이름 숨기기를 켜면 알림에 \"취침 약 2종\" 처럼 개수만 보여요. 진료 알림은 진료 기록에 다음 진료일을 적어 두면 가요.",
+                "이름 숨기기를 켜면 알림에 \"자기전 약 2종\" 처럼 개수만 보여요. 진료 알림은 진료 기록에 다음 진료일을 적어 두면 가요.",
                 "Turning on name hiding shows only a count in the notification, like \"2 bedtime medications.\" Appointment reminders go out once a prescription has a next visit date."
             )
         }

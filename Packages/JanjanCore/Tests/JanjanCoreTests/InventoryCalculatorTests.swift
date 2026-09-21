@@ -445,3 +445,102 @@ extension InventoryCalculatorTests {
         )
     }
 }
+
+// MARK: - 기준점이 없을 때 (QA 2026-09-21)
+
+extension InventoryCalculatorTests {
+
+    /// 재고 칸을 비우고 등록하면 정정이 생기지 않는다. 그때 셈이 0 에서
+    /// 시작해 그 앞의 복용까지 빼면 남은 개수가 음수로 내려간다.
+    ///
+    /// 8/1 등록(재고 안 셈) → 8/1~8/30 매일 1정 → 8/31 에 28정 받음.
+    /// 앱이 개수를 처음 안 것은 8/31 이므로, 그 앞의 30정은 앱이 존재조차
+    /// 모르던 약이다. 남은 개수는 28정이어야 한다(−2정이 아니라).
+    func testFirstStockEventIsTheBaselineWhenNothingWasCounted() {
+        let doses = (1...30).map { day in
+            DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: Fixed.date(2026, 8, day, 21),
+                actualAt: Fixed.date(2026, 8, day, 21),
+                status: .taken,
+                quantity: 1,
+                kind: .scheduled,
+                slotKey: DoseSlot.bedtime.storageKey
+            )
+        }
+        let stock: [StockEvent] = [
+            .refill(medicationID: Fixed.medA, quantity: 28, at: Fixed.date(2026, 8, 31, 10))
+        ]
+
+        XCTAssertEqual(
+            InventoryCalculator.remaining(
+                for: Fixed.medA,
+                stockEvents: stock,
+                doseEvents: doses,
+                asOf: Fixed.date(2026, 8, 31, 23),
+                calendar: Fixed.calendar
+            ),
+            28
+        )
+    }
+
+    /// 기준점이 생긴 **뒤**의 복용은 그대로 뺀다.
+    func testDosesAfterTheFirstStockEventStillSubtract() {
+        let stock: [StockEvent] = [
+            .refill(medicationID: Fixed.medA, quantity: 28, at: Fixed.date(2026, 8, 1, 10))
+        ]
+        let doses = (2...6).map { day in
+            DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: Fixed.date(2026, 8, day, 21),
+                actualAt: Fixed.date(2026, 8, day, 21),
+                status: .taken,
+                quantity: 1,
+                kind: .scheduled,
+                slotKey: DoseSlot.bedtime.storageKey
+            )
+        }
+
+        XCTAssertEqual(
+            InventoryCalculator.remaining(
+                for: Fixed.medA,
+                stockEvents: stock,
+                doseEvents: doses,
+                asOf: Fixed.date(2026, 8, 10),
+                calendar: Fixed.calendar
+            ),
+            23
+        )
+    }
+
+    /// 정정이 있으면 예전 규칙 그대로다 - 정정이 기준점이고 그 앞은 버린다.
+    func testCorrectionStillWinsAsTheBaseline() {
+        let stock: [StockEvent] = [
+            .refill(medicationID: Fixed.medA, quantity: 28, at: Fixed.date(2026, 8, 1, 10)),
+            .correction(medicationID: Fixed.medA, setTo: 10, at: Fixed.date(2026, 8, 10, 10))
+        ]
+        let doses = (2...20).map { day in
+            DoseEvent(
+                medicationID: Fixed.medA,
+                scheduledAt: Fixed.date(2026, 8, day, 21),
+                actualAt: Fixed.date(2026, 8, day, 21),
+                status: .taken,
+                quantity: 1,
+                kind: .scheduled,
+                slotKey: DoseSlot.bedtime.storageKey
+            )
+        }
+
+        // 8/10 에 10정으로 맞췄고 그 뒤 8/11~8/20 에 10정을 먹었다 → 0.
+        XCTAssertEqual(
+            InventoryCalculator.remaining(
+                for: Fixed.medA,
+                stockEvents: stock,
+                doseEvents: doses,
+                asOf: Fixed.date(2026, 8, 25),
+                calendar: Fixed.calendar
+            ),
+            0
+        )
+    }
+}

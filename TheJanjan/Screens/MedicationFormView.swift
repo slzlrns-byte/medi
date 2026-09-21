@@ -327,6 +327,14 @@ struct MedicationFormView: View {
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if hasDuplicateTimes {
+                    Text(t(
+                        "같은 시각이 두 줄에 있어요. 한 시각에는 한 줄만 둘 수 있어요.",
+                        "Two slots share the same time. Each time can hold only one slot."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // 정신과 처방은 하루 네 번을 넘기도 한다(분복 등). 모자라면 더 넣는다.
@@ -494,7 +502,22 @@ struct MedicationFormView: View {
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
         // 재고도 안 줄어든다. 저장은 되는데 아무 일도 일어나지 않는 약이 생긴다.
+        // 같은 시각을 두 줄에 두면 안 된다. 직접 넣은 시간대는 **시각이 곧
+        // 저장 키**라(`custom-21:00`), 둘이 겹치면 하루 두 번 먹은 것이 한
+        // 번으로 접힌다 - 소비도 복약률 분모도 반으로 줄었다(QA 2026-09-21).
+        // 프리셋끼리는 키가 달라 접히지 않지만, 같은 시각에 두 줄이 서는 것
+        // 자체가 화면에서 구별되지 않는다.
+        guard !hasDuplicateTimes else { return false }
         return drafts.contains { $0.isOn } && !weekdays.isEmpty
+    }
+
+    /// 켠 줄 중에 시·분이 겹치는 것이 있는지.
+    private var hasDuplicateTimes: Bool {
+        let times = drafts.filter(\.isOn).map { draft in
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: draft.time)
+            return (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        }
+        return Set(times).count != times.count
     }
 
     private func adjust(_ draft: Binding<SlotDraft>, by delta: Decimal) {

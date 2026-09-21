@@ -70,6 +70,26 @@ public enum InventoryCalculator {
             return lhs.step.rank < rhs.step.rank
         }
 
+        // **기준점이 하나도 없으면 가장 이른 재고 사건이 기준점이다.**
+        //
+        // 재고 칸을 비우고 약을 등록하면 정정이 만들어지지 않는다(선택이다).
+        // 그러면 셈이 0 에서 시작해 **그 앞의 복용까지 전부 빼** 버린다 -
+        // 8/1 에 등록하고 한 달 매일 먹은 뒤 8/31 에 28정을 받으면
+        // 0 − 30 + 28 = −2정이 됐다. 두 달이면 −32정이다(QA 2026-09-21).
+        //
+        // 앱이 개수를 처음 알게 된 순간보다 앞선 복용은 **앱이 존재조차
+        // 모르던 약**이라 셀 근거가 없다. 그 순간을 암묵적 기준점으로 삼는다.
+        // 정정이 하나라도 있으면 그쪽이 기준점이므로 여기는 지나간다.
+        if !steps.contains(where: { if case .correction = $0.step { return true } else { return false } }),
+           let firstStock = steps.first(where: {
+               if case .consumption = $0.step { return false } else { return true }
+           })?.date {
+            steps.removeAll { entry in
+                if case .consumption = entry.step { return entry.date < firstStock }
+                return false
+            }
+        }
+
         var running: Decimal = 0
         for entry in steps {
             switch entry.step {

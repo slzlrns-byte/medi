@@ -113,7 +113,7 @@ struct DoseQuickView: View {
 #Preview {
     DoseQuickView(slot: WatchSnapshot.SlotLine(
         slotKey: "bedtime",
-        labelKo: "취침",
+        labelKo: "자기전",
         timeText: "22:30",
         medicationNames: ["라모트리진", "쿠에티아핀"],
         medicationIDs: [],

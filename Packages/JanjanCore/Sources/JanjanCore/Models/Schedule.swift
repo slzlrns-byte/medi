@@ -112,7 +112,10 @@ public enum Weekday: Int, Codable, Sendable, CaseIterable, Comparable {
     }
 }
 
-/// 복용 시간대. 아침·점심·저녁·취침 네 개가 기본이고, 나머지는 사용자 정의.
+/// 복용 시간대. 아침·점심·저녁·자기전 네 개가 기본이고, 나머지는 사용자 정의.
+///
+/// 저장 키(`storageKey`)는 `bedtime` 그대로다 - 이미 깔린 기기의 기록이
+/// 그 키로 매여 있어서, 라벨만 바꾼다("취침" → "자기전", 사용자 2026-09-21).
 public enum DoseSlot: Hashable, Codable, Sendable {
     case morning
     case noon
@@ -127,7 +130,7 @@ public enum DoseSlot: Hashable, Codable, Sendable {
         case .morning: return "아침"
         case .noon: return "점심"
         case .evening: return "저녁"
-        case .bedtime: return "취침"
+        case .bedtime: return "자기전"
         case .custom(let time): return time.description
         }
     }
