@@ -20,6 +20,9 @@ struct VisitHistoryView: View {
     /// 무료로 선명하게 보이는 최근 회차 수: 이번 진료 + 바로 이전 회차.
     static let freeClearVisits = 2
 
+    /// 가장 최근 진료 말고 나머지도 펴 둘지(사용자 요청 2026-09-21).
+    @State private var isShowingOlder = false
+
     /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
     @ObservedObject private var clock = JanjanClock.shared
     private var today: Date { clock.today }
@@ -43,11 +46,15 @@ struct VisitHistoryView: View {
                     if visits.isEmpty {
                         emptyCard
                     } else {
-                        ForEach(Array(visits.prefix(Self.freeClearVisits))) { record in
-                            visitCard(record, isBlurred: false)
+                        // 가장 최근 진료만 펴 두고 나머지는 접는다. 진료를
+                        // 오래 다닐수록 이 목록이 길어지는데, 대개 보러 오는
+                        // 것은 "지난번에 뭐 받았더라" 하나다(사용자 2026-09-21).
+                        if let latest = visits.first {
+                            visitCard(latest, isBlurred: false)
                         }
-                        if visits.count > Self.freeClearVisits {
-                            olderSection
+                        if visits.count > 1 {
+                            olderToggle
+                            if isShowingOlder { olderSection }
                         }
                     }
                 }
@@ -68,23 +75,107 @@ struct VisitHistoryView: View {
         }
     }
 
-    /// 세 회차째부터. 무료에게는 날짜만 남기고 내용이 흐려지며, 누르면 페이월이 열린다.
-    /// 배지가 카드마다 붙지 않게 묶음 전체에 문 하나만 단다.
-    @ViewBuilder
-    private var olderSection: some View {
-        let older = Array(visits.dropFirst(Self.freeClearVisits))
-        if pro.isPro {
-            ForEach(older) { record in
-                visitCard(record, isBlurred: false)
+    /// 접힌 나머지를 여는 손잡이.
+    private var olderToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) { isShowingOlder.toggle() }
+        } label: {
+            HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
+                Text(isShowingOlder
+                     ? t("접기", "Collapse")
+                     : olderCountText)
+                    .janjanBody(13)
+                    .foregroundStyle(Color.ink2)
+                Image(systemName: isShowingOlder ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.janjan(.line2))
+                Spacer(minLength: 0)
             }
-        } else {
-            VStack(spacing: CGFloat(JanjanSpacing.s)) {
-                ForEach(older) { record in
-                    visitCard(record, isBlurred: true)
+            .padding(.horizontal, CGFloat(JanjanSpacing.xs))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var olderCountText: String {
+        let count = visits.count - 1
+        return t("지난 기록 \(count)개 더 보기",
+                 count == 1 ? "1 earlier visit" : "\(count) earlier visits")
+    }
+
+    /// 한 달치 진료 묶음. 회차를 죽 늘어놓는 것보다 달로 끊어 주면
+    /// "8월에 두 번 갔었네" 가 세지 않고도 보인다(사용자 요청 2026-09-21).
+    private struct MonthGroup: Identifiable {
+        let id: String
+        let title: String
+        let records: [PrescriptionRecord]
+    }
+
+    private var olderGroups: [MonthGroup] {
+        let calendar = Calendar.current
+        var order: [String] = []
+        var buckets: [String: [PrescriptionRecord]] = [:]
+
+        for record in visits.dropFirst() {
+            let parts = calendar.dateComponents([.year, .month], from: record.visitDate)
+            let key = "\(parts.year ?? 0)-\(parts.month ?? 0)"
+            if buckets[key] == nil {
+                buckets[key] = []
+                order.append(key)
+            }
+            buckets[key]?.append(record)
+        }
+
+        // visits 가 최신순이므로 order 도 최신순이고, 묶음 안도 그대로다.
+        return order.compactMap { key in
+            guard let records = buckets[key], let first = records.first else { return nil }
+            return MonthGroup(id: key, title: monthText(first.visitDate), records: records)
+        }
+    }
+
+    /// 무료에게 선명하게 보이는 회차의 id. Pro 면 전부다.
+    private var clearIDs: Set<UUID> {
+        guard !pro.isPro else { return Set(visits.map(\.id)) }
+        return Set(visits.prefix(Self.freeClearVisits).map(\.id))
+    }
+
+    /// 세 회차째부터. 무료에게는 날짜만 남기고 내용이 흐려지며, 누르면 페이월이 열린다.
+    /// 배지가 카드마다 붙지 않게 묶음마다 문 하나만 단다.
+    private var olderSection: some View {
+        let clear = clearIDs
+        return VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+            ForEach(olderGroups) { group in
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                    Text(group.title)
+                        .janjanBody(12, weight: .medium)
+                        .foregroundStyle(Color.muted)
+                        .padding(.horizontal, CGFloat(JanjanSpacing.xs))
+
+                    ForEach(group.records.filter { clear.contains($0.id) }) { record in
+                        visitCard(record, isBlurred: false)
+                    }
+
+                    let locked = group.records.filter { !clear.contains($0.id) }
+                    if !locked.isEmpty {
+                        VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                            ForEach(locked) { record in
+                                visitCard(record, isBlurred: true)
+                            }
+                        }
+                        .proGated(.visitHistory)
+                    }
                 }
             }
-            .proGated(.visitHistory)
         }
+    }
+
+    /// "2026년 8월" · "August 2026".
+    private func monthText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: lang.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("yMMMM")
+        return formatter.string(from: date)
     }
 
     // MARK: - 카드
