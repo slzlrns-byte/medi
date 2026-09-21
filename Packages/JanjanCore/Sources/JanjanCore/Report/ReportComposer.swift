@@ -786,7 +786,10 @@ public enum ReportComposer {
     }
 
     /// "9월 3일". 기간 안의 날짜라 연도는 머리글이 이미 말했다.
-    static func monthDayText(
+    ///
+    /// 앱 화면도 쓴다(지난 진료 이후 약 변경). 종이와 화면이 같은 날짜를
+    /// 다른 모양으로 적으면, 둘을 나란히 놓고 보는 사람이 다른 날인 줄 안다.
+    public static func monthDayText(
         _ date: Date,
         language: JanjanLanguage = .korean,
         calendar: Calendar = .current
