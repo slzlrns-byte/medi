@@ -245,7 +245,8 @@ final class ReportComposerTests: XCTestCase {
         let report = content(doses: Fixed.workedExampleDoses())
         // 14 복용 · 2 건너뜀 · 1 미기록.
         XCTAssertTrue(texts(report).contains("복용 14회 · 건너뜀 2회 · 미기록 1회"))
-        XCTAssertTrue(texts(report).contains("복약률 82%"))
+        // 비율 혼자 두지 않는다 - 며칠로 잰 숫자인지 함께 적는다.
+        XCTAssertTrue(texts(report).contains { $0.hasPrefix("복약률 ") && $0.contains("답한 날") })
     }
 
     func testPercentRoundsDownNotUp() {

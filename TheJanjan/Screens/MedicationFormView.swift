@@ -44,6 +44,10 @@ struct MedicationFormView: View {
     @State private var isSaving = false
     /// 알림 권한을 묻는 화면. 시간이 있는 약을 저장한 직후에만 올라온다.
     @State private var isAskingNotification = false
+    /// 요일을 바꿔 저장하려 할 때 한 번 묻는 창.
+    @State private var isConfirmingWeekdayChange = false
+    /// 고치러 들어올 때의 요일. 바뀌었는지 이 값과 견준다.
+    private let originalWeekdays: Set<Weekday>
 
 
     private var lang: JanjanLanguage { .current }
@@ -53,6 +57,7 @@ struct MedicationFormView: View {
     init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
         self.editingID = nil
+        self.originalWeekdays = []
         _name = State(initialValue: prefill?.name ?? "")
         _strength = State(initialValue: prefill?.strengthText ?? "")
     }
@@ -73,7 +78,9 @@ struct MedicationFormView: View {
         // "매일" 로 채워 두면 새 등록에서 일부러 없앴던 그 기본값이 —
         // 지나치기 쉬워서 없앴다 — 이 문을 통해 되살아난다(QA 2026-09-19).
         // 새 등록과 같이 빈 채로 시작한다.
-        _weekdays = State(initialValue: existing.schedules.first?.weekdays ?? [])
+        let saved = existing.schedules.first?.weekdays ?? []
+        self.originalWeekdays = saved
+        _weekdays = State(initialValue: saved)
         _drafts = State(initialValue: SlotDraft.from(existing.schedules))
     }
 
@@ -199,6 +206,20 @@ struct MedicationFormView: View {
         .fogBackground()
         .scrollContentBackground(.hidden)
         .keyboardDoneBar()
+        .confirmationDialog(
+            t("요일을 바꾸면 복약률이 새로 집계됩니다. 괜찮으시겠어요?",
+              "Changing the days recalculates your adherence. Is that okay?"),
+            isPresented: $isConfirmingWeekdayChange,
+            titleVisibility: .visible
+        ) {
+            Button(t("바꾸기", "Change")) { commitSave() }
+            Button(t("그대로 두기", "Keep the days"), role: .cancel) {}
+        } message: {
+            Text(t(
+                "지난 기록은 그대로 남아요. 다만 지난 날들의 예정이 새 요일로 다시 그려져서, 복약률과 그래프의 숫자가 달라질 수 있어요.",
+                "Your past records stay as they are. But past days are re-planned with the new schedule, so the adherence number and the charts may change."
+            ))
+        }
         .navigationTitle(isEditing ? t("약 고치기", "Edit medication") : t("직접 입력", "Enter manually"))
         .navigationBarTitleDisplayMode(.inline)
 
@@ -542,8 +563,27 @@ struct MedicationFormView: View {
         return renames
     }
 
+    /// 요일을 바꿔서 저장하려는지. 새 등록에는 견줄 대상이 없다.
+    private var changesWeekdays: Bool {
+        isEditing && !originalWeekdays.isEmpty && weekdays != originalWeekdays
+    }
+
     private func save() {
         guard canSave, !isSaving else { return }
+
+        // 계획은 저장해 두지 않고 지금의 요일로 매번 다시 그린다. 그래서
+        // 요일을 바꾸면 지난 날들의 예정도 새 요일로 다시 그려지고, 복약률과
+        // 그래프가 함께 달라진다. 조용히 바뀌면 사용자는 이유를 알 수 없다
+        // (사용자 결정 2026-09-21).
+        if changesWeekdays {
+            isConfirmingWeekdayChange = true
+            return
+        }
+        commitSave()
+    }
+
+    private func commitSave() {
+        guard !isSaving else { return }
         isSaving = true
 
         if let editingID {

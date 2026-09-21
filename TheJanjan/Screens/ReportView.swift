@@ -167,7 +167,17 @@ struct ReportView: View {
         InventoryCalculator.adherenceRate(
             doseEvents: doses,
             from: reportWindow.start,
-            to: today
+            to: endOfToday
+        )
+    }
+
+    /// 복약률 옆에 붙는 표본. 비율 혼자 두면 5일 열어 5번 누른 사람과
+    /// 28일 내내 챙긴 사람이 똑같이 100% 로 보인다.
+    private var answeredDays: Int {
+        InventoryCalculator.answeredDayCount(
+            doseEvents: doses,
+            from: reportWindow.start,
+            to: endOfToday
         )
     }
 

@@ -238,10 +238,18 @@ public enum ReportComposer {
         let skipped = counted.filter { $0.status == .skipped }.count
         let unrecorded = counted.filter { $0.status == .unrecorded }.count
 
+        // 비율에는 **표본이 늘 붙는다.** 미기록을 분모에서 빼기로 한 이상
+        // (사용자 결정 2026-09-21) 5일 열어 5번 누른 사람도 100% 라서,
+        // 며칠치로 잰 숫자인지 모르면 읽는 사람이 판단할 수 없다.
         if let rate = InventoryCalculator.adherenceRate(doseEvents: doseEvents, from: start, to: end) {
+            let answeredDays = InventoryCalculator.answeredDayCount(
+                doseEvents: doseEvents, from: start, to: end
+            )
             lines.append(.init(
                 style: .body,
-                text: en ? "Adherence \(percentText(rate))" : "복약률 \(percentText(rate))"
+                text: en
+                    ? "Adherence \(percentText(rate)) (from \(answeredDays) day\(answeredDays == 1 ? "" : "s") answered)"
+                    : "복약률 \(percentText(rate)) (답한 날 \(answeredDays)일 기준)"
             ))
         }
         lines.append(.init(
@@ -253,8 +261,8 @@ public enum ReportComposer {
         lines.append(.init(
             style: .caption,
             text: en
-                ? "Skipped is a choice not to take; unrecorded is a scheduled dose with no answer."
-                : "건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답하지 않은 예정분입니다."
+                ? "Adherence counts answered doses only. Skipped is a choice not to take; unrecorded has no answer and is left out of the rate."
+                : "복약률은 답한 예정분만 셉니다. 건너뜀은 복용하지 않기로 한 선택이고, 미기록은 답이 없어 비율에서 빠집니다."
         ))
         return lines
     }

@@ -210,12 +210,22 @@ public enum InventoryCalculator {
 
     // MARK: - 복약률
 
-    /// 기간 안의 복약률 = 복용함 ÷ (복용함 + 건너뜀 + 미기록).
+    /// 기간 안의 복약률 = **복용함 ÷ (복용함 + 건너뜀)**.
+    ///
+    /// **모르는 날은 분모에서도 뺀다**(사용자 결정 2026-09-21).
+    /// 미기록은 "안 먹었다" 가 아니라 "답이 없다" 이고, 그 둘을 섞으면 앱이
+    /// 모르는 것을 안 먹은 것으로 바꿔 말하게 된다. 요일을 넓히기만 해도
+    /// 앱이 지난 4주의 안 먹는 날을 "빠트림" 으로 채워 100% 가 42% 로
+    /// 내려갔던 것이 그 결과다 - 한 번도 안 빠트린 사람의 숫자였다.
     ///
     /// 정기 예정분(`kind == .scheduled`)만 센다. 필요시 약은 안 먹는 게 정상이라
     /// 분모에 넣으면 복약률이 근거 없이 내려간다.
     ///
-    /// - Returns: 0…1 사이 비율. 셀 사건이 하나도 없으면 nil.
+    /// **비율만 보이면 안 된다.** 5일 열어 5번 누른 사람도 100% 다. 그래서
+    /// 화면과 종이는 `answeredDayCount` 를 함께 적어 "28일 중 12일 기록" 을
+    /// 같이 보여 준다 - 비율에 표본이 붙어야 읽는 사람이 판단할 수 있다.
+    ///
+    /// - Returns: 0…1 사이 비율. 답한 사건이 하나도 없으면 nil.
     public static func adherenceRate(
         doseEvents: [DoseEvent],
         medicationID: UUID? = nil,
@@ -246,10 +256,35 @@ public enum InventoryCalculator {
             latest[key] = event
         }
 
-        let total = latest.count
-        guard total > 0 else { return nil }
-        let taken = latest.values.filter { $0.status == .taken }.count
-        return Decimal(taken) / Decimal(total)
+        // 답한 것만 센다. 미기록(앱이 채운 것과 사용자가 "기억나지 않아요" 를
+        // 고른 것 둘 다)은 양쪽 어디에도 들어가지 않는다.
+        let answered = latest.values.filter { $0.status == .taken || $0.status == .skipped }
+        guard !answered.isEmpty else { return nil }
+        let taken = answered.filter { $0.status == .taken }.count
+        return Decimal(taken) / Decimal(answered.count)
+    }
+
+    /// 그 기간에 **답이 남은 날**이 며칠인지. 복약률 옆에 붙는 표본 크기다.
+    ///
+    /// 비율만 적으면 5일 열어 5번 누른 사람과 28일 내내 챙긴 사람이 똑같이
+    /// 100% 로 보인다. 그 종이를 읽는 사람이 구별할 수 있어야 한다.
+    public static func answeredDayCount(
+        doseEvents: [DoseEvent],
+        medicationID: UUID? = nil,
+        from start: Date,
+        to end: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        var days: Set<Date> = []
+        for event in doseEvents {
+            if let medicationID, event.medicationID != medicationID { continue }
+            guard event.kind == .scheduled else { continue }
+            guard event.status == .taken || event.status == .skipped else { continue }
+            let when = event.effectiveDate
+            guard when >= start, when <= end else { continue }
+            days.insert(calendar.startOfDay(for: event.scheduledAt))
+        }
+        return days.count
     }
 
     /// 최근 4주(28일) 복약률. 소진 예측이 쓰는 기본값이다.

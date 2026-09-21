@@ -1,7 +1,13 @@
 import XCTest
 @testable import JanjanCore
 
-/// 복약률과 소진 예측. 설계 05절의 예시를 그대로 재현한다:
+/// 복약률과 소진 예측. 설계 05절의 예시를 그대로 재현한다.
+///
+/// **복약률의 분모가 2026-09-21 에 바뀌었다**(사용자 결정) - 미기록은
+/// "안 먹었다" 가 아니라 "답이 없다" 라서 분모에서도 뺀다. 예시의 17일 중
+/// 미기록 하루가 빠져 14/16(87%)이 되고, 소진 예측도 그만큼 짧아진다.
+/// 아래 주석의 옛 숫자(14/17 · 82% · 17일 · 9/3)는 기록으로 남겨 둔다.
+///
 /// 8/1 처방 28일분, 하루 1정 → 8/17 까지 복용 14 · 건너뜀 2 · 미기록 1
 /// → 잔여 14, 복약률 14/17(82%), 약 17일, 예상 소진 9/3, 다음 진료 8/29 → 알림 없음.
 final class ProjectionTests: XCTestCase {
@@ -17,11 +23,27 @@ final class ProjectionTests: XCTestCase {
             last28DaysEndingAt: asOf,
             calendar: Fixed.calendar
         )
-        XCTAssertEqual(rate, Decimal(14) / Decimal(17))
+        // 복용 14 · 건너뜀 2 · 미기록 1 → 미기록을 빼고 14/16.
+        XCTAssertEqual(rate, Decimal(14) / Decimal(16))
 
-        // 82% 로 표시된다.
+        // 87% 로 표시된다(예전 규칙에서는 14/17 = 82% 였다).
         let percent = DecimalQuantity.round((rate ?? 0) * 100, scale: 0)
-        XCTAssertEqual(percent, 82)
+        XCTAssertEqual(percent, 88)
+    }
+
+    /// 비율 옆에 붙는 표본. 답이 남은 날만 센다 - 미기록 하루는 빠진다.
+    func testAnsweredDayCountLeavesOutUnrecorded() {
+        XCTAssertEqual(
+            InventoryCalculator.answeredDayCount(
+                doseEvents: Fixed.workedExampleDoses(),
+                medicationID: Fixed.medA,
+                from: Fixed.date(2026, 8, 1, 0, 0),
+                to: asOf,
+                calendar: Fixed.calendar
+            ),
+            16,
+            "17일 중 미기록 하루를 빼면 16일"
+        )
     }
 
     func testAdherenceIgnoresAsNeededDoses() {
@@ -43,7 +65,7 @@ final class ProjectionTests: XCTestCase {
             last28DaysEndingAt: asOf,
             calendar: Fixed.calendar
         )
-        XCTAssertEqual(rate, Decimal(14) / Decimal(17))
+        XCTAssertEqual(rate, Decimal(14) / Decimal(16))
     }
 
     func testAdherenceIsNilWhenNothingScheduled() {
@@ -75,14 +97,15 @@ final class ProjectionTests: XCTestCase {
         let days = InventoryCalculator.projectedDaysRemaining(
             remaining: remaining, dailyScheduledQuantity: 1, adherence: rate
         )
+        // 잔여 14 ÷ (하루 1 × 0.875) = 16일. 복약률이 올라간 만큼 더 빨리 준다.
         XCTAssertNotNil(days)
-        XCTAssertEqual(DecimalQuantity.round(days ?? 0, scale: 2), 17)
+        XCTAssertEqual(DecimalQuantity.round(days ?? 0, scale: 2), 16)
 
         let runOut = InventoryCalculator.projectedRunOutDate(
             remaining: remaining, dailyScheduledQuantity: 1, adherence: rate,
             from: asOf, calendar: Fixed.calendar
         )
-        XCTAssertEqual(runOut, Fixed.date(2026, 9, 3, 0, 0))
+        XCTAssertEqual(runOut, Fixed.date(2026, 9, 2, 0, 0))
     }
 
     func testLowerAdherencePushesRunOutDateBack() {
