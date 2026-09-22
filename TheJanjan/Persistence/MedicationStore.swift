@@ -191,7 +191,28 @@ enum MedicationStore {
             }
         }
 
+        // **개수만 바뀐 변경도 이력을 남긴다**(QA 2026-09-22).
+        //
+        // 예전에는 표기가 안 바뀌면 여기서 그냥 돌아갔다. 그런데 시간대별
+        // 1회 개수는 이미 바뀐 뒤다. 그래서 그 변경이 `DoseChangeRecord` 에
+        // 없고, `hasLaterChange` 가 그것만 보므로 **나중에 더 과거의 진료를
+        // 뒤늦게 적으면 오늘의 개수가 그때 값으로 되돌아갔다** - 사용자는
+        // 지난 날짜를 적었을 뿐인데 알림·오늘 화면·소진 예측이 전부 옛
+        // 개수로 돈다.
+        //
+        // 표기가 그대로인 변경은 화면에 "10mg → 10mg" 으로 보이면 안 되므로
+        // `DoseChange.isTextual` 이 아닌 줄로 남긴다.
         guard let toText, toText != fromText else {
+            if applies, newDosePerIntake != nil {
+                let change = DoseChange(
+                    medicationID: medicationID,
+                    changedAt: changedAt,
+                    fromText: fromText,
+                    toText: fromText,
+                    note: note
+                )
+                context.insert(DoseChangeRecord.make(from: change))
+            }
             save("용량 적용", in: context)
             return nil
         }

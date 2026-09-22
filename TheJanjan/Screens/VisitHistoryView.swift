@@ -90,9 +90,13 @@ struct VisitHistoryView: View {
                 }
                 Button(t("그대로 두기", "Keep it"), role: .cancel) { pendingDeletion = nil }
             } message: { _ in
+                // 문구가 동작과 **반대**였다(QA 2026-09-22). 그날 세어 둔
+                // 개수는 보충과 한 쌍으로 함께 걷힌다 - 정정만 남기면 기준점이
+                // 그대로 서서 재고가 음수로 내려가기 때문이다. 2026-09-21 에
+                // 동작만 고치고 이 문장을 안 따라 고쳤다.
                 Text(t(
-                    "이 진료로 더해진 약 개수도 함께 빠져요. 그날 세어 둔 남은 개수와, 이때 적용한 용량 변경은 그대로 남아요.",
-                    "The pills this visit added are removed too. What you counted that day, and any dose change applied then, stay as they are."
+                    "이 진료로 더해진 개수와 그날 세어 둔 남은 개수가 함께 걷혀요. 남은 개수가 어긋나면 약 화면에서 다시 세어 주세요. 이때 적용한 용량 변경은 그대로 남아요.",
+                    "Both the pills this visit added and what you counted that day are removed. If the remaining count looks off, recount it on the medication screen. Any dose change applied then stays as it is."
                 ))
             }
             .navigationTitle(t("지난 진료 기록", "Visit history"))

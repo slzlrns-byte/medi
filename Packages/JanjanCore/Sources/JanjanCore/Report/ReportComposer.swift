@@ -377,8 +377,13 @@ public enum ReportComposer {
             }
             lines.append(.init(style: .body, text: parts.joined(separator: " · ")))
 
-            // 끊은 약은 모자랄 일이 없다. 복약률 때문에 실렸을 뿐이다.
-            if medication.status == .active, let shortfall = snapshot.shortfallDays, shortfall > 0 {
+            // 끊은 약은 모자랄 일이 없다 - 복약률 때문에 실렸을 뿐이다.
+            // 재고를 한 번도 세지 않은 약도 마찬가지다. `remaining` 이 0 이라
+            // "진료까지 남은 날 전부가 모자람" 이 되는데, 바로 위 줄은 그
+            // 약의 남은 개수를 아예 안 적는다(QA 2026-09-22).
+            let counted = stockEvents.contains { $0.medicationID == medication.id }
+            if medication.status == .active, counted,
+               let shortfall = snapshot.shortfallDays, shortfall > 0 {
                 lines.append(.init(
                     style: .caption,
                     text: en
@@ -402,6 +407,7 @@ public enum ReportComposer {
 
         let en = language == .english
         let inWindow = doseChanges
+            .filter(\.changesText)
             .filter { $0.changedAt >= start && $0.changedAt <= end }
             .sorted { $0.changedAt < $1.changedAt }
         guard !inWindow.isEmpty else { return [] }

@@ -145,12 +145,12 @@ struct MedicationsView: View {
                 // 목록에서 가려 둔 이름이 확인 창에서 새면 안 된다 - 가린 동안은 부르지 않는다.
                 if masksNames {
                     Text(t(
-                        "복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
+                        "복용 기록·재고·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
                         "This removes its dose and stock records together. This can't be undone."
                     ))
                 } else {
                     Text(t(
-                        "\(row.medication.name) 의 복용 기록과 재고 기록이 함께 사라져요. 되돌릴 수 없어요.",
+                        "\(row.medication.name) 의 복용 기록·재고·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
                         "This removes \(row.medication.name)'s dose and stock records together. This can't be undone."
                     ))
                 }

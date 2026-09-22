@@ -55,7 +55,9 @@ struct ChangesSinceVisitCard: View {
     private var rows: [Row] {
         guard let lastVisit else { return [] }
         let since = Calendar.current.startOfDay(for: lastVisit)
-        let changes = doseChangeRecords.map(\.core).filter { $0.changedAt >= since }
+        let changes = doseChangeRecords.map(\.core)
+            .filter(\.changesText)
+            .filter { $0.changedAt >= since }
 
         return medicationRecords
             .map(\.core)

@@ -192,8 +192,8 @@ struct MedicationDetailView: View {
             // 1회 개수는 어디에도 되돌릴 근거가 없다(변경 전 값을 안 적어
             // 둔다). 용량 표기만 되돌아간다고 미리 말한다(QA 2026-09-21).
             Text(t(
-                "용량 표기는 이 변경 전으로 돌아가요. 시간대별 1회 개수는 그대로 남으니, 달라졌다면 '약 고치기' 에서 맞춰 주세요.",
-                "The strength goes back to what it was before this change. The per-dose amounts stay as they are — adjust them in 'Edit medication' if needed."
+                "이 변경으로 적힌 용량이 지금 표기라면 그 전으로 돌아가요. 그 뒤에 따로 고쳤다면 지금 표기는 그대로 둡니다. 시간대별 1회 개수는 되돌리지 않으니, 달라졌다면 '약 고치기' 에서 맞춰 주세요.",
+                "If the current strength came from this change, it goes back to what it was before. If you edited it afterwards, the current strength stays. Per-dose amounts are not reverted — adjust them in 'Edit medication' if needed."
             ))
         }
         .confirmationDialog(
@@ -448,8 +448,10 @@ struct MedicationDetailView: View {
     /// 이 카드는 계산도 권고도 하지 않는다. "9/3 10mg → 15mg" 을 적어 두면
     /// 해석은 진료실에서 사람이 한다.
     private var doseChangeCard: some View {
+        // 1회 개수만 바뀐 줄은 이력에만 남기고 보여 주지 않는다 -
+        // "10mg → 10mg" 은 읽는 사람에게 오류로 보인다(QA 2026-09-22).
         let mine = doseChangeRecords
-            .filter { $0.medicationID == medicationID }
+            .filter { $0.medicationID == medicationID && $0.core.changesText }
             .sorted { $0.changedAt > $1.changedAt }
         let older = max(mine.count - 1, 0)
         let moreLabel = t(
@@ -813,6 +815,7 @@ struct MedicationDetailView: View {
         let remaining = doseChangeRecords
             .filter { $0.medicationID == medicationID && $0.id != deletedID }
             .map(\.core)
+            .filter(\.changesText)
 
         context.delete(entry)
         pendingDoseChangeDeletion = nil
@@ -821,9 +824,16 @@ struct MedicationDetailView: View {
             if lhs.changedAt != rhs.changedAt { return lhs.changedAt < rhs.changedAt }
             return lhs.id.uuidString < rhs.id.uuidString
         }
-        if let latest {
+        // **지금 표기가 이 변경의 결과일 때만 되돌린다**(QA 2026-09-22).
+        // 예전에는 조건 없이 `latest.toText` 로 덮었다. 그래서 (a) 마지막이
+        // 아닌 변경을 지워도 표기가 안 바뀌면서 확인창은 "이 변경 전으로
+        // 돌아가요" 라고 했고, (b) 그 뒤에 "약 고치기" 로 손수 적어 둔 표기가
+        // 아무 변경이나 하나 지우는 순간 말없이 사라졌다.
+        if record?.strengthText != removed.toText {
+            // 지금 표기는 이 변경에서 온 것이 아니다. 이력에서만 지운다.
+        } else if let latest {
             record?.strengthText = latest.toText
-        } else if record?.strengthText == removed.toText, !removed.fromText.isEmpty {
+        } else if !removed.fromText.isEmpty {
             // **마지막 변경을 지웠으면 그 앞의 표기로 되돌린다**(QA 2026-09-21).
             // 예전에는 "남은 변경이 없으면 손대지 않는다" 였다. 그래서 잘못
             // 적은 "10mg → 15mg" 을 지우면 이력은 비는데 머리글은 15mg 으로
@@ -843,7 +853,8 @@ struct MedicationDetailView: View {
         var changes = doseChangeRecords
             .filter { $0.medicationID == medicationID && $0.id != deletedID }
             .map(\.core)
-        if let newChange { changes.append(newChange) }
+            .filter(\.changesText)
+        if let newChange, newChange.changesText { changes.append(newChange) }
 
         let latest = changes.max { lhs, rhs in
             if lhs.changedAt != rhs.changedAt { return lhs.changedAt < rhs.changedAt }
@@ -1135,10 +1146,13 @@ private struct DoseChangeCompareSheet: View {
         )
     }
 
+    /// 가장 가까운 다음 진료. **날 단위로 센다** - `today` 는 앱을 켠 순간이라
+    /// 시각으로 견주면 오전 10시 진료가 오후에는 "지난 것" 이 되어, 같은 화면
+    /// 안에서 "오늘 진료" 와 "미정" 이 동시에 뜬다(QA 2026-09-22).
     private var nextVisit: Date? {
         prescriptionRecords
             .compactMap { $0.core.nextVisitDate }
-            .filter { $0 >= today }
+            .filter { $0 >= Calendar.current.startOfDay(for: today) }
             .min()
     }
 

@@ -139,10 +139,13 @@ struct ReportView: View {
     private var symptomEntries: [SymptomEntry] { symptomRecords.map(\.core) }
     private var medicationNotes: [MedicationNote] { noteRecords.map(\.core) }
 
+    /// 가장 가까운 다음 진료. **날 단위로 센다** - `today` 는 앱을 켠 순간이라
+    /// 시각으로 견주면 오전 10시 진료가 오후에는 "지난 것" 이 되어, 같은 화면
+    /// 안에서 "오늘 진료" 와 "미정" 이 동시에 뜬다(QA 2026-09-22).
     private var nextVisit: Date? {
         prescriptionRecords
             .compactMap { $0.core.nextVisitDate }
-            .filter { $0 >= today }
+            .filter { $0 >= Calendar.current.startOfDay(for: today) }
             .min()
     }
 

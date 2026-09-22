@@ -194,6 +194,52 @@ final class PrescriptionAdherenceTests: XCTestCase {
         XCTAssertEqual(result?.rate, Decimal(string: "0.5"))
     }
 
+    /// **앱을 깔기 전의 날은 분모에 넣지 않는다**(QA 2026-09-22).
+    ///
+    /// 오늘 앱을 깔고 지난 진료를 적는 사람이 있다. `DayPlan` 은 등록일 앞에
+    /// 계획을 만들지 않으므로 그 날들에는 복용 기록이 **있을 수가 없다**.
+    /// 그대로 세면 한 알도 안 빠트린 사람의 첫 리포트가 0% 로 나간다.
+    func testDaysBeforeTheAppKnewTheMedicationAreNotCounted() {
+        // 9/1 진료(28일치 28정)를 9/15 에 앱을 깔고 적었다. 9/15~9/20 은
+        // 꼬박 먹었다(9/21 은 아직 안 지났다).
+        var registered = medication()
+        registered.createdAt = Fixed.date(2026, 9, 15, 9, 0)
+        let result = rate(
+            doses: (15...20).map { taken(day: $0) },
+            medications: [registered]
+        )
+        // 분모는 9/15~9/20 의 6일치 = 28 × 6 ÷ 28 = 6정.
+        XCTAssertEqual(result?.expected, 6, "등록 전 14일은 분모에 없다")
+        XCTAssertEqual(result?.taken, 6)
+        XCTAssertEqual(result?.rate, 1, "꼬박 먹었으면 100% 다")
+    }
+
+    /// 등록일이 없는 옛 기록은 예전처럼 진료일부터 센다.
+    func testMedicationWithoutACreatedAtIsUnchanged() {
+        XCTAssertEqual(rate(doses: (2...19).map { taken(day: $0) })?.expected, 20)
+    }
+
+    /// **분자도 달력과 같은 축을 쓴다**(QA 2026-09-22).
+    ///
+    /// 어젯밤 취침약을 자정 넘겨 누르면 `actualAt` 은 다음 날이 된다. 그것으로
+    /// 창을 자르면 창 끝의 한 알이 밀려 나가, 하루도 안 빠트린 사람이 96% 가
+    /// 됐다. 달력이 그 기록을 어제의 줄로 그리는 것처럼 여기도 `scheduledAt`
+    /// 으로 자른다.
+    func testADoseLoggedAfterMidnightStillCountsForItsOwnDay() {
+        // 창의 마지막 날(9/20) 취침약을 9/21 00:10 에 눌렀다.
+        let lateNight = DoseEvent(
+            medicationID: Fixed.medA,
+            scheduledAt: Fixed.date(2026, 9, 20, 22, 30),
+            actualAt: Fixed.date(2026, 9, 21, 0, 10),
+            status: .taken,
+            quantity: 1,
+            kind: .scheduled,
+            slotKey: DoseSlot.bedtime.storageKey
+        )
+        let result = rate(doses: (2...19).map { taken(day: $0) } + [lateNight])
+        XCTAssertEqual(result?.taken, 19, "예정 시각이 9/20 이면 9/20 의 약이다")
+    }
+
     /// 더 먹었다고 100% 를 넘겨 적지 않는다.
     func testRateNeverExceedsOneHundred() {
         let doses = (2...21).map { taken(day: $0, quantity: 2) }   // 예정의 두 배

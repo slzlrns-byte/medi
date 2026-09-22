@@ -870,13 +870,22 @@ struct TodayView: View {
 
     /// 다음 진료 전에 모자라는 약을 약별로 세지 않고 한 번에 묶어 말한다(설계 05절).
     private var shortfallText: String? {
+        // 날 단위로 센다 - 오전 진료가 오후에 "지난 것" 이 되면 이 칩만
+        // 사라지고 옆의 "오늘 진료" 와 어긋난다(QA 2026-09-22).
         guard let nextVisit = prescriptionRecords
             .compactMap({ $0.core.nextVisitDate })
-            .filter({ $0 >= today })
+            .filter({ $0 >= Calendar.current.startOfDay(for: today) })
             .min()
         else { return nil }
 
         let short = medications.filter { medication in
+            // 재고를 한 번도 세지 않은 약은 `remaining` 이 0 이라 "진료까지
+            // 남은 날 전부가 모자람" 으로 나온다. 중단한 약도 스케줄이 살아
+            // 있어 같은 길을 탄다. 약 탭은 이 둘을 이미 거르는데 여기만
+            // 안 걸러서, 한 앱이 두 말을 했다(QA 2026-09-22).
+            guard medication.status == .active,
+                  stockEvents.contains(where: { $0.medicationID == medication.id })
+            else { return false }
             let snapshot = InventoryCalculator.snapshot(
                 medicationID: medication.id,
                 schedules: schedules,
@@ -899,12 +908,25 @@ struct TodayView: View {
     // MARK: - 기록
 
     private func record(_ entry: DayPlan.Entry, in line: DayPlan.SlotLine, as status: DoseEvent.Status) {
+        // **이미 지나간 시간대는 그 시각으로 박는다**(QA 2026-09-22).
+        //
+        // 예전에는 누른 순간이 `actualAt` 이 됐다. 재고는 `actualAt` 순으로
+        // 세고 "다시 세기" 의 정정은 그 앞을 전부 버리는 기준점이라, 아침 약을
+        // 밤에 기록하는 사람은 **세고 나서 기록하면 한 알이 더 빠지고, 기록하고
+        // 세면 안 빠졌다.** 같은 하루가 순서에 따라 달라졌다.
+        //
+        // 어제 이전을 채우는 길들(지나간 시간대 시트·달력)은 이미 그 날 그
+        // 시각으로 박는다. 오늘 것만 규칙이 달랐다. 아직 오지 않은 시간대를
+        // 미리 누르는 경우는 그대로 지금 시각을 쓴다 - 그때는 정말 지금이다.
+        let now = Date()
+        let plannedAt = line.time.date(on: today)
         DoseRecorder.record(
             medicationID: entry.medicationID,
             slotKey: line.slotKey,
             status: status,
             source: .phone,
             on: today,
+            at: min(plannedAt, now),
             quantity: entry.dose,
             in: context
         )

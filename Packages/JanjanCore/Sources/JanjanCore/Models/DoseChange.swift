@@ -34,6 +34,17 @@ public struct DoseChange: Identifiable, Hashable, Codable, Sendable {
     }
 
     /// "10mg → 15mg". 이전 표기가 없으면 새 표기만.
+    /// 용량 **표기**가 실제로 달라진 변경인가.
+    ///
+    /// 1회 개수만 바뀐 변경도 이력에는 남는다 - 남기지 않으면 나중에 더 과거의
+    /// 진료를 뒤늦게 적을 때 그 개수가 조용히 되돌아간다(`hasLaterChange` 가
+    /// 이 줄들을 본다). 다만 보여 줄 것은 없으므로("10mg → 10mg") 화면과 종이는
+    /// 이 값으로 거른다(QA 2026-09-22).
+    public var changesText: Bool {
+        fromText.trimmingCharacters(in: .whitespacesAndNewlines)
+            != toText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     public var arrowTextKo: String {
         fromText.isEmpty ? toText : "\(fromText) → \(toText)"
     }
