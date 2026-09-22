@@ -420,10 +420,19 @@ struct StrengthUnitRow: View {
         return needsSpace ? "\(base) \(unit)" : base + unit
     }
 
+    /// 숫자가 있어야 단위를 붙인다. 빈 칸에 "mg" 만 붙으면 숫자 없는 표기라
+    /// 단위 검사도 통과해 "약 이름 mg" 가 저장된다.
+    private var hasNumber: Bool {
+        text.unicodeScalars.contains { CharacterSet.decimalDigits.contains($0) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-            Text(t("단위까지 적어 주세요. 용량이면 10mg, 개수면 2개처럼요.",
-                   "Add the unit too — 10mg for a strength, 2 pills for a count."))
+            Text(hasNumber
+                 ? t("단위까지 적어 주세요. 용량이면 10mg, 개수면 2개처럼요.",
+                     "Add the unit too — 10mg for a strength, 2 pills for a count.")
+                 : t("숫자를 적고 단위를 골라 주세요. 예: 10 → mg",
+                     "Type the number, then pick a unit. For example: 10 → mg"))
                 .janjanBody(12)
                 .foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -454,6 +463,8 @@ struct StrengthUnitRow: View {
                             .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .disabled(!hasNumber)
+                    .opacity(hasNumber ? 1 : 0.45)
                     .accessibilityLabel(Text(t("단위 \(unit) 붙이기", "Add unit \(unit)")))
                 }
             }

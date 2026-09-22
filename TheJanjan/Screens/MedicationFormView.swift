@@ -4,9 +4,13 @@ import JanjanCore
 
 /// 약 등록 폼 (설계 03절). **고치기도 같은 화면이 맡는다**(2026-09-19).
 ///
-/// 필수는 이름·용량(단위까지)·시간대·요일이다(사용자 결정 2026-09-22). 용도와
-/// 제형은 비워 둬도 저장되고 나중에 채울 수 있다. 재고는 여기서 받지 않는다 —
-/// 진료 기록에서 받는다.
+/// 필수는 이름·용량(단위까지)·지금 남은 개수·시간대·요일이다(사용자 결정
+/// 2026-09-22). 용도와 제형은 비워 둬도 저장되고 나중에 채울 수 있다.
+///
+/// 남은 개수는 한때 진료 기록에서만 받았다(등록 정정 위에 진료 보충이 얹혀
+/// 개수가 두 배가 되어서). 실제로 써 보니 등록과 진료 등록이 갈라져 있어
+/// 불편했고, 다시 등록에서 받는다(사용자 결정 2026-09-22 저녁). 두 배 문제는
+/// 진료 폼이 같은 날의 등록 정정을 알아보고 한 줄 짚어 주는 것으로 막는다.
 ///
 /// 시스템 `Form` 을 쓰지 않고 흰 카드로 짠다. 회색 그룹 목록은 이 앱의 시각 언어가 아니다.
 ///
@@ -35,6 +39,8 @@ struct MedicationFormView: View {
     @State private var name: String
     @State private var strength: String
     @State private var purpose = ""
+    /// 지금 남은 개수. 새 등록에서만 받는다 - 고치기에서는 "다시 세기" 가 맡는다.
+    @State private var stockText = ""
     @State private var form: Medication.Form = .tablet
     @State private var kind: Medication.Kind = .scheduled
     /// 기본은 아무 요일도 고르지 않은 상태 - 직접 눌러 고른다
@@ -100,7 +106,7 @@ struct MedicationFormView: View {
             "\(draft.preset?.storageKey ?? "custom")|\(draft.isOn)|\(draft.timeOfDay.hour):\(draft.timeOfDay.minute)|\(draft.dose)"
         }.joined(separator: ",")
         let dayPart = weekdays.sorted().map { "\($0.rawValue)" }.joined(separator: ",")
-        return [name, strength, purpose, "\(form)", "\(kind)", dayPart, slotPart].joined(separator: "\u{1F}")
+        return [name, strength, purpose, stockText, "\(form)", "\(kind)", dayPart, slotPart].joined(separator: "\u{1F}")
     }
 
     /// 열릴 때와 다른 것이 하나라도 있는지. 봉투 스캔으로 채워 온 새 등록은
@@ -196,6 +202,9 @@ struct MedicationFormView: View {
         ScrollView {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 identityCard
+                if !isEditing {
+                    stockCard
+                }
                 kindCard
                 if kind == .scheduled {
                     slotCard
@@ -325,7 +334,10 @@ struct MedicationFormView: View {
                 // 10mg 인지 10정인지 알 수가 없다(사용자 지적 2026-09-21).
                 // 단위를 앱이 대신 붙여 주지는 않는다 - 약 정보를 지어내는
                 // 셈이 되므로, 한 번 눌러 붙일 수 있게만 해 둔다.
-                if strengthNeedsUnit(strength) {
+                // 숫자를 적기 전에도 단위 고르개가 보인다(사용자 요청 2026-09-22).
+                // 무엇을 적어야 하는지 칸을 보자마자 안다. 숫자 없이 단위만
+                // 누르는 것은 고르개가 스스로 막는다.
+                if needsStrength || strengthNeedsUnit(strength) {
                     StrengthUnitRow(text: $strength)
                 }
                 Text(needsStrength
@@ -341,6 +353,29 @@ struct MedicationFormView: View {
                     placeholder: t("예: 잠들기 쉽게", "e.g. To help me sleep"),
                     text: $purpose
                 )
+            }
+        }
+    }
+
+    private var stockCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                JanjanField(
+                    label: t("지금 남은 개수", "Pills on hand"),
+                    placeholder: t("예: 28", "e.g. 28"),
+                    keyboard: .decimalPad,
+                    text: $stockText
+                )
+                // **비워 둘 수 없다**(사용자 결정 2026-09-22). 이 값이 재고의
+                // 기준점을 세운다. 0 도 답이다 - 지금 하나도 없으면 0 을 적는다.
+                Text(needsStock
+                     ? t("지금 가진 개수를 적어 주세요. 하나도 없으면 0 이라고 적어도 돼요.",
+                         "Enter how many you have now. If you have none, 0 is a valid answer.")
+                     : t("세어 본 개수가 남은 개수의 기준이 돼요. 나중에 '다시 세기' 로 고칠 수 있어요.",
+                         "The count you enter becomes the baseline. You can correct it later with 'Count again'."))
+                    .janjanBody(12)
+                    .foregroundStyle(needsStock ? Color.janjan(.peachInk) : Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -568,6 +603,10 @@ struct MedicationFormView: View {
             return t("용량에 단위를 붙여 주세요. 예: 15 mg",
                      "Add a unit to the strength. For example: 15 mg")
         }
+        if needsStock {
+            return t("지금 남은 개수를 적어 주세요. 하나도 없으면 0.",
+                     "Enter how many pills you have now. 0 if none.")
+        }
         guard kind == .scheduled else { return nil }
         // 화면에 카드가 선 순서(시간대 → 요일)대로 말한다. 거꾸로 말하면
         // 요일을 고른 뒤에 또 시간대를 켜라는 말을 듣는다(QA 2026-09-22).
@@ -591,6 +630,7 @@ struct MedicationFormView: View {
         // (사용자 결정 2026-09-22 / 2026-09-21).
         guard !needsStrength else { return false }
         guard !strengthNeedsUnit(strength) else { return false }
+        guard !needsStock else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
@@ -631,6 +671,21 @@ struct MedicationFormView: View {
     /// 않는다. 고치러 들어온 김에 채운다.
     private var needsStrength: Bool {
         strength.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 남은 개수 칸을 아직 못 받은 상태인지. 고치기 화면에는 이 칸이 없다
+    /// (재고는 "다시 세기" 가 맡는다).
+    private var needsStock: Bool {
+        !isEditing && initialStock == nil
+    }
+
+    /// "1.5", "1,5" 둘 다 받는다. 숫자가 아니면 아직 안 적은 것으로 본다.
+    private var initialStock: Decimal? {
+        let trimmed = stockText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard !trimmed.isEmpty, let value = Decimal(string: trimmed), value >= 0 else { return nil }
+        return value
     }
 
     // MARK: - 저장
@@ -716,10 +771,11 @@ struct MedicationFormView: View {
         let schedules = makeSchedules(for: medication.id)
 
         MedicationStore.add(
-            // **등록에서는 재고를 받지 않는다**(사용자 결정 2026-09-22).
-            // 재고의 기준점은 진료 기록 한 곳에서만 선다 - 두 곳에서 받으니
-            // 등록 정정 위에 진료 보충이 얹혀 개수가 두 배가 됐다.
-            MedicationStore.Draft(medication: medication, schedules: schedules),
+            MedicationStore.Draft(
+                medication: medication,
+                schedules: schedules,
+                initialStock: initialStock
+            ),
             in: context
         )
 

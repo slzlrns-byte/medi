@@ -249,6 +249,18 @@ struct PrescriptionFormView: View {
     }
 
     private var emptyCard: some View {
+        // 카드 어디를 눌러도 등록으로 간다(사용자 요청 2026-09-22) - 아래
+        // 버튼만 문이면 글자를 누른 사람은 아무 일도 안 일어난다고 느낀다.
+        Button {
+            isShowingNewMedication = true
+        } label: {
+            emptyCardBody
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text(t("눌러서 약을 등록합니다", "Tap to register a medication")))
+    }
+
+    private var emptyCardBody: some View {
         JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
                 Text(t("등록된 약이 없어요", "No medications registered"))
@@ -323,10 +335,9 @@ struct PrescriptionFormView: View {
 
                 // **받기 전 개수를 늘 묻는다**(사용자 결정 2026-09-22).
                 //
-                // 재고의 기준점은 이제 이 화면 한 곳에서만 선다 - 약 등록에서는
-                // 재고를 받지 않는다. 접어 두면 대부분 안 누르고, 그러면 기준점
-                // 없이 보충만 쌓여 남은 개수가 실제와 멀어진다. 매 진료마다 한
-                // 번 짚고 가면 그 자리에서 다시 맞는다.
+                // 접어 두면 대부분 안 누르고, 그러면 기준점 없이 보충만 쌓여
+                // 남은 개수가 실제와 멀어진다. 매 진료마다 한 번 짚고 가면 그
+                // 자리에서 다시 맞는다.
                 //
                 // ± 버튼만 두지 않는다 - 14정이면 열네 번 눌러야 했다.
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
@@ -355,10 +366,10 @@ struct PrescriptionFormView: View {
                         .janjanBody(11)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
-                    // 9/21 이전 빌드의 등록 폼은 "지금 남은 개수" 를 정정으로 남겼다.
-                    // 약국에서 받아 온 28정을 그 칸에 적고 바로 진료를 적으면, 미리
-                    // 채운 값(28) 위에 받아 온 28 이 더해져 56 이 된다(QA 2026-09-22).
-                    // 진료일에 만든 등록 정정이 있으면 그 사실을 짚어 준다.
+                    // 등록 폼은 "지금 남은 개수" 를 정정으로 남긴다. 약국에서 받아 온
+                    // 28정을 그 칸에 적고 바로 진료를 적으면, 미리 채운 값(28) 위에
+                    // 받아 온 28 이 더해져 56 이 된다(QA 2026-09-22). 진료일에 만든
+                    // 등록 정정이 있으면 그 사실을 짚어 준다.
                     if let counted = registrationStockOnVisitDay(for: medication) {
                         Text(t(
                             "등록할 때 적은 \(DecimalQuantity.display(counted))정에 이번에 받아 온 약이 들어 있으면 0 으로 고쳐 주세요.",
@@ -653,8 +664,7 @@ struct PrescriptionFormView: View {
         }
     }
 
-    /// 옛 빌드의 등록 폼이 진료일과 같은 날에 남긴 "지금 남은 개수" 정정의 값.
-    /// 지금 빌드는 이런 정정을 만들지 않는다 - 옛 사용자의 저장소에만 있다.
+    /// 등록 폼이 진료일과 같은 날에 남긴 "지금 남은 개수" 정정의 값.
     private func registrationStockOnVisitDay(for medication: Medication) -> Decimal? {
         let calendar = Calendar.current
         return stockRecords.first {

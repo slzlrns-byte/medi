@@ -378,7 +378,7 @@ struct MedicationsView: View {
                     .foregroundStyle(Color.ink)
                 // "이름과 시간만으로" 는 옛말이다 - 용량(단위까지)과 요일도 받는다.
                 // 폼에 들어가 막히고 나서야 알면 첫인상이 거짓말이 된다(QA 2026-09-22).
-                Text(t("이름·용량·먹는 때·요일만 적으면 돼요.", "Just the name, the dose, when you take it, and which days."))
+                Text(t("이름·용량·남은 개수·먹는 때·요일을 적으면 돼요.", "Just the name, the dose, how many you have, when you take it, and which days."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
@@ -590,7 +590,7 @@ struct AddMedicationEntryView: View {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 entryRow(
                     title: t("직접 입력", "Enter manually"),
-                    subtitle: t("이름 · 용량 · 먹는 때 · 요일을 하나씩 적어요.", "Enter the name, dose, time and days one by one."),
+                    subtitle: t("이름 · 용량 · 남은 개수 · 먹는 때 · 요일을 하나씩 적어요.", "Enter the name, dose, count on hand, time and days one by one."),
                     systemImage: "square.and.pencil"
                 ) {
                     isShowingForm = true

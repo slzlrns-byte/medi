@@ -14,22 +14,36 @@ enum MedicationStore {
     private static let logger = Logger(subsystem: Janjan.appBundleID, category: "medication-store")
 
     /// 등록 화면이 채워서 넘기는 초안.
-    ///
-    /// **재고는 들어 있지 않다**(사용자 결정 2026-09-22). 재고의 기준점은
-    /// 진료 기록 한 곳에서만 선다 - 등록에서도 받으면 그 정정 위에 진료
-    /// 보충이 얹혀 개수가 두 배가 된다.
     struct Draft {
         var medication: Medication
         var schedules: [Schedule]
+        /// 등록할 때 센 "지금 남은 개수". 등록 폼이 반드시 받는다(사용자 결정
+        /// 2026-09-22). nil 은 스캔 같은 다른 길이 재고 없이 넘길 때뿐이다.
+        var initialStock: Decimal? = nil
     }
 
-    /// 새 약 하나와 그 스케줄을 저장한다.
+    /// 새 약 하나와 그 스케줄·첫 재고를 저장한다.
+    ///
+    /// 첫 재고는 보충이 아니라 **정정**으로 넣는다. 정정은 기준점을 세우므로
+    /// 나중에 다시 세어 고쳐도 이전 계산이 따라오지 않는다(설계 05절).
+    /// 메모는 `registrationCorrectionNote` 다 - 진료 폼이 같은 날의 등록 정정을
+    /// 이 메모로 알아보고, 받아 온 약을 두 번 세지 않게 한 줄 짚어 준다.
     @discardableResult
-    static func add(_ draft: Draft, in context: ModelContext) -> UUID {
+    static func add(_ draft: Draft, at moment: Date = Date(), in context: ModelContext) -> UUID {
         context.insert(MedicationRecord.make(from: draft.medication))
 
         for schedule in draft.schedules {
             context.insert(ScheduleRecord.make(from: schedule))
+        }
+
+        if let stock = draft.initialStock {
+            let event = StockEvent.correction(
+                medicationID: draft.medication.id,
+                setTo: stock,
+                at: moment,
+                note: registrationCorrectionNote
+            )
+            context.insert(StockEventRecord.make(from: event))
         }
 
         save("약 등록", in: context)
@@ -316,8 +330,8 @@ enum MedicationStore {
     /// 진료 폼이 적는 "받기 전 개수" 정정의 메모. 옛 빌드의 정정을 알아보는
     /// 열쇠이기도 하니 바꾸지 않는다.
     static let visitCorrectionNote = "진료일에 세어 둔 개수"
-    /// 9/21 이전 빌드의 등록 폼이 적던 정정의 메모. 이제는 만들지 않지만
-    /// 옛 사용자의 저장소에 남아 있다.
+    /// 등록 폼이 적는 "지금 남은 개수" 정정의 메모. 9/21 이전 빌드도 같은
+    /// 메모를 썼으므로 옛 사용자의 정정도 이것으로 알아본다. 바꾸지 않는다.
     static let registrationCorrectionNote = "등록할 때 세어 둔 개수"
 
     static func setStatus(_ status: Medication.Status, for medicationID: UUID, in context: ModelContext) {
