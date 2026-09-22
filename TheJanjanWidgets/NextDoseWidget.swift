@@ -115,13 +115,6 @@ struct NextDoseWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: DoseEntry
 
-    /// 잠금화면에 보일 이름. 무료 토글 "잠금화면에서 약 이름 숨기기" 도
-    /// 따른다 - 알림은 "2종" 으로 오는데 이 위젯만 이름을 그대로 띄웠다
-    /// (QA 2026-09-22). 빈 배열이면 아래가 "N개 남음" 으로 부른다.
-    private var lockScreenNames: [String] {
-        JanjanPrivacy.hidesNamesOnLockScreen ? [] : lockScreenNames
-    }
-
     var body: some View {
         switch family {
         case .systemMedium: mediumBody
@@ -151,8 +144,8 @@ struct NextDoseWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 if entry.slotKey != nil {
                     header
-                    if !lockScreenNames.isEmpty {
-                        Text(lockScreenNames.joined(separator: " · "))
+                    if !entry.medicationNames.isEmpty {
+                        Text(entry.medicationNames.joined(separator: " · "))
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -284,6 +277,14 @@ struct NextDoseLockScreenView: View {
     @Environment(\.widgetFamily) private var family
     let entry: DoseEntry
 
+    /// 잠금화면에 보일 이름. 무료 토글 "잠금화면에서 약 이름 숨기기" 도
+    /// 따른다 - 알림은 "2종" 으로 오는데 이 위젯만 이름을 그대로 띄웠다
+    /// (QA 2026-09-22). 빈 배열이면 아래가 "N개 남음" 으로 부른다.
+    private var lockScreenNames: [String] {
+        JanjanPrivacy.hidesNamesOnLockScreen ? [] : entry.medicationNames
+    }
+
+
     var body: some View {
         switch family {
         case .accessoryInline:
@@ -293,9 +294,9 @@ struct NextDoseLockScreenView: View {
                 if entry.slotKey != nil {
                     Text([entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " "))
                         .font(.headline)
-                    Text(entry.medicationNames.isEmpty
+                    Text(lockScreenNames.isEmpty
                          ? t("\(entry.pendingCount)개 남음", "\(entry.pendingCount) left")
-                         : entry.medicationNames.joined(separator: " · "))
+                         : lockScreenNames.joined(separator: " · "))
                         .font(.caption)
                         .lineLimit(1)
                 } else {
