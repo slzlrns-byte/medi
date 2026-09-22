@@ -53,14 +53,23 @@ public enum SampleData {
         Schedule(medicationID: quetiapine.id, slot: .bedtime, dosePerIntake: Decimal(string: "0.5") ?? 1)
     ]
 
-    /// 설계 05절의 예시: 8/1 에 28일분 보충.
+    /// 예시 진료의 ID. 보충이 이 진료에 매여야 복약률이 선다.
+    ///
+    /// 예전에는 보충에 진료 ID 가 없어서 `prescriptionAdherence` 의 `received`
+    /// 가 비었고, 예시 데이터로 찍은 리포트 화면이 "진료와 받아 온 개수를
+    /// 적어 두면 복약률이 나와요" 라는 빈 상태로 나갔다 - 진료를 적어 둔
+    /// 사람에게 그 문장은 거짓이고, 스토어 대표 화면이 그 모양이었다
+    /// (스크린샷 런 46, 2026-09-22).
+    public static let prescriptionID = UUID(uuidString: "0A8F5F1E-6B6D-4C0B-9E3A-2D9C7B4E5A11")!
+
+    /// 설계 05절의 예시: 진료일에 28일분 보충. 전부 예시 진료에 매인다.
     public static func stockEvents(referenceDate: Date) -> [StockEvent] {
         let refillDate = calendar.date(byAdding: .day, value: -16, to: referenceDate) ?? referenceDate
         return [
-            .refill(medicationID: escitalopram.id, quantity: 28, at: refillDate),
-            .refill(medicationID: lamotrigine.id, quantity: 28, at: refillDate),
-            .refill(medicationID: quetiapine.id, quantity: 14, at: refillDate),
-            .refill(medicationID: lorazepam.id, quantity: 10, at: refillDate)
+            .refill(medicationID: escitalopram.id, quantity: 28, at: refillDate, prescriptionID: prescriptionID),
+            .refill(medicationID: lamotrigine.id, quantity: 28, at: refillDate, prescriptionID: prescriptionID),
+            .refill(medicationID: quetiapine.id, quantity: 14, at: refillDate, prescriptionID: prescriptionID),
+            .refill(medicationID: lorazepam.id, quantity: 10, at: refillDate, prescriptionID: prescriptionID)
         ]
     }
 
@@ -116,6 +125,7 @@ public enum SampleData {
 
     public static func prescription(referenceDate: Date) -> Prescription {
         Prescription(
+            id: prescriptionID,
             visitDate: calendar.date(byAdding: .day, value: -16, to: referenceDate) ?? referenceDate,
             daysSupplied: 28,
             nextVisitDate: calendar.date(byAdding: .day, value: 12, to: referenceDate),
