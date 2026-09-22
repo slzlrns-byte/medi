@@ -290,9 +290,12 @@ struct SettingsView: View {
             }
 
             Toggle(t("잠금화면에서 약 이름 숨기기", "Hide medication names on lock screen"), isOn: $hidesMedicationNames)
-                .onChange(of: hidesMedicationNames) { _, _ in
+                .onChange(of: hidesMedicationNames) { _, newValue in
+                    // 잠금화면 위젯도 같은 값을 봐야 한다 - 앱 그룹에도 쓴다.
+                    JanjanPrivacy.storeLockScreenPreference(newValue)
                     // 이미 예약된 알림은 문구가 구워진 채로 남아 있다. 다시 깔아야 바뀐다.
                     Task { await ReminderPlanner.reschedule(using: context) }
+                    AppServices.shared.pushWatchSnapshot()
                 }
 
             Picker(t("진료 알림", "Appointment reminders"), selection: $appointmentLeadDays) {
@@ -635,7 +638,11 @@ struct SettingsView: View {
             // Pro 사본(`JanjanEntitlement.proKey`)은 남긴다. 사용자 데이터가
             // 아니라 StoreKit 권한의 그림자이고, 지우면 돈을 낸 사람의 위젯만
             // 다음 갱신까지 잠긴 채로 보인다.
-            for key in [JanjanPrivacy.hideNamesKey, JanjanLanguage.defaultsKey] {
+            for key in [
+                JanjanPrivacy.hideNamesKey,
+                JanjanPrivacy.lockScreenHideNamesKey,
+                JanjanLanguage.defaultsKey
+            ] {
                 group.removeObject(forKey: key)
             }
         }

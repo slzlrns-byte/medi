@@ -42,6 +42,30 @@ enum JanjanPrivacy {
     /// 지킨다. 무료 사용자는 스위치를 켤 수 없다.
     static var hidesNames: Bool { isOn }
 
+    /// 무료 토글 "잠금화면에서 약 이름 숨기기" 의 키. 알림 본문이 이 값을 본다.
+    ///
+    /// 위젯도 봐야 한다. 예전에는 standard 에만 있어서 위젯 프로세스가 읽을
+    /// 수조차 없었고, 알림은 "2종" 으로 오는데 **잠금화면 위젯**에는 약 이름이
+    /// 그대로 떴다(QA 2026-09-22). 라벨이 "잠금화면" 이니 잠금화면 위젯은
+    /// 반드시 따라야 한다. 앱은 `storeLockScreenPreference` 로 두 곳에 쓴다.
+    static let lockScreenHideNamesKey = "janjan.notifications.hideMedicationNames"
+
+    /// 잠금화면(알림·잠금화면 위젯)에서 이름을 숨겨야 하는가.
+    /// Pro 가리기가 켜져 있어도 참이다 - 그쪽은 화면 전부를 가린다.
+    static var hidesNamesOnLockScreen: Bool {
+        if hidesNames { return true }
+        if let group = UserDefaults(suiteName: Janjan.appGroupID),
+           let stored = group.object(forKey: lockScreenHideNamesKey) as? Bool {
+            return stored
+        }
+        return UserDefaults.standard.bool(forKey: lockScreenHideNamesKey)
+    }
+
+    static func storeLockScreenPreference(_ hides: Bool) {
+        UserDefaults.standard.set(hides, forKey: lockScreenHideNamesKey)
+        UserDefaults(suiteName: Janjan.appGroupID)?.set(hides, forKey: lockScreenHideNamesKey)
+    }
+
     /// 선택을 저장한다. 위젯이 다음 갱신 때 같은 값을 읽도록 그룹에도 쓴다.
     static func store(_ hides: Bool) {
         UserDefaults.standard.set(hides, forKey: hideNamesKey)

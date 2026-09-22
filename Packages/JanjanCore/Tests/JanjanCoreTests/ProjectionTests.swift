@@ -202,3 +202,45 @@ final class ProjectionTests: XCTestCase {
         XCTAssertEqual(weekdaysOnly.dailyScheduledQuantity(), Decimal(5) / Decimal(7))
     }
 }
+
+// MARK: - 소진 예측의 비율과 앱이 채운 미기록 (QA 2026-09-22)
+
+final class AdherenceRateBackfillTests: XCTestCase {
+
+    private func event(day: Int, status: DoseEvent.Status, source: DoseEvent.Source) -> DoseEvent {
+        let at = Fixed.date(2026, 9, day, 8, 0)
+        return DoseEvent(
+            medicationID: Fixed.medA, scheduledAt: at,
+            actualAt: status == .taken ? at : nil,
+            status: status, source: source, quantity: 1,
+            kind: .scheduled, slotKey: DoseSlot.morning.storageKey
+        )
+    }
+
+    /// 요일을 넓히면 채우기가 새 요일을 `.automatic` 미기록으로 채운다.
+    /// 그것을 분모에 넣으면 꼬박 먹은 사람의 비율이 반으로 내려가 소진
+    /// 예측이 두 배로 늘고 "부족한 약 없음" 이 뜬다. 물어볼 자리이지 답이
+    /// 아니므로 세지 않는다.
+    func testAppFilledUnrecordedDoesNotDragTheRateDown() {
+        let real = (1...12).map { event(day: $0, status: .taken, source: .phone) }
+        let filled = (13...28).map { event(day: $0, status: .unrecorded, source: .automatic) }
+        let rate = InventoryCalculator.adherenceRate(
+            doseEvents: real + filled,
+            from: Fixed.date(2026, 9, 1, 0), to: Fixed.date(2026, 9, 28, 23),
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(rate, 1, "채운 줄 16개는 분모에 안 든다")
+    }
+
+    /// 사용자가 직접 고른 "기억나지 않아요" 는 답이라 그대로 센다.
+    func testUserChosenUnrecordedStillCounts() {
+        let doses = (1...9).map { event(day: $0, status: .taken, source: .phone) }
+            + [event(day: 10, status: .unrecorded, source: .phone)]
+        let rate = InventoryCalculator.adherenceRate(
+            doseEvents: doses,
+            from: Fixed.date(2026, 9, 1, 0), to: Fixed.date(2026, 9, 10, 23),
+            calendar: Fixed.calendar
+        )
+        XCTAssertEqual(rate, Decimal(string: "0.9"))
+    }
+}

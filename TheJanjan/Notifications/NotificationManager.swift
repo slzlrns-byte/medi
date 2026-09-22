@@ -85,7 +85,7 @@ final class NotificationManager: NSObject {
     /// 저장은 UserDefaults 한 곳에서 한다. 화면이 `@AppStorage` 로만 들고 있으면
     /// 알림을 굽는 이 클래스는 그 값을 영영 못 보고, 토글은 아무 일도 하지 않는
     /// 장식이 된다. 정신과 약 이름이 잠금화면에 뜨는 문제라 그냥 두면 안 된다.
-    static let hideNamesDefaultsKey = "janjan.notifications.hideMedicationNames"
+    static let hideNamesDefaultsKey = JanjanPrivacy.lockScreenHideNamesKey
 
     var showsMedicationNames: Bool {
         !UserDefaults.standard.bool(forKey: Self.hideNamesDefaultsKey)

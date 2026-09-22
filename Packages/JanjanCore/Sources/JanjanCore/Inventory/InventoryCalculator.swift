@@ -252,6 +252,13 @@ public enum InventoryCalculator {
         for event in doseEvents {
             if let medicationID, event.medicationID != medicationID { continue }
             guard event.kind == .scheduled else { continue }
+            // **앱이 채운 미기록은 답이 아니다**(QA 2026-09-22). 요일을 넓히면
+            // 채우기가 지난 4주의 새 요일을 전부 `.automatic` 미기록으로 채우는데,
+            // 그것을 분모에 넣으면 12/12 가 12/28 로 내려가 소진 예측이 두 배로
+            // 늘고 "부족한 약 없음" 이 뜬다 - 실제로는 6일 모자란다. 물어볼
+            // 자리로 만든 줄이지 안 먹었다는 기록이 아니므로 뺀다. 사용자가
+            // 직접 고른 "기억나지 않아요" 는 답이라 그대로 센다.
+            if event.status == .unrecorded, event.source == .automatic { continue }
             let when = event.effectiveDate
             guard when >= start, when <= end else { continue }
 
