@@ -14,32 +14,22 @@ enum MedicationStore {
     private static let logger = Logger(subsystem: Janjan.appBundleID, category: "medication-store")
 
     /// 등록 화면이 채워서 넘기는 초안.
+    ///
+    /// **재고는 들어 있지 않다**(사용자 결정 2026-09-22). 재고의 기준점은
+    /// 진료 기록 한 곳에서만 선다 - 등록에서도 받으면 그 정정 위에 진료
+    /// 보충이 얹혀 개수가 두 배가 된다.
     struct Draft {
         var medication: Medication
         var schedules: [Schedule]
-        /// 처음에 세어 본 개수. nil 이면 재고를 쓰지 않는다는 뜻이다.
-        var initialStock: Decimal?
     }
 
-    /// 새 약 하나와 그 스케줄·초기 재고를 함께 저장한다.
+    /// 새 약 하나와 그 스케줄을 저장한다.
     @discardableResult
-    static func add(_ draft: Draft, at moment: Date = Date(), in context: ModelContext) -> UUID {
+    static func add(_ draft: Draft, in context: ModelContext) -> UUID {
         context.insert(MedicationRecord.make(from: draft.medication))
 
         for schedule in draft.schedules {
             context.insert(ScheduleRecord.make(from: schedule))
-        }
-
-        // 첫 재고는 보충이 아니라 **직접 정정**으로 넣는다.
-        // 정정은 기준점을 세우므로, 나중에 다시 세어 고쳐도 이전 계산이 따라오지 않는다(설계 05절).
-        if let stock = draft.initialStock {
-            let event = StockEvent.correction(
-                medicationID: draft.medication.id,
-                setTo: stock,
-                at: moment,
-                note: "등록할 때 세어 둔 개수"
-            )
-            context.insert(StockEventRecord.make(from: event))
         }
 
         save("약 등록", in: context)
