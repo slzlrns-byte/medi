@@ -346,10 +346,7 @@ struct MedicationsView: View {
 
     /// 실제로 다녀온 진료가 하나라도 있는지. VisitHistoryView 와 같은 규칙으로 센다.
     private var hasVisitHistory: Bool {
-        prescriptionRecords.contains {
-            !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty)
-                && $0.visitDate < endOfToday
-        }
+        prescriptionRecords.contains { !$0.core.isScheduleOnly && $0.visitDate < endOfToday }
     }
 
     private var nextVisitText: String {

@@ -1370,13 +1370,19 @@ private struct StockRecountSheet: View {
     private var schedules: [Schedule] { scheduleRecords.map(\.core) }
     private var medications: [Medication] { medicationRecords.map { $0.core.displayReady } }
 
-    /// 기록상 잔여. 이 화면의 재고 카드와 같은 계산기를 쓴다.
+    /// 기록상 잔여. 이 화면의 재고 카드와 **같은 계산기를 같은 시각으로** 부른다.
+    ///
+    /// 예전에는 여기만 `Date()` 를 넘겼다. 재고 카드는 하루의 끝을 넘기는데
+    /// `remaining` 은 `occurredAt <= asOf` 로 재고 사건을 거르므로, 오늘 안이지만
+    /// 지금보다 나중 시각의 사건(진료일을 오늘로 적은 보충·정정)이 카드에는
+    /// 들어가고 이 숫자에는 빠졌다 - 같은 화면의 두 숫자가 어긋났다
+    /// (사용자 지적 2026-09-22).
     private var remaining: Decimal {
         InventoryCalculator.remaining(
             for: medicationID,
             stockEvents: stockEvents,
             doseEvents: doseEvents,
-            asOf: now
+            asOf: JanjanClock.shared.endOfToday
         )
     }
 

@@ -294,3 +294,51 @@ extension PrescriptionAdherenceTests {
         XCTAssertEqual(result?.rate, Decimal(string: "0.9"))
     }
 }
+
+// MARK: - 다녀온 진료와 일정만 담은 기록 (사용자 지적 2026-09-22)
+
+final class ScheduleOnlyPrescriptionTests: XCTestCase {
+
+    private let day = Fixed.date(2026, 9, 10, 10)
+
+    /// 오늘 탭의 "다음 진료" 칩이 만드는 모양. 두 날짜가 같은 하나다.
+    func testScheduleChipRecordIsNotAVisit() {
+        let record = Prescription(visitDate: day, daysSupplied: 0, nextVisitDate: day)
+        XCTAssertTrue(record.isScheduleOnly)
+    }
+
+    /// **이것이 이 규칙을 고친 이유다.** 진료 기록 화면에서 약을 고르지 않고
+    /// 처방일수와 메모를 비운 채 저장해도 기록은 비어 보인다. 예전 규칙은
+    /// 그것까지 가짜로 보아 지난 진료 기록·리포트에서 통째로 지웠다.
+    func testAVisitSavedWithNothingFilledInIsStillAVisit() {
+        let saved = Prescription(visitDate: day, daysSupplied: 0)
+        XCTAssertFalse(saved.isScheduleOnly, "다음 진료를 안 잡은 진료는 진료다")
+
+        let withNextVisit = Prescription(
+            visitDate: day,
+            daysSupplied: 0,
+            nextVisitDate: Fixed.date(2026, 10, 8, 10)
+        )
+        XCTAssertFalse(withNextVisit.isScheduleOnly, "다음 진료일이 다르면 진료다")
+    }
+
+    func testAnythingFilledInMakesItAVisit() {
+        XCTAssertFalse(
+            Prescription(visitDate: day, daysSupplied: 28, nextVisitDate: day).isScheduleOnly
+        )
+        XCTAssertFalse(
+            Prescription(visitDate: day, daysSupplied: 0, nextVisitDate: day, clinicNote: "용량 늘림")
+                .isScheduleOnly
+        )
+        XCTAssertFalse(
+            Prescription(visitDate: day, daysSupplied: 0, nextVisitDate: day, medicationIDs: [Fixed.medA])
+                .isScheduleOnly
+        )
+    }
+
+    /// 공백만 적은 메모는 적지 않은 것과 같다.
+    func testWhitespaceNoteIsStillEmpty() {
+        let record = Prescription(visitDate: day, daysSupplied: 0, nextVisitDate: day, clinicNote: "   ")
+        XCTAssertTrue(record.isScheduleOnly)
+    }
+}

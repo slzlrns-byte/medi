@@ -668,9 +668,15 @@ struct PrescriptionFormView: View {
             medicationIDs: Array(chosen.keys)
         )
 
-        // 남은 개수는 이번 처방에 포함한 약의 것만 저장한다 - 세다가 약을 뺐으면
-        // 그 숫자는 버린다.
-        let counted = leftovers.filter { refills[$0.key] != nil }
+        // 남은 개수는 이번 처방에 **포함한** 약의 것만 저장한다 - 세다가 약을
+        // 뺐으면 그 숫자는 버린다.
+        //
+        // 예전에는 `refills[key] != nil`(손잡이를 켜 두기만 해도 참)로 걸렀다.
+        // 그래서 약을 켜 놓고 **받아 온 개수를 0 으로 둔 채** 저장하면, 보충은
+        // 하나도 안 생기는데 "받기 전 남은 개수" 정정만 남았다. 정정은 그 앞을
+        // 전부 버리는 기준점이라 그 약의 재고가 통째로 0 이 됐다
+        // (사용자 지적 2026-09-22). 실제로 처방에 든 약(`chosen`)만 본다.
+        let counted = leftovers.filter { chosen[$0.key] != nil }
 
         MedicationStore.add(
             prescription: prescription,

@@ -37,7 +37,7 @@ struct ChangesSinceVisitCard: View {
     /// 그 사이에 올린 용량이 "유지됨" 으로 적혔다.
     private var lastVisit: Date? {
         prescriptionRecords
-            .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
+            .filter { !$0.core.isScheduleOnly }
             .map(\.core.visitDate)
             .filter { $0 < endOfToday }
             .max()

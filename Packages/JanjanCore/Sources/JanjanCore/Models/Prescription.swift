@@ -30,6 +30,25 @@ public struct Prescription: Identifiable, Hashable, Codable, Sendable {
         self.medicationIDs = medicationIDs
     }
 
+    /// 다음 진료 **일정만** 담은 기록인지. 다녀온 진료로 세지 않는다.
+    ///
+    /// 오늘 탭의 "다음 진료" 칩이 만드는 기록이 이 모양이다 - 약도 처방일수도
+    /// 메모도 없고, `visitDate` 와 `nextVisitDate` 가 같은 날짜 하나다.
+    ///
+    /// **비어 있다는 것만으로 판정하지 않는다**(사용자 지적 2026-09-22).
+    /// 진료 기록 화면에서 저장한 진료도, 약을 고르지 않고 처방일수와 메모를
+    /// 비우면 똑같이 비어 보인다. 예전 규칙은 그것까지 가짜로 보아서 사용자가
+    /// 직접 남긴 진료가 지난 진료 기록·리포트·"진료 이후 약 변경" 에서 통째로
+    /// 사라졌다. 일정만 담은 기록은 **두 날짜가 같다**는 것으로 갈라낸다.
+    public var isScheduleOnly: Bool {
+        guard medicationIDs.isEmpty,
+              daysSupplied == 0,
+              clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return false }
+        guard let next = nextVisitDate else { return false }
+        return next == visitDate
+    }
+
     /// 처방일수와 하루 예정 개수로 보충 개수를 제안한다. 사용자가 고칠 수 있는 초안일 뿐이다.
     public func suggestedRefillQuantity(dailyScheduledQuantity: Decimal) -> Decimal {
         DecimalQuantity.snapToQuarter(Decimal(daysSupplied) * dailyScheduledQuantity)

@@ -1075,7 +1075,7 @@ private struct NextVisitSheet: View {
     /// 약도 처방일수도 메모도 없는, 다음 진료 일정만 담은 기록인지.
     /// 이런 기록은 리포트의 "지난 진료" 로 세지 않고, 미정이 되면 지운다.
     private func isScheduleOnly(_ record: PrescriptionRecord) -> Bool {
-        record.medicationIDValues.isEmpty && record.daysSupplied == 0 && record.clinicNote.isEmpty
+        record.core.isScheduleOnly
     }
 
     private func save() {

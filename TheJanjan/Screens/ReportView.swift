@@ -152,7 +152,7 @@ struct ReportView: View {
     /// 여기서 세지 않는다(QA 2026-09-19).
     private var lastVisit: Date? {
         prescriptionRecords
-            .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
+            .filter { !$0.core.isScheduleOnly }
             .map(\.core.visitDate)
             .filter { $0 < endOfToday }
             .max()

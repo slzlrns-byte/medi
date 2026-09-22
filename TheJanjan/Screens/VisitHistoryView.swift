@@ -39,7 +39,7 @@ struct VisitHistoryView: View {
     /// 진료가 아니라 세지 않는다 — ReportView 의 lastVisit 과 같은 규칙.
     private var visits: [PrescriptionRecord] {
         prescriptionRecords
-            .filter { !($0.medicationIDValues.isEmpty && $0.daysSupplied == 0 && $0.clinicNote.isEmpty) }
+            .filter { !$0.core.isScheduleOnly }
             // 오늘 낮에 적은 진료가 빠지지 않게 하루의 끝과 견준다.
             .filter { $0.visitDate < endOfToday }
     }
