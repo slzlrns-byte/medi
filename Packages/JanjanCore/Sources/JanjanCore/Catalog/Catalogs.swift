@@ -37,9 +37,14 @@ public struct SymptomItem: Codable, Hashable, Sendable, Identifiable {
     public let auxField: SymptomAuxField
     /// 저장할 때 안전 카드를 띄우는 항목(자해·자살 생각).
     public let safety: Bool?
+    /// 고르개에서 뺀 항목. 기록 탭의 감정 단어·기운 눈금·잠 카드와 같은 것을
+    /// 두 번 묻고 있었다(사용자 지적 2026-09-22). 옛 기록의 이름은 그대로
+    /// 찾히도록 목록에서 지우지 않고 표시만 해 둔다.
+    public let retired: Bool?
 
     /// nil 을 매번 풀어 쓰지 않도록.
     public var isSafetyItem: Bool { safety == true }
+    public var isRetired: Bool { retired == true }
 
     public func name(_ language: JanjanLanguage) -> String {
         language == .english ? (nameEn ?? nameKo) : nameKo
@@ -57,12 +62,19 @@ public struct SymptomCatalog: Codable, Hashable, Sendable {
         version: "0", updated: "", note: nil, groups: [], symptoms: []
     )
 
+    /// id 로 찾는다. 은퇴한 항목도 찾힌다 - 옛 기록의 이름을 보여 줘야 한다.
     public func symptom(id: String) -> SymptomItem? {
         symptoms.first { $0.id == id }
     }
 
+    /// 고르개에 내놓는 항목들. 은퇴한 것은 뺀다.
+    public var activeSymptoms: [SymptomItem] {
+        symptoms.filter { !$0.isRetired }
+    }
+
+    /// 고르개에 내놓는, 그 묶음의 항목들. 은퇴한 것은 뺀다.
     public func symptoms(inGroup groupID: String) -> [SymptomItem] {
-        symptoms.filter { $0.group == groupID }
+        symptoms.filter { $0.group == groupID && !$0.isRetired }
     }
 
     /// 안전 카드를 띄워야 하는 항목들.

@@ -915,7 +915,7 @@ private struct MedicationNoteComposer: View {
                                 .fixedSize(horizontal: false, vertical: true)
 
                             FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
-                                ForEach(Catalogs.symptoms.symptoms) { item in
+                                ForEach(Catalogs.symptoms.activeSymptoms) { item in
                                     // 28pt 칩이 아니라 44pt 손잡이로(QA 2026-09-21).
                                     TogglePill(text: item.name(lang), isOn: symptomID == item.id) {
                                         symptomID = (symptomID == item.id) ? nil : item.id

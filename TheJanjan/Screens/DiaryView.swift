@@ -6,7 +6,11 @@ import JanjanCore
 ///
 /// **2층 구조.** 1층은 기분 원 하나다. 그것만 고르고 나가도 완전한 기록이고,
 /// 앱은 빈 칸을 재촉하지 않는다. 2층(감정 단어·에너지·불안·수면·활동·긴 글)은
-/// 접혀 있다가 사용자가 열 때만 펼쳐진다.
+/// 접혀 있다가 사용자가 "마음·잠·활동 적기" 를 열 때만 펼쳐진다.
+///
+/// **증상과 겹치지 않는다.** 감정 단어·기운 눈금·잠 카드가 묻는 것(불안·우울감·
+/// 짜증·무기력·꿈)은 증상 고르개에서 뺐다(2026-09-22). 증상은 약 부작용처럼
+/// 세기와 약을 함께 적는 것들만 남는다.
 ///
 /// 저장은 곧바로 일어난다. "저장" 버튼이 없다 — 누르지 않아 기록이 사라지는 일을
 /// 만들지 않기 위해서다. SwiftData 가 바뀐 값을 그대로 써 준다.
@@ -261,7 +265,9 @@ struct DiaryView: View {
 
     private var expandButton: some View {
         WhitePillButton(
-            title: isExpanded ? t("접기", "Show less") : t("더 남기기", "Add more"),
+            // "더 남기기" 는 안에 무엇이 있는지 말하지 않았다(사용자 지적
+            // 2026-09-22). 펼치면 나오는 것을 이름에 적는다.
+            title: isExpanded ? t("접기", "Show less") : t("마음·잠·활동 적기", "Feelings, sleep & activities"),
             systemImage: isExpanded ? "chevron.up" : "chevron.down"
         ) {
             withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }

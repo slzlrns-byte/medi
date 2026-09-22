@@ -59,7 +59,7 @@ final class ScreenshotTests: XCTestCase {
         capture("04-기록")
 
         // 2층을 펼친 모습도 남긴다. 접힌 채로는 무엇이 있는지 보이지 않는다.
-        let expand = app.buttons["더 남기기"]
+        let expand = app.buttons["마음·잠·활동 적기"]
         if expand.waitForExistence(timeout: 5) {
             expand.tap()
             // 펼치는 애니메이션이 끝나기를 기다린다. 바로 찍으면 "접기" 와
