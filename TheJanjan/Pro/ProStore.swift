@@ -61,6 +61,9 @@ final class ProStore: ObservableObject {
     @Published private(set) var storeUnavailable = false
 
     @Published private(set) var isLoading = false
+    /// 복원이 도는 동안만 참. `isLoading` 은 상품을 받아올 때도 참이라
+    /// 복원 버튼의 문구에는 쓸 수 없다.
+    @Published private(set) var isRestoring = false
 
     /// 사용자에게 보여 줄 마지막 안내. 사용자가 닫을 수 있어야 하니 var 로 둔다.
     @Published var lastError: String?
@@ -219,8 +222,12 @@ final class ProStore: ObservableObject {
     /// 복원. 로그인이 없는 앱이라 복원은 애플 계정 동기화 한 번이면 끝난다.
     func restore() async {
         isLoading = true
+        isRestoring = true
         lastError = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            isRestoring = false
+        }
 
         do {
             try await AppStore.sync()

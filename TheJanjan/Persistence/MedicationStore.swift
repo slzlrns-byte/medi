@@ -305,6 +305,9 @@ enum MedicationStore {
         if status == .stopped {
             record.stoppedAt = Date()
             record.resumedAt = nil
+            // 잠금화면에 떠 있는 알림은 그대로 남아 거기서 "복용함" 을 누르면
+            // 끊은 약의 기록이 생기고 재고가 빠졌다(QA 2026-09-22). 삭제와 같게 걷는다.
+            NotificationManager.shared.removeDeliveredNotifications(for: medicationID)
         } else if record.stoppedAt != nil {
             record.resumedAt = Date()
         }

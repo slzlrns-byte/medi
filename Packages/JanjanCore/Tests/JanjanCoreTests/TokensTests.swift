@@ -329,7 +329,8 @@ final class TokensTests: XCTestCase {
         let original = WatchMessage.doseAction(
             medicationIDs: [Fixed.medA, Fixed.medB],
             slotKey: DoseSlot.bedtime.storageKey,
-            action: .taken
+            action: .taken,
+            at: Fixed.date(2026, 8, 17, 22, 30)
         )
         let restored = WatchMessage(payload: original.payload)
         XCTAssertEqual(restored, original)

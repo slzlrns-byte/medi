@@ -1,9 +1,30 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 import JanjanCore
+
+/// 알림 델리게이트를 **첫 프레임보다 먼저** 건다.
+///
+/// 예전에는 `AppServices.start`(화면의 `.task` 안, 구독 확인 뒤)에서만 걸었다.
+/// 앱을 완전히 끈 상태에서 잠금화면 알림의 "복용함" 을 누르면 iOS 가 앱을
+/// 백그라운드로 깨우는데, 그때 화면의 `.task` 가 돈다는 보장이 없어 액션이
+/// 아무 데도 닿지 않을 수 있었다(QA 2026-09-22). `didFinishLaunching` 은
+/// 어느 길로 깨어나든 가장 먼저 돈다.
+@MainActor
+final class JanjanAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        NotificationManager.shared.bootstrap()
+        return true
+    }
+}
 
 @main
 struct TheJanjanApp: App {
+
+    @UIApplicationDelegateAdaptor(JanjanAppDelegate.self) private var appDelegate
 
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appLock = AppLockManager()
@@ -192,6 +213,11 @@ final class AppServices {
     /// 기록이 바뀌었으니 워치 화면도 새로 그리라고 밀어 준다.
     /// 워치가 없거나 꺼져 있으면 조용히 아무 일도 일어나지 않는다.
     func pushWatchSnapshot() {
+        // 기록이 바뀌면 홈 위젯도 다시 그린다. 예전에는 위젯 자신이 적을 때만
+        // 다시 그려서, 앱에서 "먹었어요" 를 눌러도 위젯은 다음 시간대까지
+        // "아침 1개 남음 / 먹었어요" 를 보여 줬다(QA 2026-09-22). 워치를 미는
+        // 자리마다 위젯도 함께 - 저장 경로가 이 문을 지난다.
+        WidgetCenter.shared.reloadAllTimelines()
         guard let container else { return }
         PhoneSessionManager.shared.pushSnapshot(
             WatchSnapshotBuilder.snapshot(using: container.mainContext, isPro: isPro)

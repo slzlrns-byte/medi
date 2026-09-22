@@ -46,9 +46,13 @@ struct PrescriptionFormView: View {
     /// 받기 전 개수 칸에 적힌 글자 그대로. 지우는 중("", "0.")에도 칸이 튀지 않게
     /// 글자와 값을 따로 들고 있는다.
     @State private var leftoverTexts: [UUID: String] = [:]
+    /// 폼 안에서 약을 막 등록했다. 목록이 갱신되면 그 약을 골라 둔다.
+    @State private var autoSelectNewest = false
     @State private var isSaving = false
     /// 사용자가 개수를 직접 고친 약. 제안값을 다시 덮어쓰지 않으려고 기억해 둔다.
     @State private var edited: Set<UUID> = []
+    /// 받기 전 개수를 손으로 고친 약. 진료일을 바꿔도 이 약의 값은 안 건드린다.
+    @State private var leftoverEdited: Set<UUID> = []
     /// 이번 진료에서 처음 받은 약을 그 자리에서 등록하는 시트.
     @State private var isShowingNewMedication = false
     /// 이번 진료에서 용량이 바뀐 약. 손잡이를 켠 약만 여기 있다.
@@ -125,7 +129,13 @@ struct PrescriptionFormView: View {
         .sheet(isPresented: $isShowingNewMedication) {
             NavigationStack {
                 // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
-                MedicationFormView { isShowingNewMedication = false }
+                // 방금 등록한 약은 이번 진료에서 받은 약이다 - 그러려고 여기서
+                // 등록했다. 목록에만 나타나고 체크는 안 된 채면 한 번 더 눌러야
+                // 하고, 놓치면 이번 처방에 없는 약으로 저장된다(QA 2026-09-22).
+                MedicationFormView {
+                    isShowingNewMedication = false
+                    autoSelectNewest = true
+                }
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(t("닫기", "Close")) { isShowingNewMedication = false }
@@ -133,6 +143,15 @@ struct PrescriptionFormView: View {
                         }
                     }
             }
+        }
+        .onChange(of: activeMedications.map(\.id)) { _, ids in
+            guard autoSelectNewest else { return }
+            autoSelectNewest = false
+            // 등록일이 가장 나중인 약 = 방금 등록한 약.
+            guard let newest = activeMedications.max(by: {
+                ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast)
+            }), ids.contains(newest.id), refills[newest.id] == nil else { return }
+            toggle(newest)
         }
         // 입력칸이 여럿인 화면인데 키보드를 내릴 길이 없었다 - 한 번 적고
         // 나면 키보드가 저장 버튼을 덮은 채였다(사용자, TestFlight 17).
@@ -599,6 +618,7 @@ struct PrescriptionFormView: View {
             refills[medication.id] = nil
             leftovers[medication.id] = nil
             leftoverTexts[medication.id] = nil
+            leftoverEdited.remove(medication.id)
             // 이번 처방에서 뺀 약의 용량 변경까지 들고 있으면, 화면에 보이지도
             // 않는 것이 저장될 때 적용된다.
             doseEdits[medication.id] = nil
@@ -622,6 +642,7 @@ struct PrescriptionFormView: View {
         Binding(
             get: { leftoverTexts[medication.id] ?? "" },
             set: { text in
+                leftoverEdited.insert(medication.id)
                 leftoverTexts[medication.id] = text
                 let trimmed = text
                     .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -688,8 +709,23 @@ struct PrescriptionFormView: View {
     /// 사용자가 직접 고친 약은 건드리지 않는다.
     private func refreshSuggestions() {
         for medication in activeMedications where refills[medication.id] != nil {
-            guard !edited.contains(medication.id) else { continue }
-            refills[medication.id] = suggestedQuantity(for: medication)
+            if !edited.contains(medication.id) {
+                refills[medication.id] = suggestedQuantity(for: medication)
+            }
+            // 미리 채운 "받기 전 개수" 는 **진료일 기준의 잔여**다. 약을 고른 뒤
+            // 진료일을 과거로 옮기면 그 사이 복용이 두 번 빠졌다 - 값은 오늘
+            // 기준으로 굳어 있고 사건은 진료일 뒤로 또 빠져서(QA 2026-09-22).
+            // 손대지 않은 칸은 새 진료일로 다시 채운다.
+            if !leftoverEdited.contains(medication.id) {
+                let remaining = max(InventoryCalculator.remaining(
+                    for: medication.id,
+                    stockEvents: stockRecords.map(\.core),
+                    doseEvents: doseRecords.map(\.core),
+                    asOf: visitDate
+                ), 0)
+                leftovers[medication.id] = remaining
+                leftoverTexts[medication.id] = DecimalQuantity.display(remaining)
+            }
         }
     }
 

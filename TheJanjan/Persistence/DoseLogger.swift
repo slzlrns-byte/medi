@@ -74,9 +74,21 @@ final class SwiftDataDoseLogger: DoseLogging {
             return
         }
 
-        // 저장 규칙은 DoseRecorder 한 곳에만 있다. 같은 시간대의 기록은 덮어쓴다 —
-        // 알림에서 복용함을 누른 뒤 앱에서 건너뜀으로 고쳐도 재고가 두 번 깎이지 않는다.
-        for medicationID in knownIDs {
+        // **이미 답한 약은 건드리지 않는다**(QA 2026-09-22). 알림·워치의
+        // "전부 복용함" 은 시간대 하나에 묶인 약 전부에 걸리는데, 그중 하나를
+        // 앱에서 일부러 "건너뜀" 으로 적어 둔 사람이 있다. 그대로 덮으면 그
+        // 건너뜀이 복용함이 되고 재고가 한 알 빠진다. 앱 타일의 "먹었어요" 와
+        // 같게 **미답만** 채운다. 답을 고치는 일은 앱 화면이 약별로 한다.
+        let pending = knownIDs.filter { medicationID in
+            !DoseRecorder.isAnswered(medicationID: medicationID, slotKey: slotKey, near: date, in: context)
+        }
+        guard !pending.isEmpty else {
+            AppServices.shared.pushWatchSnapshot()
+            return
+        }
+
+        // 저장 규칙은 DoseRecorder 한 곳에만 있다.
+        for medicationID in pending {
             DoseRecorder.record(
                 medicationID: medicationID,
                 slotKey: slotKey,

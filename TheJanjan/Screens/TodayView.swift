@@ -37,6 +37,8 @@ struct TodayView: View {
     @State private var safetyReason: SafetyReason?
     @State private var isShowingUnrecordedSheet = false
     @State private var isShowingNextVisitSheet = false
+    /// 빈 화면의 "약 등록하기". 약 탭과 같은 흐름을 연다.
+    @State private var isShowingAddFlow = false
     #if DEBUG
     /// 화면 찍기 전용: `-JanjanShowUnrecorded` 인자가 있으면 뜨자마자 살펴보기
     /// 시트를 연다. simctl 로만 띄우는 영어 캡처가 버튼을 누를 수 없어서다.
@@ -537,12 +539,29 @@ struct TodayView: View {
                     // 지우게 두면, 실수 하나를 무르는 데 손이 너무 많이 간다
                     // (사용자 요청 2026-09-21). 묻고 나서 지운다 - 되돌리기가
                     // 실수로 또 눌리면 처음 실수와 똑같은 일이 된다.
+                    // "완료" 만 적으면 상태 표시로 읽힌다 - 되돌리는 문이라는 것은
+                    // VoiceOver 힌트에만 있었고 눈에는 안 보였다(QA 2026-09-22).
+                    // 실수로 누른 사람이 되돌릴 길을 못 찾는 것이 이 앱에서 가장
+                    // 자주 겪을 막다른 길이라, 칩 안에 되돌리기를 글자로 적는다.
                     Button {
                         undoing = SlotSelection(id: line.slotKey)
                     } label: {
-                        PillChip(text: t("완료", "Done"), tint: .surface, textTint: .sageInk)
-                            .frame(minWidth: 96, minHeight: 56)
-                            .contentShape(Capsule(style: .continuous))
+                        VStack(spacing: 2) {
+                            Text(t("완료", "Done"))
+                                .janjanBody(15, weight: .medium)
+                                .foregroundStyle(Color.janjan(.sageInk))
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(t("되돌리기", "Undo"))
+                                    .janjanBody(11)
+                            }
+                            .foregroundStyle(Color.muted)
+                        }
+                        .padding(.horizontal, CGFloat(JanjanSpacing.s))
+                        .frame(minWidth: 96, minHeight: 56)
+                        .background(Capsule(style: .continuous).fill(Color.janjan(.surface)))
+                        .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(t(
@@ -606,10 +625,21 @@ struct TodayView: View {
                 Text(t("아직 등록한 약이 없어요", "No medications yet"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text(t("약 탭에서 하나만 추가해도 오늘 일정이 만들어져요.", "Add just one in the Meds tab, and today's plan appears."))
+                Text(t("하나만 추가해도 오늘 일정이 만들어져요.", "Add just one, and today's plan appears."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
+
+                // 첫 사용자가 처음 만나는 빈 화면이 여기다. "약 탭에서" 라고
+                // 말만 하고 누를 것이 없으면 탭을 찾아 헤맨다(QA 2026-09-22).
+                // 약 탭의 빈 카드와 같은 문을 여기에도 둔다.
+                WhitePillButton(title: t("약 등록하기", "Add a medication"), systemImage: "plus") {
+                    isShowingAddFlow = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
             }
+        }
+        .sheet(isPresented: $isShowingAddFlow) {
+            AddMedicationEntryView()
         }
     }
 
@@ -908,25 +938,14 @@ struct TodayView: View {
     // MARK: - 기록
 
     private func record(_ entry: DayPlan.Entry, in line: DayPlan.SlotLine, as status: DoseEvent.Status) {
-        // **이미 지나간 시간대는 그 시각으로 박는다**(QA 2026-09-22).
-        //
-        // 예전에는 누른 순간이 `actualAt` 이 됐다. 재고는 `actualAt` 순으로
-        // 세고 "다시 세기" 의 정정은 그 앞을 전부 버리는 기준점이라, 아침 약을
-        // 밤에 기록하는 사람은 **세고 나서 기록하면 한 알이 더 빠지고, 기록하고
-        // 세면 안 빠졌다.** 같은 하루가 순서에 따라 달라졌다.
-        //
-        // 어제 이전을 채우는 길들(지나간 시간대 시트·달력)은 이미 그 날 그
-        // 시각으로 박는다. 오늘 것만 규칙이 달랐다. 아직 오지 않은 시간대를
-        // 미리 누르는 경우는 그대로 지금 시각을 쓴다 - 그때는 정말 지금이다.
-        let now = Date()
-        let plannedAt = line.time.date(on: today)
+        // 복용 시각 규칙(지나간 시간대는 예정 시각으로)은 `DoseRecorder` 가
+        // 한 곳에서 정한다 - 알림·위젯·워치와 같은 규칙이어야 한다.
         DoseRecorder.record(
             medicationID: entry.medicationID,
             slotKey: line.slotKey,
             status: status,
             source: .phone,
             on: today,
-            at: min(plannedAt, now),
             quantity: entry.dose,
             in: context
         )

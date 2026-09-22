@@ -67,10 +67,20 @@ enum DoseRecorder {
             in: context,
             calendar: calendar
         )
+        // **이미 지나간 시간대는 그 시각으로 박는다.** 예정이 08:00 인 약을 21:00
+        // 에 "복용함" 으로 적으면 `actualAt` 은 08:00 이다. 재고는 `actualAt`
+        // 순으로 세고 "다시 세기" 의 정정은 그 앞을 전부 버리는 기준점이라,
+        // 누른 시각을 그대로 쓰면 **세고 나서 적으면 한 알이 더 빠지고 적고
+        // 나서 세면 안 빠졌다**. 예전에는 오늘 화면만 이 규칙을 알고 알림·
+        // 위젯·워치·시리는 누른 시각을 넘겨 같은 하루가 길에 따라 달랐다
+        // (QA 2026-09-22). 규칙을 호출부가 아니라 여기 한 곳에 둔다.
+        // 아직 오지 않은 시간대를 미리 누르면 지금 시각이 더 이르므로 그대로다.
+        let takenAt = min(scheduledAt, moment)
+
         if let existing = existingRecords.first {
             for extra in existingRecords.dropFirst() { context.delete(extra) }
             existing.statusRaw = status.rawValue
-            existing.actualAt = (status == .taken) ? moment : nil
+            existing.actualAt = (status == .taken) ? takenAt : nil
             existing.sourceRaw = source.rawValue
             existing.quantity = amount
             existing.scheduledAt = scheduledAt
@@ -82,7 +92,7 @@ enum DoseRecorder {
         let event = DoseEvent(
             medicationID: medicationID,
             scheduledAt: scheduledAt,
-            actualAt: (status == .taken) ? moment : nil,
+            actualAt: (status == .taken) ? takenAt : nil,
             status: status,
             source: source,
             quantity: amount,
@@ -92,6 +102,27 @@ enum DoseRecorder {
         let record = DoseEventRecord.make(from: event)
         context.insert(record)
         return record
+    }
+
+    /// 그 칸에 **사용자가 준 답**이 이미 있는가. 앱이 채운 미기록(`.automatic`)
+    /// 은 답이 아니다. 알림·워치의 "전부 복용함" 이 앱 타일과 같은 규칙으로
+    /// 미답만 채우기 위해 묻는다.
+    static func isAnswered(
+        medicationID: UUID,
+        slotKey: String,
+        near moment: Date,
+        in context: ModelContext,
+        calendar: Calendar = .current
+    ) -> Bool {
+        let schedule = scheduleRecord(medicationID: medicationID, slotKey: slotKey, in: context)
+        let time = plannedTime(for: schedule, slotKey: slotKey)
+        let day = plannedDay(near: moment, scheduleTime: time, calendar: calendar)
+        return allRecords(medicationID: medicationID, slotKey: slotKey, on: day, in: context, calendar: calendar)
+            .contains { record in
+                guard let status = DoseEvent.Status(rawValue: record.statusRaw) else { return false }
+                if status == .unrecorded, record.sourceRaw == DoseEvent.Source.automatic.rawValue { return false }
+                return true
+            }
     }
 
     /// 필요시(PRN) 복용. 시간대가 없으므로 항상 새 줄로 쌓인다 —

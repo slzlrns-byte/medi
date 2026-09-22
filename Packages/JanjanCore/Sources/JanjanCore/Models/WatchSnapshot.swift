@@ -190,7 +190,9 @@ public struct WatchSnapshot: Codable, Hashable, Sendable {
 /// 여기 한 곳에 모아 둔다. 양쪽 앱이 같은 타입을 쓰니 키가 어긋날 수 없다.
 public enum WatchMessage: Hashable, Sendable {
 
-    case doseAction(medicationIDs: [UUID], slotKey: String, action: DoseAction)
+    /// `at` 은 워치에서 **누른 시각**이다. 폰이 멀어 큐에 쌓였다가 며칠 뒤
+    /// 도착해도 그날이 아니라 누른 날의 줄에 적혀야 한다(QA 2026-09-22).
+    case doseAction(medicationIDs: [UUID], slotKey: String, action: DoseAction, at: Date)
     /// 필요시(응급) 복용 한 번. 시간대가 없으므로 슬롯 없이 약과 시각만 말한다.
     case asNeededTaken(medicationID: UUID, quantity: Decimal, at: Date)
     case symptom(symptomID: String, severity: Int, at: Date)
@@ -231,13 +233,13 @@ public enum WatchMessage: Hashable, Sendable {
 
     public var payload: [String: Any] {
         switch self {
-        case .doseAction(let medicationIDs, let slotKey, let action):
+        case .doseAction(let medicationIDs, let slotKey, let action, let date):
             return [
                 Key.type: Kind.doseAction.rawValue,
                 Key.medicationIDs: medicationIDs.map(\.uuidString),
                 Key.slotKey: slotKey,
                 Key.action: action.rawValue,
-                Key.timestamp: Date().timeIntervalSince1970
+                Key.timestamp: date.timeIntervalSince1970
             ]
         case .asNeededTaken(let medicationID, let quantity, let date):
             return [
@@ -287,7 +289,8 @@ public enum WatchMessage: Hashable, Sendable {
             self = .doseAction(
                 medicationIDs: rawIDs.compactMap(UUID.init(uuidString:)),
                 slotKey: slotKey,
-                action: action
+                action: action,
+                at: date
             )
         case .asNeededTaken:
             guard let rawID = payload[Key.medicationID] as? String,

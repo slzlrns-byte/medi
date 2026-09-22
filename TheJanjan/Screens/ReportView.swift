@@ -161,9 +161,21 @@ struct ReportView: View {
             .max()
     }
 
+    /// 오늘 진료를 적었고 받아 온 약도 있는지. 복약률이 nil 인 이유가
+    /// "근거가 없어서" 가 아니라 "아직 하루가 안 지나서" 인 경우를 가른다.
+    private var hasVisitTodayWithRefills: Bool {
+        let calendar = Calendar.current
+        return prescriptionRecords.contains { record in
+            !record.core.isScheduleOnly
+                && calendar.isDate(record.visitDate, inSameDayAs: today)
+                && stock.contains { $0.prescriptionID == record.id }
+        }
+    }
+
     /// 화면과 PDF 가 같은 창을 본다. 계산은 ReportComposer 한 곳이 한다.
     private var reportWindow: (start: Date, anchoredToVisit: Bool) {
-        ReportComposer.window(endingAt: today, lastVisit: lastVisit)
+        // 복약률이 쓴 진료가 곧 기간의 기준이다(ReportComposer 와 같은 규칙).
+        ReportComposer.window(endingAt: today, lastVisit: adherence?.visitDate ?? lastVisit)
     }
 
     /// **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21).
@@ -254,6 +266,14 @@ struct ReportView: View {
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if hasVisitTodayWithRefills {
+                    // 방금 오늘 진료를 적은 사람이다. "적어 두면 나와요" 는 그
+                    // 사람에게 "저장이 안 됐나?" 로 읽힌다(QA 2026-09-22). 진료
+                    // 당일은 셀 날이 아직 없을 뿐이라고 갈라 말한다.
+                    Text(t("오늘 진료를 적었어요. 복약률은 내일부터 나와요.",
+                           "Today's visit is logged. Adherence starts tomorrow."))
+                        .janjanBody(15)
+                        .foregroundStyle(Color.muted)
                 } else {
                     // 셀 근거가 없으면 숫자를 지어내지 않는다.
                     Text(t("진료와 받아 온 개수를 적어 두면 복약률이 나와요.",

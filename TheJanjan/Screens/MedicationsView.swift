@@ -367,7 +367,9 @@ struct MedicationsView: View {
                 Text(t("첫 약을 등록해 볼까요", "Let's add your first medication"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
-                Text(t("이름과 시간만으로 시작할 수 있어요.", "A name and a time is all it takes to start."))
+                // "이름과 시간만으로" 는 옛말이다 - 용량(단위까지)과 요일도 받는다.
+                // 폼에 들어가 막히고 나서야 알면 첫인상이 거짓말이 된다(QA 2026-09-22).
+                Text(t("이름·용량·먹는 때만 적으면 돼요.", "Just the name, the dose, and when you take it."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
@@ -550,7 +552,8 @@ struct MedicationsView: View {
 }
 
 /// 약 추가의 첫 갈림길. 직접 입력은 무료, 약봉투 스캔은 Pro다(유도 세 곳 중 하나).
-private struct AddMedicationEntryView: View {
+// 오늘 탭의 빈 카드도 같은 갈림길을 연다 - 파일 밖에서 쓴다.
+struct AddMedicationEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isShowingForm = false

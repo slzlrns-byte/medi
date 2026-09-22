@@ -117,12 +117,6 @@ public enum ReportComposer {
         // (QA 2026-09-21). 창의 끝은 그 날의 마지막 순간으로 맞춘다.
         let endMoment = calendar.date(byAdding: .day, value: 1, to: endDay)?
             .addingTimeInterval(-1) ?? end
-        let (start, anchored) = window(endingAt: end, lastVisit: lastVisit, calendar: calendar)
-        let windowLength = (calendar.dateComponents([.day], from: start, to: endDay).day ?? 0) + 1
-
-        // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
-        let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
-
         // 복약률은 한 번만 센다. "복약" 구역과 약별 줄이 같은 값을 나눠 쓴다 -
         // 한 종이 안에서 두 숫자가 다른 규칙으로 서면 안 된다.
         let adherence = InventoryCalculator.prescriptionAdherence(
@@ -133,6 +127,18 @@ public enum ReportComposer {
             asOf: endMoment,
             calendar: calendar
         )
+
+        // **기간의 기준은 복약률이 쓴 그 진료다.** 복약률은 셀 수 있는 진료가
+        // 나올 때까지 물러나는데(진료 당일이거나 약을 지운 진료를 건너뛴다),
+        // 기간만 가장 나중 진료에 붙여 두면 머리글은 "9월 22일 – 9월 22일" 이고
+        // 그 아래 캡션은 "9월 1일 진료" 가 된다 - 한 종이에 진료일이 둘
+        // (QA 2026-09-22). 복약률이 없으면 예전처럼 마지막 진료다.
+        let anchorVisit = adherence?.visitDate ?? lastVisit
+        let (start, anchored) = window(endingAt: end, lastVisit: anchorVisit, calendar: calendar)
+        let windowLength = (calendar.dateComponents([.day], from: start, to: endDay).day ?? 0) + 1
+
+        // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
+        let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
 
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(
@@ -244,8 +250,16 @@ public enum ReportComposer {
         // 세고 있었다. 기기 둘이 같은 칸에 기록한 날이 있으면 같은 칸에
         // "복약률 100%" 와 "복용 2회 · 건너뜀 1회"(=66%)가 나란히 찍혔다
         // (QA 2026-09-21). 같은 집합에서 센다.
+        // **복약률과 같은 창, 같은 축으로 센다**(QA 2026-09-22). 예전에는 이
+        // 세 숫자만 기간 전체를 `effectiveDate` 로 세어, 바로 위 캡션의
+        // "복용 기록 37정" 옆에 "복용 39회" 가 섰다 - 오늘 아침 두 알이 한쪽에만
+        // 든 것이다. 복약률이 있으면 그 창(`[windowStart, windowEnd)`, 예정
+        // 시각 축)을, 없으면 예전처럼 기간 전체를 센다.
         let counted = InventoryCalculator.collapsedScheduledDoses(doseEvents).filter { event in
-            event.effectiveDate >= start && event.effectiveDate <= end
+            if let adherence {
+                return event.scheduledAt >= adherence.windowStart && event.scheduledAt < adherence.windowEnd
+            }
+            return event.effectiveDate >= start && event.effectiveDate <= end
         }
 
         guard !counted.isEmpty else {

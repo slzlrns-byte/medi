@@ -388,3 +388,66 @@ final class ScheduleOnlyPrescriptionTests: XCTestCase {
         XCTAssertTrue(record.isScheduleOnly)
     }
 }
+
+// MARK: - 진료 폴백과 창 (QA 2026-09-22)
+
+final class PrescriptionFallbackTests: XCTestCase {
+
+    private let calendar = Fixed.calendar
+
+    private func taken(_ month: Int, _ day: Int) -> DoseEvent {
+        let at = Fixed.date(2026, month, day, 8, 0)
+        return DoseEvent(
+            medicationID: Fixed.medA, scheduledAt: at, actualAt: at,
+            status: .taken, quantity: 1, kind: .scheduled,
+            slotKey: DoseSlot.morning.storageKey
+        )
+    }
+
+    /// 진료실에서 오늘 진료를 먼저 적고 리포트를 뽑는다. 오늘 진료는 셀 날이
+    /// 없으니 건너뛰고 지난 진료로 센다 - 그리고 그 진료가 창의 기준이다.
+    func testVisitTodayFallsBackToThePreviousVisitAndItsWindow() {
+        let earlier = Prescription(visitDate: Fixed.date(2026, 9, 1, 10), daysSupplied: 28)
+        let today = Prescription(visitDate: Fixed.date(2026, 9, 22, 10), daysSupplied: 28)
+        let stock = [
+            StockEvent.refill(medicationID: Fixed.medA, quantity: 28,
+                              at: earlier.visitDate, prescriptionID: earlier.id),
+            StockEvent.refill(medicationID: Fixed.medA, quantity: 28,
+                              at: today.visitDate, prescriptionID: today.id)
+        ]
+        let result = InventoryCalculator.prescriptionAdherence(
+            prescriptions: [earlier, today],
+            stockEvents: stock,
+            doseEvents: (1...21).map { taken(9, $0) } + [taken(9, 22)],
+            medications: [Medication(id: Fixed.medA, name: "A")],
+            asOf: Fixed.date(2026, 9, 22, 23, 0),
+            calendar: calendar
+        )
+        XCTAssertEqual(result?.visitDate, earlier.visitDate, "오늘 진료는 건너뛴다")
+        XCTAssertEqual(result?.windowStart, Fixed.date(2026, 9, 1, 0))
+        XCTAssertEqual(result?.windowEnd, Fixed.date(2026, 9, 22, 0), "오늘은 창 밖이다")
+        XCTAssertEqual(result?.taken, 21, "오늘 아침 한 알은 분자에 안 든다")
+        XCTAssertEqual(result?.rate, 1)
+    }
+
+    /// 마지막 진료의 약을 지웠으면(보충이 없으면) 그 앞 진료로 물러난다.
+    func testVisitWithoutRefillsIsSkipped() {
+        let earlier = Prescription(visitDate: Fixed.date(2026, 8, 1, 10), daysSupplied: 28)
+        let later = Prescription(visitDate: Fixed.date(2026, 9, 1, 10), daysSupplied: 28)
+        let stock = [
+            StockEvent.refill(medicationID: Fixed.medA, quantity: 28,
+                              at: earlier.visitDate, prescriptionID: earlier.id)
+        ]
+        let result = InventoryCalculator.prescriptionAdherence(
+            prescriptions: [earlier, later],
+            stockEvents: stock,
+            doseEvents: (1...28).map { taken(8, $0) },
+            medications: [Medication(id: Fixed.medA, name: "A")],
+            asOf: Fixed.date(2026, 9, 22, 23, 0),
+            calendar: calendar
+        )
+        XCTAssertEqual(result?.visitDate, earlier.visitDate)
+        XCTAssertEqual(result?.expected, 28)
+        XCTAssertEqual(result?.taken, 28)
+    }
+}

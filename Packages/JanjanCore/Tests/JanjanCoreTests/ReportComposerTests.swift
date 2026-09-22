@@ -279,6 +279,9 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertTrue(texts(report).contains(
             "8월 1일 진료 · 약 1종 · 지금까지 16정 예정 중 복용 기록 14정 (약별 복약률의 평균)"
         ))
+        // 바로 아래 세 숫자도 **같은 창**(8/1~8/16)을 센다. 8/17 의 미기록은
+        // 창 밖이라 안 든다 - 위 캡션의 14정과 아래의 14회가 같은 것을 가리킨다.
+        XCTAssertTrue(texts(report).contains("복용 14회 · 건너뜀 2회 · 미기록 0회"))
     }
 
     func testPercentRoundsDownNotUp() {

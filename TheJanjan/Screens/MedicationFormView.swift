@@ -513,14 +513,16 @@ struct MedicationFormView: View {
                      "Add a unit to the strength. For example: 15 mg")
         }
         guard kind == .scheduled else { return nil }
-        if weekdays.isEmpty {
-            return t("요일을 하나 이상 골라 주세요.", "Pick at least one day of the week.")
+        // 화면에 카드가 선 순서(시간대 → 요일)대로 말한다. 거꾸로 말하면
+        // 요일을 고른 뒤에 또 시간대를 켜라는 말을 듣는다(QA 2026-09-22).
+        if !drafts.contains(where: \.isOn) {
+            return t("복용 시간대를 하나 이상 켜 주세요.", "Turn on at least one dose time.")
         }
         if hasDuplicateTimes {
             return t("같은 시각에 두 줄을 둘 수 없어요. 시각을 다르게 해 주세요.",
                      "Two rows can't share the same time. Set different times.")
         }
-        return t("복용 시간대를 하나 이상 켜 주세요.", "Turn on at least one dose time.")
+        return t("요일을 하나 이상 골라 주세요.", "Pick at least one day of the week.")
     }
 
     private var canSave: Bool {

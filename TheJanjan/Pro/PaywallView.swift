@@ -410,15 +410,18 @@ struct PaywallView: View {
                 } label: {
                     // 심사자가 가장 먼저 누르는 버튼이다. 몇 초 걸리는 동안
                     // 아무 반응이 없으면 고장 난 것으로 보인다.
-                    underlined(pro.isLoading
+                    // `isLoading` 은 상품을 받아오는 동안에도 참이라, 페이월을
+                    // 열자마자 몇 초간 "복원하는 중…" 이 떴다(QA 2026-09-22).
+                    // 복원이 실제로 도는 동안만 그렇게 말한다.
+                    underlined(pro.isRestoring
                                ? t("복원하는 중…", "Restoring…")
                                : t("구매 복원", "Restore purchase"))
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(pro.isLoading)
-                .opacity(pro.isLoading ? 0.5 : 1)
+                .disabled(pro.isRestoring)
+                .opacity(pro.isRestoring ? 0.5 : 1)
 
                 separator
                 externalLink(t("이용약관", "Terms of Use"), Janjan.termsURLString)

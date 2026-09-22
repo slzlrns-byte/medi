@@ -101,7 +101,8 @@ struct DoseQuickView: View {
         session.send(.doseAction(
             medicationIDs: slot.medicationIDs,
             slotKey: slot.slotKey,
-            action: action
+            action: action,
+            at: Date()
         ))
         // 폰의 새 스냅샷을 기다리지 않고 화면부터 완료로 바꾼다 - 안 그러면
         // 같은 줄이 미완료로 남아 두 번 누르게 된다. 진짜 스냅샷이 오면 덮인다.

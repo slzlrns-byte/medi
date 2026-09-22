@@ -292,6 +292,10 @@ public enum InventoryCalculator {
 
         /// 진료 받은 날.
         public let visitDate: Date
+        /// 분모가 선 날들. `[windowStart, windowEnd)`, 날 단위. 종이의 "복용 N회"
+        /// 줄이 같은 창을 세야 한 구역 안의 두 숫자가 어긋나지 않는다.
+        public let windowStart: Date
+        public let windowEnd: Date
         /// 그 진료 이후 지난 날 수.
         public let elapsedDays: Int
         /// 약별 몫. 화면과 종이가 약마다 따로 적을 때 쓴다.
@@ -515,8 +519,14 @@ public enum InventoryCalculator {
         // **약별 비율의 평균.** 알 수로 가중하지 않는다.
         let average = items.reduce(Decimal(0)) { $0 + $1.rate } / Decimal(items.count)
 
+        // 처방 단위의 창. 약별로 등록일·중단일에 잘리기 전의 것이다.
+        let prescriptionWindowEnd = min(
+            calendar.date(byAdding: .day, value: countedDays, to: visitDay) ?? today, today
+        )
         return PrescriptionAdherence(
             visitDate: visit.visitDate,
+            windowStart: visitDay,
+            windowEnd: prescriptionWindowEnd,
             elapsedDays: elapsed,
             items: items.sorted { $0.medicationID.uuidString < $1.medicationID.uuidString },
             received: DecimalQuantity.round(items.reduce(Decimal(0)) { $0 + $1.received }, scale: 2),

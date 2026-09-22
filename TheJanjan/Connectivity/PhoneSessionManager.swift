@@ -57,13 +57,15 @@ final class PhoneSessionManager: NSObject {
         }
 
         switch message {
-        case .doseAction(let medicationIDs, let slotKey, let action):
+        case .doseAction(let medicationIDs, let slotKey, let action, let date):
+            // 도착한 시각이 아니라 **누른 시각**이다. 큐에 쌓였다 며칠 뒤 오면
+            // 도착한 날의 줄을 덮어썼다(QA 2026-09-22).
             doseLogger?.logDose(
                 medicationIDs: medicationIDs,
                 slotKey: slotKey,
                 action: action,
                 source: .watch,
-                at: Date()
+                at: date
             )
         case .asNeededTaken(let medicationID, let quantity, let at):
             guard let context = AppServices.shared.container?.mainContext else { return }

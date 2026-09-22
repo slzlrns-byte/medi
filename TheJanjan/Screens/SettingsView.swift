@@ -8,6 +8,7 @@ import JanjanCore
 struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var lock: AppLockManager
@@ -54,6 +55,12 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Color.fog.ignoresSafeArea())
             .task { await refreshNotificationStatus() }
+            // "iOS 설정에서 알림 켜기" 로 나갔다 돌아오면 그 줄이 그대로였다.
+            // 알림은 이미 살아 있는데 화면만 옛 상태를 말했다(QA 2026-09-22).
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await refreshNotificationStatus() }
+            }
             .navigationTitle(t("설정", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -162,8 +169,8 @@ struct SettingsView: View {
                 Task { await pro.restore() }
             }
             // 복원이 도는 동안은 눌리지 않는다는 것을 색으로도 보인다.
-            .foregroundStyle(pro.isLoading ? Color.muted : Color.ink)
-            .disabled(pro.isLoading)
+            .foregroundStyle(pro.isRestoring ? Color.muted : Color.ink)
+            .disabled(pro.isRestoring)
 
             // 평생 이용권 구매자에게는 보이지 않는다 - 해지할 구독이 없어
             // 애플 화면에서 빈 목록을 만난다(QA 2026-09-19).
@@ -195,6 +202,12 @@ struct SettingsView: View {
 
     private var proFooterKo: String {
         if let message = pro.lastError { return message }
+        if pro.hasLifetime {
+            // 바로 위의 "구독 관리" 줄이 평생권에는 숨겨져 있다. 그 줄로 가라고
+            // 말하면 없는 곳을 가리킨다(QA 2026-09-22).
+            return t("한 번 결제한 이용권이라 갱신도 해지도 없어요.",
+                     "This is a one-time purchase — nothing renews and there's nothing to cancel.")
+        }
         if pro.isPro {
             return t(
                 "기간과 해지는 \"구독 관리\" 에서 확인할 수 있어요.",
@@ -443,15 +456,29 @@ struct SettingsView: View {
 
     // MARK: - 개인정보
 
+    private var hideNamesToggle: some View {
+        Toggle(ProFeature.hideNames.title(.current), isOn: $hidesMedicationNamesOnScreen)
+            .onChange(of: hidesMedicationNamesOnScreen) { _, newValue in
+                // 위젯도 같은 값을 읽도록 앱 그룹에도 쓰고, 워치 화면도 새로 밀어 준다.
+                JanjanPrivacy.store(newValue)
+                AppServices.shared.pushWatchSnapshot()
+                Task { await ReminderPlanner.reschedule(using: context) }
+            }
+    }
+
     private var privacySection: some View {
         Section {
-            Toggle(ProFeature.hideNames.title(.current), isOn: $hidesMedicationNamesOnScreen)
-                .onChange(of: hidesMedicationNamesOnScreen) { _, newValue in
-                    // 위젯도 같은 값을 읽도록 앱 그룹에도 쓰고, 워치 화면도 새로 밀어 준다.
-                    JanjanPrivacy.store(newValue)
-                    AppServices.shared.pushWatchSnapshot()
-                }
-                .proGated(.hideNames)
+            // **파는 것은 켜는 일이지 끄는 일이 아니다.** 토글 전체에 문을 달면
+            // 구독이 끝난 사람이 끄지도 못한다 - 유일한 길이 "모든 데이터 삭제"
+            // 였다(QA 2026-09-22). 켜져 있으면 문 없이 그린다.
+            //
+            // 바꾸면 알림도 다시 깐다. 본문은 예약할 때 굽기 때문에, 켜고 앱을
+            // 내리면 첫 알림이 옛 본문(약 이름 그대로)으로 온다.
+            if hidesMedicationNamesOnScreen || pro.isPro {
+                hideNamesToggle
+            } else {
+                hideNamesToggle.proGated(.hideNames)
+            }
 
             LabeledContent(t("저장 위치", "Storage")) {
                 Text(JanjanModelContainer.activeStorage.label)
