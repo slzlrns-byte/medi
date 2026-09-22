@@ -282,7 +282,8 @@ public enum InventoryCalculator {
 
     // MARK: - 진료 기준 복약률
 
-    /// 한 진료에서 받은 약으로 잰 복약률.
+    /// 한 진료를 기준으로 잰 복약률. 분모는 그 진료 뒤 지금까지 스케줄이
+    /// 예정한 개수다.
     public struct PrescriptionAdherence: Hashable, Sendable {
 
         /// 약 하나의 몫.
@@ -298,13 +299,14 @@ public enum InventoryCalculator {
             public let rate: Decimal
         }
 
-        /// 진료 받은 날.
+        /// 진료 받은 시각.
         public let visitDate: Date
-        /// 분모가 선 날들. `[windowStart, windowEnd)`, 날 단위. 종이의 "복용 N회"
-        /// 줄이 같은 창을 세야 한 구역 안의 두 숫자가 어긋나지 않는다.
+        /// 분모가 선 구간. `[windowStart, windowEnd)`, **시각 단위**. 진료 시각에서
+        /// 열려 지금(또는 처방 끝·다음 진료)에서 닫힌다. 종이의 "복용 N회" 줄이
+        /// 같은 창을 세야 한 구역 안의 두 숫자가 어긋나지 않는다.
         public let windowStart: Date
         public let windowEnd: Date
-        /// 그 진료 이후 지난 날 수.
+        /// 창이 걸친 날 수(진료일부터 창 끝 날까지).
         public let elapsedDays: Int
         /// 약별 몫. 화면과 종이가 약마다 따로 적을 때 쓴다.
         public let items: [Item]
@@ -322,46 +324,47 @@ public enum InventoryCalculator {
         public let rate: Decimal
     }
 
-    /// **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21).
+    /// **복약률은 "오늘 이 시각까지 먹었어야 하는 개수" 로 센다**(사용자 결정
+    /// 2026-09-22 저녁).
     ///
-    /// 예전에는 시간대 칸을 셌다 - "예정된 칸 중 몇 칸에 복용함이 찍혔나".
-    /// 그런데 그 예정은 저장해 둔 것이 아니라 **지금의 요일로 매번 다시
-    /// 그린 것**이라, 월·수·금 먹던 사람이 "매일" 로 바꾸기만 해도 앱이 지난
-    /// 4주의 화·목·토·일을 빠트림으로 채워 100% 가 42% 로 내려갔다.
-    /// 한 번도 안 빠트린 사람의 숫자였고 그것이 진료실로 나갔다.
-    ///
-    /// 진료에서 **받은 알 수**는 저장된 사실이라 나중에 무엇을 고쳐도 변하지
-    /// 않는다. 그래서 분모를 거기서 만든다:
-    ///
-    ///     하루치 = 받은 알 수 ÷ 처방일수
-    ///     센 날 = min(진료 이후 지난 날, 처방일수, 중단까지의 날)
-    ///     먹었어야 할 = 하루치 × 센 날
-    ///     약별 복약률 = **그 날들 안의** 복용 기록 알 수 ÷ 먹었어야 할
+    ///     창 = [진료 시각, min(지금, 진료 시각 + 처방일수, 다음 진료 시각, 중단 시각))
+    ///     먹었어야 할 = 창 안에 **예정 시각이 든** 스케줄 칸의 개수 합
+    ///     약별 복약률 = 창 안의 복용 기록 알 수 ÷ 먹었어야 할
     ///     전체 복약률 = 약별 복약률의 **평균**
     ///
-    /// **분자와 분모는 같은 날들을 본다.** 분자만 오늘까지 열어 두면 28일치를
-    /// 받고 40일이 지난 사람의 비율이 100% 에 붙고, 캡션이 "받은 28정 예정 중
-    /// 복용 기록 40정" 이라고 적는다(QA 2026-09-21).
+    /// **날이 아니라 시각으로 자른다.** 오늘 진료를 받았으면 그날 아침 약은
+    /// 이전 처방의 몫이고, 진료 뒤 저녁 약부터 새 처방의 몫이다. 오늘 아직
+    /// 오지 않은 시간대는 세지 않는다 - 오후 3시에 보면 자기전 약은 분모에
+    /// 없다. 그래서 진료 당일에도 첫 시간대가 지나면 바로 숫자가 선다.
+    ///
+    /// 한때 받은 알 수 ÷ 처방일수 × 지난 날로 셌다(2026-09-21). 요일을 고쳐도
+    /// 흔들리지 않는 장점이 있었지만, 하루 두 번 먹는 약이나 여유분을 더 받은
+    /// 약에서 "먹었어야 하는 개수" 와 어긋났고, 달력·"기록 없이 지나간 시간대"
+    /// 와 다른 셈법이었다. 지금은 앱 어디서나 스케줄이 예정을 정한다. 대신
+    /// 요일을 고치면 지난 복약률도 새 요일로 다시 계산된다 - 고치기 폼이 그
+    /// 사실을 말한다.
+    ///
+    /// **받은 알 수는 분모가 아니다.** 어느 약이 이 진료에 속하는지(보충이
+    /// 있는 약) 정하는 데만 쓴다. 필요시 약은 빼고 센다 - 안 먹는 것이 정상이라
+    /// 분모에 넣으면 비율이 근거 없이 내려간다.
     ///
     /// **알 수로 가중하지 않는다.** 합으로 나누면 하루 세 번 먹는 약이 한 번
     /// 먹는 약보다 세 배 무거워진다. 약 두 개 중 하나를 꼬박 먹고 하나를
     /// 통째로 건너뛰었으면 그건 50% 다(사용자 결정 2026-09-21).
     ///
-    /// **중단한 약도 중단 전까지는 센다.** 2주 내내 건너뛰다가 끊은 약은
-    /// 그 2주에 대해 0% 이고, 끊은 뒤로는 분모가 더 늘지 않는다.
+    /// **중단한 약도 중단 전까지는 센다.** 끊은 뒤로는 분모가 더 늘지 않는다.
+    /// 끊었다 다시 먹는 약의 쉰 구간 `[stoppedAt, resumedAt)` 은 의사가 시킨
+    /// 휴약이라 분모에서도 분자에서도 뺀다.
     ///
-    /// **기록하지 않은 날은 안 먹은 것으로 센다.** 분모는 처방이 정하므로
-    /// 기록이 없으면 분자에 안 들어갈 뿐이다. 나중에 그 날을 채우면 분자가
-    /// 올라가 비율이 따라 오른다 - "기록 빼먹은 날은 복약 안 한 걸로 하고,
-    /// 이후에 기록하면 집계" 가 그대로 성립한다.
+    /// **기록하지 않은 칸은 안 먹은 것으로 센다.** 나중에 그 칸을 채우면
+    /// 분자가 올라가 비율이 따라 오른다.
     ///
-    /// **필요시 약은 빼고 센다.** 안 먹는 것이 정상이라 분모에 넣으면 비율이
-    /// 근거 없이 내려간다.
-    ///
-    /// - Returns: 진료 기록이 없거나, 받은 약이 없거나, 진료 당일이면 nil.
-    ///   그때는 숫자를 지어내지 말고 화면이 안내 문구를 대신 보여 준다.
+    /// - Returns: 진료 기록이 없거나, 받은 약이 없거나, 아직 지난 시간대가
+    ///   하나도 없으면 nil. 그때는 그 앞 진료로 물러나고, 그것도 없으면
+    ///   화면이 안내 문구를 대신 보여 준다.
     public static func prescriptionAdherence(
         prescriptions: [Prescription],
+        schedules: [Schedule] = [],
         stockEvents: [StockEvent],
         doseEvents: [DoseEvent],
         medications: [Medication],
@@ -370,52 +373,85 @@ public enum InventoryCalculator {
         calendar: Calendar = .current
     ) -> PrescriptionAdherence? {
 
-        // 다녀온 진료를 **나중 것부터** 훑는다. 오늘 안에 적은 것도 든다.
-        //
-        // 예전에는 가장 나중 진료 하나만 보고, 그것으로 셀 수 없으면 그대로
-        // 포기했다. 그래서 진료실에서 오늘 진료를 먼저 적고 리포트를 뽑으면
-        // (진료 당일이라 셀 날이 없다) 한 달치 복약률이 "진료와 받아 온
-        // 개수를 적어 두면 나와요" 로 사라졌다. 그 진료의 약을 나중에 지운
-        // 경우도 같았다 - 진료는 남아 기간의 기준은 되는데 숫자만 비었다.
-        // 셀 수 있는 진료가 나올 때까지 물러난다(QA 2026-09-22).
-        let today = calendar.startOfDay(for: asOf)
+        // 다녀온 진료를 **나중 것부터** 훑는다. 셀 수 있는 진료가 나올 때까지
+        // 물러난다 - 방금 적은 오늘 진료는 지난 시간대가 아직 없을 수 있고,
+        // 약을 지운 진료는 보충이 없다(QA 2026-09-22). 이전 진료의 창은
+        // 그 다음 진료 시각에서 닫힌다: 진료 전 아침 약은 이전 처방의 몫이다.
         let candidates = prescriptions
-            .filter { calendar.startOfDay(for: $0.visitDate) <= today }
+            .filter { $0.visitDate <= asOf }
             .filter { $0.daysSupplied > 0 }
             .sorted { $0.visitDate > $1.visitDate }
+        var laterVisit: Date?
         for visit in candidates {
+            let until = min(asOf, laterVisit ?? asOf)
             if let result = adherence(
                 for: visit,
+                until: until,
+                schedules: schedules,
                 stockEvents: stockEvents,
                 doseEvents: doseEvents,
                 medications: medications,
                 medicationID: medicationID,
-                today: today,
                 calendar: calendar
             ) {
                 return result
             }
+            laterVisit = visit.visitDate
         }
         return nil
+    }
+
+    /// 스케줄이 `[start, end)` 안에 예정한 개수 합. 쉰 구간은 뺀다.
+    ///
+    /// `Schedule.isActive(on:)` 가 요일·시작일·종료일을 본다 - 등록일 앞에는
+    /// 계획이 없으므로 그 날들은 저절로 0 이다. 오늘의 아직 안 온 시간대는
+    /// `end`(지금) 뒤라 들지 않는다.
+    static func plannedQuantity(
+        schedules: [Schedule],
+        from start: Date,
+        to end: Date,
+        excluding pause: (start: Date, end: Date)? = nil,
+        calendar: Calendar
+    ) -> Decimal {
+        guard start < end, !schedules.isEmpty else { return 0 }
+        var total: Decimal = 0
+        var day = calendar.startOfDay(for: start)
+        let lastDay = calendar.startOfDay(for: end)
+        while day <= lastDay {
+            for schedule in schedules where schedule.isActive(on: day, calendar: calendar) {
+                let at = schedule.timeOfDay.date(on: day, calendar: calendar)
+                guard at >= start, at < end else { continue }
+                if let pause, at >= pause.start, at < pause.end { continue }
+                total += schedule.dosePerIntake
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return total
     }
 
     /// 진료 하나를 기준으로 낸 복약률. 셀 근거가 없으면 nil.
     private static func adherence(
         for visit: Prescription,
+        until: Date,
+        schedules: [Schedule],
         stockEvents: [StockEvent],
         doseEvents: [DoseEvent],
         medications: [Medication],
         medicationID: UUID?,
-        today: Date,
         calendar: Calendar
     ) -> PrescriptionAdherence? {
 
-        let visitDay = calendar.startOfDay(for: visit.visitDate)
-        let elapsed = calendar.dateComponents([.day], from: visitDay, to: today).day ?? 0
-        // 진료 당일은 아직 셀 것이 없다. 하루가 지나야 하루치를 묻는다.
-        guard elapsed > 0 else { return nil }
-
-        let countedDays = min(elapsed, visit.daysSupplied)
+        // 처방 단위의 창. 처방일수를 넘겨서는 자라지 않는다 - 받은 약이
+        // 그만큼뿐이다.
+        let supplyEnd = calendar.date(byAdding: .day, value: visit.daysSupplied, to: visit.visitDate) ?? until
+        let prescriptionEnd = min(until, supplyEnd)
+        guard visit.visitDate < prescriptionEnd else { return nil }
+        let elapsed = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: visit.visitDate),
+            to: calendar.startOfDay(for: prescriptionEnd)
+        ).day ?? 0
 
         // 필요시 약은 빼고, 이 진료에 매인 보충만 약별로 모은다.
         var byID: [UUID: Medication] = [:]
@@ -430,8 +466,7 @@ public enum InventoryCalculator {
         }
         guard !received.isEmpty else { return nil }
 
-        // 이 진료에 매인 약들의 복용 기록만 모은다. 기기 간 중복은 하나로 묶고,
-        // 날짜로 자르는 일은 약별로 한다 - 약마다 분모가 서는 날이 다르다.
+        // 이 진료에 매인 약들의 복용 기록만 모은다. 기기 간 중복은 하나로 묶는다.
         var recordsByID: [UUID: [DoseEvent]] = [:]
         for event in collapsedScheduledDoses(doseEvents, calendar: calendar) {
             guard event.status == .taken else { continue }
@@ -443,65 +478,40 @@ public enum InventoryCalculator {
         for (id, quantity) in received {
             let medication = byID[id]
 
-            // 분모가 서는 창을 약마다 따로 연다. 양끝을 다음 셋이 정한다.
-            //
-            // · **앱이 그 약을 알기 전의 날은 세지 않는다**(QA 2026-09-22).
-            //   `DayPlan` 은 등록일 앞에 계획을 만들지 않으므로 그 날들에는
-            //   복용 기록이 **있을 수가 없다**. 그대로 세면 분자가 구조적으로
-            //   비어 0% 가 된다 - 오늘 앱을 깔고 지난 진료를 적은 사람이
-            //   첫 리포트에서 그 숫자를 본다.
-            // · **끊은 약은 끊은 날 앞에서 멈춘다.** 그 전의 침묵은 여전히
-            //   안 먹은 것으로 센다(사용자 결정 2026-09-21).
-            // · 처방일수를 넘겨서는 자라지 않는다 - 받은 약이 그만큼뿐이다.
-            var windowStart = visitDay
+            // 약마다 창을 따로 연다.
+            // · 앱이 그 약을 알기 전(등록 전)은 세지 않는다 - 그 날들에는
+            //   기록이 있을 수가 없다(QA 2026-09-22).
+            // · 끊은 약은 끊은 시각 앞에서 멈춘다.
+            var windowStart = visit.visitDate
             if let createdAt = medication?.createdAt {
-                windowStart = max(windowStart, calendar.startOfDay(for: createdAt))
+                windowStart = max(windowStart, createdAt)
             }
-            var windowEnd = calendar.date(byAdding: .day, value: countedDays, to: visitDay) ?? today
-            windowEnd = min(windowEnd, today)
+            var windowEnd = prescriptionEnd
             if medication?.status == .stopped, let stoppedAt = medication?.stoppedAt {
-                windowEnd = min(windowEnd, calendar.startOfDay(for: stoppedAt))
+                windowEnd = min(windowEnd, stoppedAt)
             }
+            guard windowStart < windowEnd else { continue }
 
-            var days = calendar.dateComponents([.day], from: windowStart, to: windowEnd).day ?? 0
-            guard days > 0 else { continue }
-
-            // **의사가 시킨 휴약은 빠트린 것이 아니다**(QA 2026-09-22).
-            // 끊었다가 다시 먹는 약의 쉬었던 구간 `[stoppedAt, resumedAt)` 은
-            // 분모에서 뺀다. "기록 없이 지나간 시간대"(UnrecordedSlots)와
-            // 패턴 그래프(PatternTimeline)는 이미 이 구간을 빼는데 여기만
-            // 세고 있었다 - 같은 화면의 그래프는 꽉 찬 날로 그리면서 비율만
-            // 내려가, 이틀 쉰 사람의 숫자가 9%p 깎여 진료실로 나갔다.
-            if medication?.status == .active,
-               let stoppedAt = medication?.stoppedAt,
-               let resumedAt = medication?.resumedAt {
-                let pauseStart = max(calendar.startOfDay(for: stoppedAt), windowStart)
-                let pauseEnd = min(calendar.startOfDay(for: resumedAt), windowEnd)
-                let paused = calendar.dateComponents([.day], from: pauseStart, to: pauseEnd).day ?? 0
-                days -= max(paused, 0)
-                guard days > 0 else { continue }
-            }
-
-            // **분자도 분모와 같은 날들만, 같은 축으로 본다**(QA 2026-09-21·22).
-            //
-            // 예전에는 분자가 `asOf` 까지 열려 있어서, 28일치를 받고 40일이
-            // 지난 사람은 분모가 멈춘 채 분자만 자라 비율이 100% 에 붙었다.
-            //
-            // 그리고 축이 달랐다. 분모는 날짜로 세는데 분자는 `effectiveDate`
-            // (= 실제로 누른 시각)로 잘랐다. 그래서 어젯밤 취침약을 자정 넘겨
-            // 누르면 그 한 알이 창 밖으로 밀려, 하루도 안 빠트린 사람이 96%
-            // 가 됐다. **달력이 쓰는 축과 같게 `scheduledAt` 으로 자른다** -
-            // "어젯밤 22:30 약을 00:10 에 먹었어도 그것은 어제의 취침 줄"
-            // 이라는 `DayPlan` 의 규칙이 여기서도 그대로 서야 한다.
-            // (재고는 실제로 준 시점이 중요하므로 `effectiveDate` 를 쓴다.)
-            // 쉬었던 구간은 분모에서 뺐으므로 분자에서도 뺀다. 쉬는 동안
-            // 먹은 기록이 있으면 그것까지 세어 100% 를 넘기게 된다.
             var pause: (start: Date, end: Date)?
             if medication?.status == .active,
                let stoppedAt = medication?.stoppedAt,
                let resumedAt = medication?.resumedAt {
-                pause = (calendar.startOfDay(for: stoppedAt), calendar.startOfDay(for: resumedAt))
+                pause = (stoppedAt, resumedAt)
             }
+
+            let expected = plannedQuantity(
+                schedules: schedules.filter { $0.medicationID == id },
+                from: windowStart,
+                to: windowEnd,
+                excluding: pause,
+                calendar: calendar
+            )
+            guard expected > 0 else { continue }
+
+            // **분자도 분모와 같은 창, 같은 축(예정 시각)으로 본다.** 어젯밤
+            // 22:30 약을 00:10 에 먹었어도 그것은 어젯밤 줄이다 - `DayPlan` 의
+            // 규칙이 여기서도 그대로 선다. (재고는 실제로 준 시점이 중요하므로
+            // `effectiveDate` 를 쓴다.)
             let taken = (recordsByID[id] ?? []).reduce(Decimal(0)) { sum, event in
                 let when = event.kind == .scheduled ? event.scheduledAt : event.effectiveDate
                 guard when >= windowStart, when < windowEnd else { return sum }
@@ -509,8 +519,6 @@ public enum InventoryCalculator {
                 return sum + event.quantity
             }
 
-            let expected = quantity * Decimal(days) / Decimal(visit.daysSupplied)
-            guard expected > 0 else { continue }
             // 100% 를 넘겨 적지 않는다. 더 먹었다는 뜻일 수도 있지만 대개는
             // 기록이 겹친 것이고, "복약률 120%" 는 읽는 사람에게 오류로 보인다.
             let rate = min(max(DecimalQuantity.round(taken / expected, scale: 4), 0), 1)
@@ -527,14 +535,10 @@ public enum InventoryCalculator {
         // **약별 비율의 평균.** 알 수로 가중하지 않는다.
         let average = items.reduce(Decimal(0)) { $0 + $1.rate } / Decimal(items.count)
 
-        // 처방 단위의 창. 약별로 등록일·중단일에 잘리기 전의 것이다.
-        let prescriptionWindowEnd = min(
-            calendar.date(byAdding: .day, value: countedDays, to: visitDay) ?? today, today
-        )
         return PrescriptionAdherence(
             visitDate: visit.visitDate,
-            windowStart: visitDay,
-            windowEnd: prescriptionWindowEnd,
+            windowStart: visit.visitDate,
+            windowEnd: prescriptionEnd,
             elapsedDays: elapsed,
             items: items.sorted { $0.medicationID.uuidString < $1.medicationID.uuidString },
             received: DecimalQuantity.round(items.reduce(Decimal(0)) { $0 + $1.received }, scale: 2),

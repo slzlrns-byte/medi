@@ -286,13 +286,12 @@ struct MedicationFormView: View {
             Button(t("바꾸기", "Change")) { commitSave() }
             Button(t("그대로 두기", "Keep the days"), role: .cancel) {}
         } message: {
-            // 복약률은 이제 **진료에서 받은 알 수**로 세므로 요일을 바꿔도
-            // 움직이지 않는다(`InventoryCalculator.prescriptionAdherence`).
-            // 예전 문구는 그것을 몰랐다 - 실제로 달라지는 것만 적는다
-            // (QA 2026-09-21).
+            // 복약률의 분모는 스케줄이 예정한 개수다(사용자 결정 2026-09-22).
+            // 요일을 바꾸면 지난 날의 예정도 새 요일로 다시 서므로 복약률도
+            // 움직인다 - 실제로 달라지는 것을 그대로 적는다.
             Text(t(
-                "지난 기록과 복약률은 그대로예요. 달력·패턴 보기의 '예정'과 '기록 없이 지나간 시간대'가 새 요일로 다시 그려지고, 소진 예측이 달라질 수 있어요.",
-                "Your past records and your adherence stay as they are. The calendar, the pattern view and the missed-dose list are re-planned with the new days, and the run-out forecast may change."
+                "지난 복용 기록은 그대로예요. 달력·패턴 보기의 '예정'과 '기록 없이 지나간 시간대', 그리고 복약률이 새 요일 기준으로 다시 계산되고, 소진 예측이 달라질 수 있어요.",
+                "Your past dose records stay as they are. The calendar, the pattern view, the missed-dose list and your adherence are recalculated with the new days, and the run-out forecast may change."
             ))
         }
         .navigationTitle(isEditing ? t("약 고치기", "Edit medication") : t("직접 입력", "Enter manually"))

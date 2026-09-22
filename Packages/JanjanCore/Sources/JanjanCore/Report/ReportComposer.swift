@@ -96,8 +96,8 @@ public enum ReportComposer {
         medicationNotes: [MedicationNote] = [],
         symptomEntries: [SymptomEntry] = [],
         doseChanges: [DoseChange] = [],
-        /// 복약률의 분모가 여기서 나온다 - 진료에서 받은 알 수는 저장된
-        /// 사실이라 나중에 요일을 고쳐도 변하지 않는다.
+        /// 복약률의 기준 진료가 여기서 나온다. 분모는 그 진료 뒤 스케줄이
+        /// 예정한 개수다(사용자 결정 2026-09-22).
         prescriptions: [Prescription] = [],
         lastVisit: Date? = nil,
         nextVisit: Date? = nil,
@@ -120,12 +120,15 @@ public enum ReportComposer {
             .addingTimeInterval(-1) ?? end
         // 복약률은 한 번만 센다. "복약" 구역과 약별 줄이 같은 값을 나눠 쓴다 -
         // 한 종이 안에서 두 숫자가 다른 규칙으로 서면 안 된다.
+        // 기준 시각은 `end` 그대로다(하루의 끝이 아니다). 오늘의 아직 안 온
+        // 시간대는 분모에 들지 않는다(사용자 결정 2026-09-22).
         let adherence = InventoryCalculator.prescriptionAdherence(
             prescriptions: prescriptions,
+            schedules: schedules,
             stockEvents: stockEvents,
             doseEvents: doseEvents,
             medications: medications,
-            asOf: endMoment,
+            asOf: end,
             calendar: calendar
         )
 
@@ -141,9 +144,9 @@ public enum ReportComposer {
         // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
         let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
 
-        // 오늘 진료를 적고 바로 뽑은 종이. 화면은 "내일부터 나와요" 로 가르는데
-        // 종이만 "적어 두면 나와요" 라고 하면 방금 적은 사람에게 저장이 안 된
-        // 것으로 읽힌다(QA 2026-09-22).
+        // 오늘 진료를 적고 바로 뽑은 종이. 화면은 "첫 시간대가 지나면" 으로
+        // 가르는데 종이만 "적어 두면 나와요" 라고 하면 방금 적은 사람에게
+        // 저장이 안 된 것으로 읽힌다(QA 2026-09-22).
         let loggedVisitToday = adherence == nil && prescriptions.contains { visit in
             !visit.isScheduleOnly
                 && calendar.isDate(visit.visitDate, inSameDayAs: endDay)
@@ -308,8 +311,8 @@ public enum ReportComposer {
             lines.append(.init(
                 style: .caption,
                 text: en
-                    ? "Today's visit is logged. Adherence starts tomorrow."
-                    : "오늘 진료를 적었어요. 복약률은 내일부터 나와요."
+                    ? "Today's visit is logged. Adherence appears once the first dose time after the visit has passed."
+                    : "오늘 진료를 적었어요. 진료 뒤 첫 복용 시간대가 지나면 복약률이 나와요."
             ))
         } else {
             lines.append(.init(

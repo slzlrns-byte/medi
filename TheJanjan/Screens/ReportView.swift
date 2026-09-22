@@ -183,15 +183,18 @@ struct ReportView: View {
         ReportComposer.window(endingAt: today, lastVisit: adherence?.visitDate ?? lastVisit)
     }
 
-    /// **복약률은 받은 약으로 센다**(사용자 결정 2026-09-21).
-    /// 종이와 같은 계산을 쓴다 - 한 화면 안에서 두 숫자가 달라지면 안 된다.
+    /// **복약률은 지금 이 시각까지 먹었어야 하는 개수로 센다**(사용자 결정
+    /// 2026-09-22). 종이와 같은 계산을 쓴다 - 한 화면 안에서 두 숫자가
+    /// 달라지면 안 된다. 기준 시각은 `Date()` 다 - 오늘의 아직 안 온 시간대를
+    /// 분모에 넣지 않으려면 하루의 끝이 아니라 지금이어야 한다.
     private var adherence: InventoryCalculator.PrescriptionAdherence? {
         InventoryCalculator.prescriptionAdherence(
             prescriptions: prescriptionRecords.map(\.core),
+            schedules: schedules,
             stockEvents: stock,
             doseEvents: doses,
             medications: medicationRecords.map { $0.core.displayReady },
-            asOf: endOfToday
+            asOf: Date()
         )
     }
 
@@ -274,9 +277,9 @@ struct ReportView: View {
                 } else if hasVisitTodayWithRefills {
                     // 방금 오늘 진료를 적은 사람이다. "적어 두면 나와요" 는 그
                     // 사람에게 "저장이 안 됐나?" 로 읽힌다(QA 2026-09-22). 진료
-                    // 당일은 셀 날이 아직 없을 뿐이라고 갈라 말한다.
-                    Text(t("오늘 진료를 적었어요. 복약률은 내일부터 나와요.",
-                           "Today's visit is logged. Adherence starts tomorrow."))
+                    // 뒤 첫 시간대가 아직 안 지났을 뿐이라고 갈라 말한다.
+                    Text(t("오늘 진료를 적었어요. 진료 뒤 첫 복용 시간대가 지나면 복약률이 나와요.",
+                           "Today's visit is logged. Adherence appears once the first dose time after the visit has passed."))
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                 } else {
@@ -508,8 +511,10 @@ struct ReportView: View {
         isExporting = true
         exportError = nil
 
+        // 하루의 끝이 아니라 **지금**이다. 복약률이 오늘의 아직 안 온 시간대를
+        // 분모에 넣지 않으려면 종이도 같은 시각을 봐야 한다.
         let content = ReportComposer.make(
-            endingAt: endOfToday,
+            endingAt: Date(),
             medications: medications,
             schedules: schedules,
             doseEvents: doses,

@@ -249,7 +249,7 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertTrue(texts(report).contains("복용 14회 · 건너뜀 2회 · 미기록 1회"))
     }
 
-    /// 복약률은 **진료에서 받은 약**에서 나온다. 진료 기록이 없으면 세 숫자는
+    /// 복약률은 **진료 기록**이 있어야 선다. 진료 기록이 없으면 세 숫자는
     /// 그대로 적되 비율은 지어내지 않는다(사용자 결정 2026-09-21).
     func testAdherenceNeedsAVisitRecord() {
         let report = content(doses: Fixed.workedExampleDoses())
@@ -260,9 +260,9 @@ final class ReportComposerTests: XCTestCase {
         ))
     }
 
-    /// 8/1 에 28일치 28정을 받고 8/17 저녁에 뽑는다. 분모는 진료 다음 날부터
-    /// 어제까지의 16일치(16정)이고, 분자는 그 16일 안의 복용 기록 14정이다.
-    /// 8/15·8/16 건너뜀, 8/17 미기록은 분자에 들어가지 않는다.
+    /// 8/1 10시에 28일치를 받고 8/17 21:00 에 뽑는다. 자기전 22:30 약이라
+    /// 분모는 8/1~8/16 의 16칸(8/17 22:30 은 아직이다)이고, 분자는 그 안의
+    /// 복용 기록 14정이다. 8/15·8/16 건너뜀은 분자에 들어가지 않는다.
     func testAdherenceComesFromWhatTheVisitGave() {
         let visit = Prescription(visitDate: Fixed.date(2026, 8, 1, 10), daysSupplied: 28)
         let report = content(
