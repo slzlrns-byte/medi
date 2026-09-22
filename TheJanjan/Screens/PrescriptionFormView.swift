@@ -114,6 +114,21 @@ struct PrescriptionFormView: View {
         }
         .fogBackground()
         .scrollContentBackground(.hidden)
+        // 카드가 아니라 **화면**에 단다. 예전에는 약 목록 카드에 붙어 있어서,
+        // 약이 하나도 없는 사람에게는 이 문 자체가 없었다(사용자 지적
+        // 2026-09-22).
+        .sheet(isPresented: $isShowingNewMedication) {
+            NavigationStack {
+                // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
+                MedicationFormView(skipsStock: true) { isShowingNewMedication = false }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(t("닫기", "Close")) { isShowingNewMedication = false }
+                                .foregroundStyle(Color.ink)
+                        }
+                    }
+            }
+        }
         // 입력칸이 여럿인 화면인데 키보드를 내릴 길이 없었다 - 한 번 적고
         // 나면 키보드가 저장 버튼을 덮은 채였다(사용자, TestFlight 17).
         .keyboardDoneBar()
@@ -218,6 +233,18 @@ struct PrescriptionFormView: View {
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
+
+                // "먼저 등록하면" 이라고 말해 놓고 등록할 자리를 안 주면
+                // 폼을 닫고 약 탭에 갔다 와야 한다 - 적던 진료일도 함께
+                // 날아간다(사용자 요청 2026-09-22). 약이 있을 때의
+                // "여기 없는 약 등록" 과 같은 문이다.
+                WhitePillButton(
+                    title: t("약 등록하기", "Register a medication"),
+                    systemImage: "plus"
+                ) {
+                    isShowingNewMedication = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xs))
             }
         }
     }
@@ -243,18 +270,6 @@ struct PrescriptionFormView: View {
                 WhitePillButton(title: t("여기 없는 약 등록", "Register a new medication"), systemImage: "plus") {
                     isShowingNewMedication = true
                 }
-            }
-        }
-        .sheet(isPresented: $isShowingNewMedication) {
-            NavigationStack {
-                // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
-                MedicationFormView(skipsStock: true) { isShowingNewMedication = false }
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button(t("닫기", "Close")) { isShowingNewMedication = false }
-                                .foregroundStyle(Color.ink)
-                        }
-                    }
             }
         }
     }
