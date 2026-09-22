@@ -24,6 +24,8 @@ struct PrescriptionFormView: View {
     @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
     @Query private var scheduleRecords: [ScheduleRecord]
     @Query private var stockRecords: [StockEventRecord]
+    /// 받기 전 개수를 미리 채우려면 지금 재고를 알아야 한다.
+    @Query private var doseRecords: [DoseEventRecord]
 
     /// 처음 열릴 때의 처방일수. `hasEdits` 가 "손댔는지" 를 이 값과 견준다.
     static let defaultDaysSupplied = 28
@@ -41,6 +43,9 @@ struct PrescriptionFormView: View {
     /// 약 id → 진료일에 세어 둔 "받기 전 남아 있던 개수". 안 세면 여기 없다.
     /// 매 진료마다 남은 개수를 짚고 넘어가게 하는 손잡이다(사용자 결정 2026-09-16).
     @State private var leftovers: [UUID: Decimal] = [:]
+    /// 받기 전 개수 칸에 적힌 글자 그대로. 지우는 중("", "0.")에도 칸이 튀지 않게
+    /// 글자와 값을 따로 들고 있는다.
+    @State private var leftoverTexts: [UUID: String] = [:]
     @State private var isSaving = false
     /// 사용자가 개수를 직접 고친 약. 제안값을 다시 덮어쓰지 않으려고 기억해 둔다.
     @State private var edited: Set<UUID> = []
@@ -120,7 +125,7 @@ struct PrescriptionFormView: View {
         .sheet(isPresented: $isShowingNewMedication) {
             NavigationStack {
                 // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
-                MedicationFormView(skipsStock: true) { isShowingNewMedication = false }
+                MedicationFormView { isShowingNewMedication = false }
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(t("닫기", "Close")) { isShowingNewMedication = false }
@@ -296,25 +301,38 @@ struct PrescriptionFormView: View {
                     )
                 }
 
-                if let leftover = leftovers[medication.id] {
-                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                        Text(t("받기 전 남아 있던 개수", "Pills left before this refill"))
-                            .janjanBody(11)
-                            .foregroundStyle(Color.muted)
-                        CountStepper(
-                            text: t("\(DecimalQuantity.display(leftover))정", pillsEn(leftover)),
-                            decreaseLabelKo: t("\(spokenName) 남은 개수 줄이기", "Decrease \(spokenName) leftover count"),
-                            increaseLabelKo: t("\(spokenName) 남은 개수 늘리기", "Increase \(spokenName) leftover count"),
-                            onDecrease: { adjustLeftover(medication, by: -1) },
-                            onIncrease: { adjustLeftover(medication, by: 1) }
+                // **받기 전 개수를 늘 묻는다**(사용자 결정 2026-09-22).
+                //
+                // 재고의 기준점은 이제 이 화면 한 곳에서만 선다 - 약 등록에서는
+                // 재고를 받지 않는다. 접어 두면 대부분 안 누르고, 그러면 기준점
+                // 없이 보충만 쌓여 남은 개수가 실제와 멀어진다. 매 진료마다 한
+                // 번 짚고 가면 그 자리에서 다시 맞는다.
+                //
+                // ± 버튼만 두지 않는다 - 14정이면 열네 번 눌러야 했다.
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                    Text(t("받기 전 남아 있던 개수", "Pills left before this refill"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        JanjanField(
+                            label: "",
+                            placeholder: "0",
+                            keyboard: .decimalPad,
+                            text: leftoverBinding(for: medication)
                         )
+                        .frame(maxWidth: 110)
+                        .accessibilityLabel(Text(t("\(spokenName) 받기 전 남아 있던 개수",
+                                                   "\(spokenName) pills left before this refill")))
+                        Text(t("정", "pills"))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.muted)
+                        Spacer(minLength: 0)
                     }
-                } else {
-                    // 매 진료마다 남은 개수를 짚고 가면 재고가 실제와 다시 맞는다.
-                    // 강요는 아니다 - 안 세면 그냥 보충만 더해진다.
-                    WhitePillButton(title: t("남아 있던 약도 세어 두기", "Also count what was left"), systemImage: "number") {
-                        leftovers[medication.id] = 0
-                    }
+                    Text(t("한 알도 안 남았으면 0 그대로 두세요. 이 개수 위에 받아 온 약이 더해져요.",
+                           "Leave it at 0 if none were left. What you picked up is added on top of this."))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 doseChangeSection(medication)
@@ -580,24 +598,47 @@ struct PrescriptionFormView: View {
         if refills[medication.id] != nil {
             refills[medication.id] = nil
             leftovers[medication.id] = nil
+            leftoverTexts[medication.id] = nil
             // 이번 처방에서 뺀 약의 용량 변경까지 들고 있으면, 화면에 보이지도
             // 않는 것이 저장될 때 적용된다.
             doseEdits[medication.id] = nil
             edited.remove(medication.id)
         } else {
             refills[medication.id] = suggestedQuantity(for: medication)
+            // 앱이 지금 아는 남은 개수를 미리 채워 둔다. 맞으면 그대로 두고
+            // 다르면 고치면 된다 - 빈 칸에서 시작하는 것보다 손이 덜 간다.
+            leftovers[medication.id] = max(InventoryCalculator.remaining(
+                for: medication.id,
+                stockEvents: stockRecords.map(\.core),
+                doseEvents: doseRecords.map(\.core),
+                asOf: visitDate
+            ), 0)
+            leftoverTexts[medication.id] = DecimalQuantity.display(leftovers[medication.id] ?? 0)
         }
+    }
+
+    /// 받기 전 개수 칸의 글자. 숫자로 읽히면 그대로 `leftovers` 에 옮긴다.
+    private func leftoverBinding(for medication: Medication) -> Binding<String> {
+        Binding(
+            get: { leftoverTexts[medication.id] ?? "" },
+            set: { text in
+                leftoverTexts[medication.id] = text
+                let trimmed = text
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: ",", with: ".")
+                if trimmed.isEmpty {
+                    leftovers[medication.id] = 0
+                } else if let value = Decimal(string: trimmed), value >= 0 {
+                    leftovers[medication.id] = DecimalQuantity.snapToQuarter(value)
+                }
+            }
+        )
     }
 
     private func adjust(_ medication: Medication, by delta: Decimal) {
         guard let current = refills[medication.id] else { return }
         refills[medication.id] = max(current + delta, 0)
         edited.insert(medication.id)
-    }
-
-    private func adjustLeftover(_ medication: Medication, by delta: Decimal) {
-        guard let current = leftovers[medication.id] else { return }
-        leftovers[medication.id] = max(current + delta, 0)
     }
 
     private func mySchedules(_ medication: Medication) -> [Schedule] {

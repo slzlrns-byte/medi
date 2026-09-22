@@ -39,7 +39,6 @@ struct MedicationFormView: View {
     /// 기본은 아무 요일도 고르지 않은 상태 - 직접 눌러 고른다
     /// (사용자 요청 2026-09-19. 전에는 매일이 기본이라 지나치기 쉬웠다).
     @State private var weekdays: Set<Weekday> = []
-    @State private var stockText = ""
     @State private var drafts: [SlotDraft] = SlotDraft.presets()
     @State private var isSaving = false
     /// 알림 권한을 묻는 화면. 시간이 있는 약을 저장한 직후에만 올라온다.
@@ -49,26 +48,15 @@ struct MedicationFormView: View {
     /// 고치러 들어올 때의 요일. 바뀌었는지 이 값과 견준다.
     private let originalWeekdays: Set<Weekday>
 
-    /// 재고 칸을 아예 두지 않는 길. 진료 기록 안에서 연 등록 폼이 그렇다 -
-    /// 바로 아래에 "받아 온 개수" 가 있어서 같은 숫자를 두 번 적게 되고,
-    /// 등록 정정이 보충보다 **나중** 이라 기준점이 되어 받아 온 개수가
-    /// 통째로 무시됐다(QA 2026-09-21).
-    private let skipsStock: Bool
-
 
     private var lang: JanjanLanguage { .current }
 
     /// - Parameter prefill: 약봉투 스캔이 읽어 온 값. 채워만 두고 사용자가 고칠 수 있다 —
     ///   잘못 읽은 이름이 확인 없이 저장되면 그 뒤 기록이 전부 그 위에 쌓인다.
-    init(
-        prefill: PharmacyLabelParser.Candidate? = nil,
-        skipsStock: Bool = false,
-        onSaved: @escaping () -> Void
-    ) {
+    init(prefill: PharmacyLabelParser.Candidate? = nil, onSaved: @escaping () -> Void) {
         self.onSaved = onSaved
         self.editingID = nil
         self.originalWeekdays = []
-        self.skipsStock = skipsStock
         _name = State(initialValue: prefill?.name ?? "")
         _strength = State(initialValue: prefill?.strengthText ?? "")
     }
@@ -77,7 +65,6 @@ struct MedicationFormView: View {
     init(existing: Existing) {
         self.onSaved = {}
         self.editingID = existing.medication.id
-        self.skipsStock = false
         _name = State(initialValue: existing.medication.name)
         _strength = State(initialValue: existing.medication.strengthText)
         _purpose = State(initialValue: existing.medication.purposeLine)
@@ -189,11 +176,6 @@ struct MedicationFormView: View {
                     weekdayCard
                 }
                 // 재고는 "세어 본 사건" 이 쌓여 만들어지는 값이라 고치기에서
-                // 숫자 하나로 덮으면 기준점이 끊긴다. 다시 세는 일은 상세
-                // 화면의 "다시 세기" 가 맡는다.
-                if !isEditing, !skipsStock {
-                    stockCard
-                }
                 if isEditing {
                     editingNoteCard
                 }
@@ -503,34 +485,6 @@ struct MedicationFormView: View {
         }
     }
 
-    private var stockCard: some View {
-        JanjanCard {
-            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                JanjanField(
-                    label: t("지금 남은 개수", "Pills on hand"),
-                    placeholder: t("예: 28", "e.g. 28"),
-                    keyboard: .decimalPad,
-                    text: $stockText
-                )
-                // **비워 둘 수 없다**(사용자 결정 2026-09-21). 이 값이 재고의
-                // 기준점을 세운다. 없으면 셈이 0 에서 시작해 그 앞의 복용까지
-                // 빼 버려서, 한 달 먹고 28정을 받은 사람의 남은 개수가
-                // −2정이 됐다. 0 도 답이다 - 지금 하나도 없으면 0 을 적는다.
-                Text(needsStock
-                     ? t("지금 가진 개수를 적어 주세요. 하나도 없으면 0 이라고 적어도 돼요.",
-                         "Enter how many you have now. If you have none, 0 is a valid answer.")
-                     : t("세어 본 개수가 재고의 기준이 돼요. 나중에 '다시 세기' 로 고칠 수 있어요.",
-                         "The count you enter becomes the baseline. You can correct it later with 'Count again'."))
-                    .janjanBody(12)
-                    .foregroundStyle(needsStock ? Color.janjan(.peachInk) : Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    // MARK: - 규칙
-
-    /// 쪼갤 수 없는 제형은 1정 단위로만 센다(설계 03절의 제형 규칙).
     private var doseStep: Decimal {
         form.isSplittable ? DecimalQuantity.step * 2 : 1
     }
@@ -558,10 +512,6 @@ struct MedicationFormView: View {
             return t("용량에 단위를 붙여 주세요. 예: 15 mg",
                      "Add a unit to the strength. For example: 15 mg")
         }
-        if needsStock {
-            return t("지금 남은 개수를 적어야 저장할 수 있어요. 하나도 없으면 0 이라고 적어 주세요.",
-                     "Enter how many pills you have now to save. If you have none, enter 0.")
-        }
         guard kind == .scheduled else { return nil }
         if weekdays.isEmpty {
             return t("요일을 하나 이상 골라 주세요.", "Pick at least one day of the week.")
@@ -583,9 +533,6 @@ struct MedicationFormView: View {
         // (사용자 결정 2026-09-22 / 2026-09-21).
         guard !needsStrength else { return false }
         guard !strengthNeedsUnit(strength) else { return false }
-        // 재고 기준점이 없으면 남은 개수 계산이 0 에서 시작해 그 앞의 복용까지
-        // 빼 버린다(QA 2026-09-21). 새로 등록할 때는 반드시 받는다.
-        guard !needsStock else { return false }
         // 필요시 약은 시간대가 없어도 된다 — 그게 필요시 약의 정의다.
         guard kind == .scheduled else { return true }
         // 요일을 하나도 안 고르면 알림도 안 가고, 오늘 화면에도 안 뜨고,
@@ -626,21 +573,6 @@ struct MedicationFormView: View {
     /// 않는다. 고치러 들어온 김에 채운다.
     private var needsStrength: Bool {
         strength.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    /// 재고 칸을 아직 못 받은 상태인지. 고치기 화면에는 이 칸이 없다
-    /// (재고는 "다시 세기" 가 맡는다).
-    private var needsStock: Bool {
-        !isEditing && !skipsStock && initialStock == nil
-    }
-
-    /// "1.5", "1,5" 둘 다 받는다. 숫자가 아니면 재고를 적지 않은 것으로 본다.
-    private var initialStock: Decimal? {
-        let trimmed = stockText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: ",", with: ".")
-        guard !trimmed.isEmpty, let value = Decimal(string: trimmed), value >= 0 else { return nil }
-        return DecimalQuantity.snapToQuarter(value)
     }
 
     // MARK: - 저장
@@ -726,11 +658,10 @@ struct MedicationFormView: View {
         let schedules = makeSchedules(for: medication.id)
 
         MedicationStore.add(
-            MedicationStore.Draft(
-                medication: medication,
-                schedules: schedules,
-                initialStock: initialStock
-            ),
+            // **등록에서는 재고를 받지 않는다**(사용자 결정 2026-09-22).
+            // 재고의 기준점은 진료 기록 한 곳에서만 선다 - 두 곳에서 받으니
+            // 등록 정정 위에 진료 보충이 얹혀 개수가 두 배가 됐다.
+            MedicationStore.Draft(medication: medication, schedules: schedules),
             in: context
         )
 
