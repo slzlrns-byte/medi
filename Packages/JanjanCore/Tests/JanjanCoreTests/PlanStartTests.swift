@@ -156,9 +156,13 @@ final class AutoFilledUnrecordedTests: XCTestCase {
         XCTAssertFalse(asksAgain(source: .watch))
     }
 
-    /// 분모에는 들어간다. 채우는 목적이 그것이다 - 앱을 안 연 날이
-    /// 복약률에서 조용히 사라지지 않게.
-    func testFilledUnrecordedCountsInTheDenominator() {
+    /// **분모에 들어가지 않는다**(2026-09-22 에 뒤집음). 예전에는 "앱을 안 연
+    /// 날이 복약률에서 사라지지 않게" 넣었는데, 이 비율은 이제 진료실 복약률이
+    /// 아니라 **소진 예측**에만 쓰인다. 요일을 넓히면 지난 4주의 새 요일이
+    /// 전부 이 줄로 채워져 꼬박 먹은 사람의 비율이 반으로 내려가고 "부족한 약
+    /// 없음" 이 떴다. 물어볼 자리이지 답이 아니다. 직접 고른 "기억나지
+    /// 않아요" 는 답이라 그대로 센다(`AdherenceRateBackfillTests`).
+    func testFilledUnrecordedStaysOutOfTheDenominator() {
         let taken = DoseEvent(
             medicationID: Fixed.medA,
             scheduledAt: Fixed.date(2026, 9, 11, 8, 0),
@@ -174,6 +178,14 @@ final class AutoFilledUnrecordedTests: XCTestCase {
             to: Fixed.date(2026, 9, 13, 0, 0),
             calendar: calendar
         )
-        XCTAssertEqual(rate, Decimal(1) / Decimal(2), "둘 중 하나만 복용함이면 절반이다")
+        XCTAssertEqual(rate, 1, "앱이 채운 줄은 세지 않으니 복용한 하루만 남는다")
+
+        let answered = InventoryCalculator.adherenceRate(
+            doseEvents: [taken, event(source: .phone)],
+            from: Fixed.date(2026, 9, 11, 0, 0),
+            to: Fixed.date(2026, 9, 13, 0, 0),
+            calendar: calendar
+        )
+        XCTAssertEqual(answered, Decimal(1) / Decimal(2), "직접 고른 '기억나지 않아요' 는 절반으로 센다")
     }
 }
