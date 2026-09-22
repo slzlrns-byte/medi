@@ -226,9 +226,15 @@ struct MedicationDetailView: View {
                         PillChip(text: medication.strengthText)
                     }
                 }
+                // 칩 둘을 라벨 없이 나란히 두니 "정제 정기" 가 같은 말을 두 번
+                // 하는 것처럼 읽혔다(사용자 지적 2026-09-22). 게다가 "정기" 는
+                // 기본값이라 아무것도 알려 주지 않는다 - 알려 줄 것이 있는
+                // **필요시** 일 때만 세운다(종이의 약별 줄과 같은 규칙).
                 HStack(spacing: CGFloat(JanjanSpacing.xs)) {
                     PillChip(text: medication.form.label(lang))
-                    PillChip(text: medication.kind.label(lang))
+                    if medication.kind == .asNeeded {
+                        PillChip(text: medication.kind.label(lang))
+                    }
                 }
                 if !medication.purposeLine.isEmpty {
                     Text(medication.purposeLine)

@@ -25,6 +25,11 @@ struct SettingsView: View {
     private var appointmentLeadDays = AppointmentReminder.defaultLeadDays
 
     @State private var isShowingDeleteConfirmation = false
+    /// "삭제" 를 직접 적게 하는 두 번째 문.
+    @State private var isShowingDeleteTypeIn = false
+    /// 실제로 지웠을 때만 마지막 알림을 띄우기 위한 표시.
+    @State private var didDeleteEverything = false
+    @State private var isShowingDeleteDone = false
     @State private var isShowingPaywall = false
     @State private var isShowingLicenses = false
 
@@ -65,10 +70,37 @@ struct SettingsView: View {
                 isPresented: $isShowingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button(t("삭제", "Delete"), role: .destructive) { deleteEverything() }
+                // 여기서 바로 지우지 않는다. 되돌릴 수 없는 일에는 손이 한 번
+                // 더 가는 문을 둔다 - 실수로 두 번 누르는 것과 글자를 적는 것은
+                // 다른 일이다(사용자 결정 2026-09-22).
+                Button(t("삭제", "Delete"), role: .destructive) { isShowingDeleteTypeIn = true }
                 Button(t("취소", "Cancel"), role: .cancel) {}
             } message: {
                 Text(deleteWarningKo)
+            }
+            .sheet(
+                isPresented: $isShowingDeleteTypeIn,
+                // 시트가 닫힌 **뒤에** 알린다. 시트 위에 알림을 겹쳐 올리면
+                // 둘이 서로를 밀어낸다.
+                onDismiss: {
+                    guard didDeleteEverything else { return }
+                    didDeleteEverything = false
+                    isShowingDeleteDone = true
+                }
+            ) {
+                DeleteEverythingSheet(warning: deleteWarningKo) {
+                    deleteEverything()
+                    didDeleteEverything = true
+                    isShowingDeleteTypeIn = false
+                }
+            }
+            .alert(
+                t("삭제되었습니다", "Everything was deleted"),
+                isPresented: $isShowingDeleteDone
+            ) {
+                Button(t("확인", "OK"), role: .cancel) {}
+            } message: {
+                Text(deleteDoneMessage)
             }
             .sheet(isPresented: $isShowingLicenses) {
                 LicenseNoticeView()
@@ -526,6 +558,14 @@ struct SettingsView: View {
         return base + " " + t("iCloud 로 연결된 다른 기기에서도 사라져요.", "It will also disappear from other devices connected through iCloud.")
     }
 
+    private var deleteDoneMessage: String {
+        let base = t("기록·약·설정이 모두 지워졌어요.",
+                     "Your records, medications and settings are gone.")
+        guard JanjanModelContainer.activeStorage == .cloudKit else { return base }
+        return base + " " + t("iCloud 로 연결된 다른 기기에도 곧 반영돼요.",
+                              "Connected iCloud devices will catch up shortly.")
+    }
+
     /// 저장된 것을 전부 지운다.
     ///
     /// 지우는 순서가 중요하다. 알림을 먼저 걷어야 이미 예약된 알림이
@@ -585,6 +625,86 @@ struct SettingsView: View {
         let short = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? "—"
         return "\(short) (\(build))"
+    }
+}
+
+/// "삭제" 를 직접 적어야 지워지는 두 번째 문 (사용자 결정 2026-09-22).
+///
+/// **왜 한 겹 더 두는가.** 이 버튼은 기록·약·설정을 되돌릴 수 없이 지우고,
+/// iCloud 로 묶여 있으면 다른 기기의 것까지 함께 지운다. 확인 창의 "삭제" 를
+/// 한 번 더 누르는 것은 실수로도 일어나지만, 글자를 적는 일은 실수로
+/// 일어나지 않는다.
+///
+/// 적는 말은 화면에 그대로 보여 준다 - 맞혀야 하는 암호가 아니라,
+/// 손을 한 번 멈추게 하는 장치다.
+private struct DeleteEverythingSheet: View {
+
+    let warning: String
+    let onConfirm: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var typed = ""
+
+    /// 한국어는 "삭제", 영어는 "DELETE". 화면에 보이는 말을 그대로 받는다.
+    private var keyword: String { t("삭제", "DELETE") }
+
+    private var matches: Bool {
+        typed.trimmingCharacters(in: .whitespacesAndNewlines) == keyword
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+                    JanjanCard {
+                        Text(warning)
+                            .janjanBody(14)
+                            .foregroundStyle(Color.ink2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text(t("지우려면 아래 칸에 \(keyword) 라고 적어 주세요.",
+                           "To erase everything, type \(keyword) in the box below."))
+                        .janjanBody(15)
+                        .foregroundStyle(Color.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    JanjanField(label: t("확인 문구", "Confirmation"), placeholder: keyword, text: $typed)
+
+                    BlackPillButton(
+                        title: t("모든 데이터 삭제", "Delete everything"),
+                        isEnabled: matches
+                    ) {
+                        onConfirm()
+                    }
+
+                    // 버튼이 왜 꺼져 있는지 버튼 옆에서 말한다.
+                    if !matches {
+                        Text(t("\(keyword) 라고 정확히 적으면 버튼이 켜져요.",
+                               "The button turns on once \(keyword) is typed exactly."))
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .keyboardDoneBar()
+            .navigationTitle(t("모든 데이터 삭제", "Delete everything"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(t("취소", "Cancel")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
     }
 }
 

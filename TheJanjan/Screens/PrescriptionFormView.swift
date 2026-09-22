@@ -335,6 +335,17 @@ struct PrescriptionFormView: View {
                     ))
                 }
 
+                // 지워서 비워 둘 수도 없다. 단위 고르개와 달리 빈 칸에는
+                // 눌러 고칠 것이 없으므로 말로 알린다(사용자 결정 2026-09-22).
+                if edit.strengthText != medication.strengthText,
+                   edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(t("용량을 비워 둘 수 없어요. 예: 10mg",
+                           "The dose can't be empty. For example: 10mg"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if let perIntake = edit.perIntake {
                     VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
                         Text(t("한 번에 먹는 개수", "Pills per dose"))
@@ -498,15 +509,22 @@ struct PrescriptionFormView: View {
 
     /// 진료일만 있어도 저장된다. 약을 아직 안 넣었어도 "다음 진료 D-" 는 살아난다.
     ///
-    /// 다만 **새로 적은** 용량에 단위가 빠져 있으면 막는다 - 그대로 넘기면
-    /// 이력에 "10 → 15" 가 남고, 그게 mg 인지 정인지는 나중에 아무도 모른다.
-    /// 손대지 않은 옛 표기까지 막으면 단위 없는 약을 가진 사람이 진료 자체를
-    /// 저장할 수 없게 되므로, 바꾼 것만 본다.
+    /// 다만 **새로 적은** 용량은 비어 있거나 단위가 빠져 있으면 막는다 -
+    /// 그대로 넘기면 이력에 "10 → 15" 가 남고, 그게 mg 인지 정인지는 나중에
+    /// 아무도 모른다. 여기서 빈 칸으로 지우면 약의 용량 표기가 통째로
+    /// 사라지는데, 그 길은 "약 고치기" 에서 이미 막아 두었다
+    /// (사용자 결정 2026-09-22).
+    ///
+    /// 손대지 않은 옛 표기까지 막지는 않는다. 단위 없는 약을 가진 사람이
+    /// 진료 자체를 저장할 수 없게 되기 때문이다 - 그 약은 "약 고치기" 에서
+    /// 채운다. 바꾼 것만 본다.
     private var canSave: Bool {
         guard !isSaving else { return false }
         return !doseEdits.contains { medicationID, edit in
             guard let medication = activeMedications.first(where: { $0.id == medicationID }) else { return false }
-            return edit.strengthText != medication.strengthText && strengthNeedsUnit(edit.strengthText)
+            guard edit.strengthText != medication.strengthText else { return false }
+            let trimmed = edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty || strengthNeedsUnit(edit.strengthText)
         }
     }
 

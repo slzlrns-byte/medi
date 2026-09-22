@@ -279,13 +279,25 @@ struct MedicationFormView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 JanjanField(label: t("용량", "Dose"), placeholder: t("예: 10mg", "e.g. 10mg"), text: $strength)
-                // 숫자만 적어 두면 목록에서 "10" 으로만 보여, 10mg 인지 10정인지
-                // 알 수가 없다(사용자 지적 2026-09-21). 막지는 않는다 - 단위를
-                // 대신 붙여 주면 약 정보를 앱이 지어내는 셈이 된다. 대신 한 번
-                // 눌러 붙일 수 있게 해 둔다.
+                // **비워 둘 수 없다**(사용자 결정 2026-09-22). 이름만 남으면
+                // 같은 약의 다른 함량을 구별할 수 없고, 그 상태로 목록·알림·
+                // 진료실 종이까지 나간다.
+                //
+                // 숫자만 적어 두는 것도 막는다. 목록에 "10" 으로만 보이면
+                // 10mg 인지 10정인지 알 수가 없다(사용자 지적 2026-09-21).
+                // 단위를 앱이 대신 붙여 주지는 않는다 - 약 정보를 지어내는
+                // 셈이 되므로, 한 번 눌러 붙일 수 있게만 해 둔다.
                 if strengthNeedsUnit(strength) {
                     StrengthUnitRow(text: $strength)
                 }
+                Text(needsStrength
+                     ? t("용량은 단위까지 적어 주세요. 예: 10mg · 0.5정 · 한 포",
+                         "Enter the dose with its unit. For example: 10mg, 0.5 tablet.")
+                     : t("목록·알림·진료실 종이에 이 표기가 그대로 나가요.",
+                         "This is what appears in the list, the reminders and the report."))
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                 JanjanField(
                     label: t("용도 한 줄 (선택)", "What it's for (optional)"),
                     placeholder: t("예: 잠들기 쉽게", "e.g. To help me sleep"),
@@ -538,6 +550,10 @@ struct MedicationFormView: View {
             return t("약 이름이 너무 길어요(\(Self.nameLimit)자까지).",
                      "That name is too long (up to \(Self.nameLimit) characters).")
         }
+        if needsStrength {
+            return t("용량을 적어야 저장할 수 있어요. 예: 10mg",
+                     "Enter the dose to save. For example: 10mg")
+        }
         if strengthNeedsUnit(strength) {
             return t("용량에 단위를 붙여 주세요. 예: 15 mg",
                      "Add a unit to the strength. For example: 15 mg")
@@ -563,6 +579,9 @@ struct MedicationFormView: View {
         // 단위 없는 용량은 아예 들여보내지 않는다. 띄워만 주고 그냥 저장되게
         // 두니 결국 "15" 가 남았다("용량 15 mg 이런 식으로 해야지", 2026-09-21).
         // 고르개가 바로 아래 있으니 막혀도 한 번 누르면 풀린다.
+        // 용량은 비워 둘 수 없고, 단위 없는 숫자로 둘 수도 없다
+        // (사용자 결정 2026-09-22 / 2026-09-21).
+        guard !needsStrength else { return false }
         guard !strengthNeedsUnit(strength) else { return false }
         // 재고 기준점이 없으면 남은 개수 계산이 0 에서 시작해 그 앞의 복용까지
         // 빼 버린다(QA 2026-09-21). 새로 등록할 때는 반드시 받는다.
@@ -600,6 +619,13 @@ struct MedicationFormView: View {
         } else {
             weekdays.insert(day)
         }
+    }
+
+    /// 용량 칸이 비어 있는지. **고치기에서도 본다** - 예전에 빈 채로 등록한
+    /// 약이 그대로 남아 있으면 "앱 안의 모든 약에 용량과 단위" 가 성립하지
+    /// 않는다. 고치러 들어온 김에 채운다.
+    private var needsStrength: Bool {
+        strength.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// 재고 칸을 아직 못 받은 상태인지. 고치기 화면에는 이 칸이 없다
