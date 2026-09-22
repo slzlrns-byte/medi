@@ -22,8 +22,10 @@ final class TokensTests: XCTestCase {
             }
         }
         XCTAssertEqual(JanjanColor.allCases.count, 24)
-        // 무료 3 + Pro 2 (밤 라일락·깊은 바다, 2026-09-19).
-        XCTAssertEqual(JanjanTheme.allCases.count, 5)
+        // 무료 5(밝은 톤 둘은 2026-09-22) + Pro 2 (밤 라일락·깊은 바다, 2026-09-19).
+        XCTAssertEqual(JanjanTheme.allCases.count, 7)
+        XCTAssertFalse(JanjanTheme.blossom.isProOnly)
+        XCTAssertFalse(JanjanTheme.lemon.isProOnly)
         XCTAssertEqual(JanjanTheme.proOnly, [.dawn, .sea])
     }
 
@@ -116,6 +118,8 @@ final class TokensTests: XCTestCase {
         XCTAssertEqual(JanjanColor.butter.lightHex(.sunset), "#FFE8CD")
         XCTAssertEqual(JanjanColor.mood7.lightHex(.sky), "#4E97D1")
         XCTAssertEqual(JanjanColor.mood1.lightHex(.sky), "#A183C2")
+        XCTAssertEqual(JanjanColor.mood7.lightHex(.blossom), "#EE95BA")
+        XCTAssertEqual(JanjanColor.mood7.lightHex(.lemon), "#F2C633")
 
         // 테마를 모르는 곳의 기본은 풋사과 크림이고, 기본 인자가 그 값을 쓴다.
         XCTAssertEqual(JanjanTheme.standard, .sprout)

@@ -257,6 +257,11 @@ struct SettingsView: View {
                     Text(themeRowLabel(theme)).tag(theme.rawValue)
                 }
             }
+            // 고른 테마의 기분 색 일곱 개. 이름만으로는 색을 알 수 없다
+            // (사용자 지적 2026-09-22).
+            LabeledContent(t("기분 색", "Mood colors")) {
+                ThemeSwatch(theme: JanjanTheme(rawValue: themeRaw) ?? .standard)
+            }
             .onChange(of: themeRaw) { old, new in
                 guard old != new else { return }
                 // Pro 테마를 무료로 고르면 되돌리고 페이월을 연다 - 반쯤 적용된

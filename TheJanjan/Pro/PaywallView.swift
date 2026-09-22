@@ -133,12 +133,32 @@ struct PaywallView: View {
                                     .janjanBody(16, weight: .medium)
                                     .foregroundStyle(Color.ink)
                             }
+                            // "Pro 테마" 는 이름만으로는 무엇을 사는지 알 수 없다
+                            // (사용자 지적 2026-09-22). 그 줄 아래 색 견본을 단다.
+                            if feature == .proThemes {
+                                proThemeSamples
+                            }
                         }
                     }
                 }
             }
             .padding(.vertical, CGFloat(JanjanSpacing.s))
         }
+    }
+
+    /// Pro 테마 각각의 기분 색 일곱 개와 이름.
+    private var proThemeSamples: some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            ForEach(JanjanTheme.allCases.filter(\.isProOnly), id: \.rawValue) { theme in
+                HStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    ThemeSwatch(theme: theme, diameter: 12)
+                    Text(theme.label(JanjanLanguage.current))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.ink2)
+                }
+            }
+        }
+        .padding(.leading, 22 + CGFloat(JanjanSpacing.s))
     }
 
     // MARK: - 아래쪽
