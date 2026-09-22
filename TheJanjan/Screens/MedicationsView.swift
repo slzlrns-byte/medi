@@ -423,20 +423,35 @@ struct MedicationsView: View {
         }
     }
 
+    private func nameLine(_ medication: Medication) -> some View {
+        medicationNameText(medication)
+            .janjanBody(16, weight: .medium)
+            .foregroundStyle(Color.ink)
+    }
+
+    @ViewBuilder
+    private func strengthChip(_ medication: Medication) -> some View {
+        if !medication.strengthText.isEmpty {
+            PillChip(text: medication.strengthText)
+        }
+    }
+
     private func medicationRow(_ row: Row) -> some View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.s)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
-                        medicationNameText(row.medication)
-                            .janjanBody(16, weight: .medium)
-                            .foregroundStyle(Color.ink)
-                            // SE 에서 "에스시탈…" 로 잘려 첫 세 글자로 약을 알아야
-                            // 했다(QA 2026-09-22). 두 줄까지 두고, 칩은 첫 줄의
-                            // 글자선에 맞춘다.
-                            .lineLimit(2)
-                        if !row.medication.strengthText.isEmpty {
-                            PillChip(text: row.medication.strengthText)
+                    // SE 에서 "에스시탈…" 로 잘려 첫 세 글자로 약을 알아야 했고,
+                    // 두 줄을 허용하니 "라모트리 / 진" 으로 어절 중간에서 꺾였다
+                    // (런 47). 이름과 칩이 한 줄에 들면 그대로, 안 들면 칩이 이름
+                    // 아래로 내려간다 - 이름은 카드 폭을 통째로 쓴다.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
+                            nameLine(row.medication).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                            strengthChip(row.medication)
+                        }
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                            nameLine(row.medication).lineLimit(2)
+                            strengthChip(row.medication)
                         }
                     }
                     if !row.medication.purposeLine.isEmpty {
