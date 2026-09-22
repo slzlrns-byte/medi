@@ -264,6 +264,7 @@ struct DiaryView: View {
         ) {
             withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
         }
+        .accessibilityValue(Text(isExpanded ? t("펼쳐짐", "Expanded") : t("접힘", "Collapsed")))
     }
 
     // MARK: - 2층
@@ -548,7 +549,7 @@ struct DiaryView: View {
         }
     }
 
-    /// 지난 2주. 숫자도 그래프도 없이 점과 글자만 — 되돌아보기지 평가가 아니다.
+    /// 최근 14건. 숫자도 그래프도 없이 점과 글자만 — 되돌아보기지 평가가 아니다.
     private var historyCard: some View {
         let past = checkInRecords
             .filter { !calendar.isDate($0.date, inSameDayAs: viewedDay) }

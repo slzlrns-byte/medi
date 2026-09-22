@@ -149,10 +149,12 @@ struct TodayView: View {
     private var unrecordedSlotsMessage: String {
         let count = unrecordedLines.count
         let noun = count == 1 ? "slot" : "slots"
-        return t(
+        // 좁은 기기에서 "…시간대가 2" / "개 있어요." 로 숫자와 단위가 갈라졌다
+        // (QA 2026-09-22). 어절 안에서는 꺾이지 않게 한다.
+        return JanjanText.wordWrapped(t(
             "기록 없이 지나간 시간대가 \(count)개 있어요.",
             "\(count) time \(noun) went by without a record."
-        )
+        ))
     }
 
     var body: some View {
@@ -405,9 +407,11 @@ struct TodayView: View {
                         .janjanBody(13)
                         .foregroundStyle(Color.muted)
                 }
+                // 꺾쇠는 이 줄이 펼쳐진다는 유일한 눈 단서다. 선 색(line2)은
+                // 배경과 1.3:1 이라 햇빛 아래서 사라졌다(QA 2026-09-22).
                 Image(systemName: "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.janjan(.line2))
+                    .foregroundStyle(Color.janjan(.outline))
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -419,6 +423,7 @@ struct TodayView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text(t("눌러서 펼칩니다", "Tap to expand")))
+        .accessibilityValue(Text(t("접힘", "Collapsed")))
     }
 
     private func flip(_ slotKey: String) {
@@ -826,9 +831,12 @@ struct TodayView: View {
                 Text(t("오늘 기분", "Mood today"))
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
+                // 고르기 전에 "기록해 보세요", 고른 뒤에 "나머지는 나중에".
+                // 거꾸로 붙어 있어 이미 기록한 사람에게 기록하라고 했다
+                // (QA 2026-09-22).
                 Text(todaysMoodScore == nil
-                     ? t("하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요.", "Choosing just one is fine. You can add the rest later.")
-                     : t("오늘 기분을 기록해 보세요.", "Log how today felt."))
+                     ? t("오늘 기분을 기록해 보세요.", "Log how today felt.")
+                     : t("하나만 골라도 괜찮아요. 나머지는 나중에 덧붙일 수 있어요.", "Choosing just one is fine. You can add the rest later."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
@@ -1051,9 +1059,12 @@ private struct NextVisitSheet: View {
                             .janjanBody(15)
                             .tint(Color.ink)
 
+                            // 알림 시각은 여기서 고른 시·분이 아니라 설정의 "진료
+                            // 알림"(전날 저녁 7시·당일 아침 8시)이 정한다. "이 시각에"
+                            // 는 거짓이었다(QA 2026-09-22).
                             Text(t(
-                                "저장하면 진료 알림이 이 시각에 맞춰지고, 소진 예측도 이 날을 기준으로 계산돼요.",
-                                "Saving sets the visit reminder to this time and anchors running-low forecasts to this date."
+                                "저장하면 설정의 '진료 알림' 에 맞춰 알려 드리고, 소진 예측도 이 날을 기준으로 계산돼요.",
+                                "Saving schedules the visit reminder (per the Settings timing) and anchors running-low forecasts to this date."
                             ))
                                 .janjanBody(12)
                                 .foregroundStyle(Color.muted)
@@ -1211,7 +1222,7 @@ private struct SlotRecordSheet: View {
                     }
 
                     if line.entries.count > 1 {
-                        WhitePillButton(title: t("모두 복용함", "Take all"), systemImage: "checkmark") {
+                        WhitePillButton(title: t("전부 먹었어요", "Took them all"), systemImage: "checkmark") {
                             for entry in line.entries { onRecord(entry, .taken) }
                             dismiss()
                         }
@@ -1263,9 +1274,11 @@ private struct SlotRecordSheet: View {
 
                 // 흰 카드 위의 흰 알약은 보이지 않는다(QA 2026-09-19). 지나간
                 // 시간대에 답하는 줄과 같은 면·같은 폭을 쓴다.
+                // 버튼 말은 앱 어디서나 "먹었어요/건너뛰었어요" 다. 상태 칩의
+                // "복용함/건너뜀" 은 상태 이름이지 버튼 말이 아니다(QA 2026-09-22).
                 AnswerPillRow(answers: [
-                    .init(t("복용함", "Taken")) { onRecord(entry, .taken) },
-                    .init(t("건너뜀", "Skipped")) { onRecord(entry, .skipped) }
+                    .init(t("먹었어요", "Took it")) { onRecord(entry, .taken) },
+                    .init(t("건너뛰었어요", "Skipped it")) { onRecord(entry, .skipped) }
                 ])
             }
         }

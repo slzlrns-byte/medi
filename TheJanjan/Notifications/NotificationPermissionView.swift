@@ -37,7 +37,8 @@ struct NotificationPermissionView: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(t("나중에 설정에서 켜고 끌 수 있어요.", "You can turn this on or off in Settings later."))
+                // 앱 설정에는 끄는 토글이 없다 - 끄기는 iOS 설정에서 한다.
+                Text(t("나중에 iOS 설정에서 켜고 끌 수 있어요.", "You can turn this on or off in iOS Settings later."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .padding(.top, CGFloat(JanjanSpacing.xxs))

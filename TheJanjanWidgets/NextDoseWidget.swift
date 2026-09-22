@@ -20,8 +20,19 @@ struct DoseEntry: TimelineEntry {
     /// 등록한 약이 아예 없는 경우. '다 챙기셨어요' 와 구별해야 한다 —
     /// 아무것도 안 한 사람에게 다 했다고 말하면 안 된다.
     let hasAnyMedication: Bool
+    /// 오늘 예정된 시간대가 하나라도 있는지. 약은 있는데 오늘 요일이
+    /// 아니거나 필요시 약뿐이면 "다 챙기셨어요" 가 아니라 "예정 없음" 이다
+    /// (QA 2026-09-22). 옛 자리 표시자는 참으로 둔다.
+    var hasPlanToday: Bool = true
 
-    var isDone: Bool { slotKey == nil && hasAnyMedication }
+    var isDone: Bool { slotKey == nil && hasAnyMedication && hasPlanToday }
+
+    /// 남은 것이 없을 때의 한 줄. 위젯 세 벌이 같은 말을 한다.
+    var restingText: String {
+        if !hasAnyMedication { return t("약을 등록하면 여기 나와요.", "Add a medication to see it here.") }
+        if !hasPlanToday { return t("오늘은 예정된 약이 없어요.", "No doses are planned for today.") }
+        return t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
+    }
 
     static let placeholder = DoseEntry(
         date: Date(),
@@ -79,7 +90,8 @@ struct NextDoseProvider: TimelineProvider {
         let context = ModelContext(container)
 
         let medicationCount = (try? context.fetchCount(FetchDescriptor<MedicationRecord>())) ?? 0
-        guard let line = TodayPlanReader.nextPending(on: now, in: context) else {
+        let slots = TodayPlanReader.slots(on: now, in: context)
+        guard let line = slots.first(where: { !$0.isCompleted }) else {
             return DoseEntry(
                 date: now,
                 slotKey: nil,
@@ -87,7 +99,8 @@ struct NextDoseProvider: TimelineProvider {
                 timeText: "",
                 medicationNames: [],
                 pendingCount: 0,
-                hasAnyMedication: medicationCount > 0
+                hasAnyMedication: medicationCount > 0,
+                hasPlanToday: !slots.isEmpty
             )
         }
 
@@ -185,9 +198,7 @@ struct NextDoseWidgetView: View {
     /// 남은 것이 없을 때. 재촉하지 않고, 하지도 않은 일을 했다고 하지도 않는다.
     private var restingBody: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(entry.hasAnyMedication
-                 ? t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
-                 : t("약을 등록하면 여기 나와요.", "Add a medication to see it here."))
+            Text(entry.restingText)
                 .font(.system(size: 15))
                 .foregroundStyle(.primary)
                 .lineLimit(3)
@@ -245,7 +256,8 @@ struct NextDoseWidget: Widget {
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName(t("다음 약", "Next dose"))
-        .description(t("다음 시간대를 보여 주고, 눌러서 바로 기록해요.", "Shows your next time slot — tap to log it right away."))
+        // 무료는 앱이 열리고 Pro 만 위젯에서 바로 기록된다 - "바로" 는 뺀다.
+        .description(t("다음 시간대를 보여 주고, 눌러서 기록해요.", "Shows your next time slot — tap to log it."))
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -300,9 +312,7 @@ struct NextDoseLockScreenView: View {
                         .font(.caption)
                         .lineLimit(1)
                 } else {
-                    Text(entry.hasAnyMedication
-                         ? t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
-                         : t("약을 등록해 주세요.", "Add a medication to get started."))
+                    Text(entry.restingText)
                         .font(.caption)
                         .lineLimit(2)
                 }

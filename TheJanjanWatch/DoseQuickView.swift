@@ -87,7 +87,7 @@ struct DoseQuickView: View {
     }
 
     private var skippedTitle: String {
-        coversManyMedications ? t("전부 건너뜀", "Skip all") : t("건너뜀", "Skipped")
+        coversManyMedications ? t("전부 건너뛰었어요", "Skipped them all") : t("건너뛰었어요", "Skipped it")
     }
 
     private var titleText: String {

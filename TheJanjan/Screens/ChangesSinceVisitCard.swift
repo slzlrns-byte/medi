@@ -111,7 +111,7 @@ struct ChangesSinceVisitCard: View {
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.janjan(.line2))
+                    .foregroundStyle(Color.janjan(.outline))
             }
             .contentShape(Rectangle())
         }

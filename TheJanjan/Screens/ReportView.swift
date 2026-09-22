@@ -39,6 +39,8 @@ struct ReportView: View {
     /// 광고를 도중에 닫았을 때 조용히 아무 일도 안 일어나면 고장으로 보인다.
     @State private var didSkipAd = false
     @State private var isShowingVisitHistory = false
+    /// 복약률 빈 자리의 "진료 기록하기" 가 여는 폼.
+    @State private var isShowingPrescriptionForm = false
     /// 질문 칸의 키보드를 "완료" 로 내리기 위한 초점(사용자 요청 2026-09-19).
     @FocusState private var isEditingQuestions: Bool
 
@@ -88,6 +90,9 @@ struct ReportView: View {
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(TapGesture().onEnded { isEditingQuestions = false })
             .navigationTitle(t("진료 준비", "Visit prep"))
+            .sheet(isPresented: $isShowingPrescriptionForm) {
+                PrescriptionFormView { isShowingPrescriptionForm = false }
+            }
             .sheet(isPresented: $isShowingVisitHistory) {
                 VisitHistoryView()
             }
@@ -281,14 +286,24 @@ struct ReportView: View {
                         .janjanBody(15)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                    // "적어 두면" 이라고 말하면서 적을 문이 이 탭에 없었다 - 약 탭에만
+                    // 있었다(QA 2026-09-22). 여기서 바로 연다.
+                    WhitePillButton(title: t("진료 기록하기", "Log a visit"), systemImage: "plus") {
+                        isShowingPrescriptionForm = true
+                    }
+                    .padding(.top, CGFloat(JanjanSpacing.xxs))
                 }
 
-                Text(t("약마다 복약률을 내서 평균을 냈어요. 기록하지 않은 복용은 복용한 것으로 세지 않고, 나중에 채워 넣으면 그때 반영돼요.",
-                       "Each medication's rate is averaged. A dose you didn't record isn't counted as taken; fill it in later and it counts then."))
-                    .janjanBody(12)
-                    .foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, CGFloat(JanjanSpacing.xxs))
+                // 계산 설명은 계산이 있을 때만. 복약률이 없는 화면에서 "평균을
+                // 냈어요" 는 없는 것을 말한다(QA 2026-09-22).
+                if adherence != nil {
+                    Text(t("약마다 복약률을 내서 평균을 냈어요. 기록하지 않은 복용은 복용한 것으로 세지 않고, 나중에 채워 넣으면 그때 반영돼요.",
+                           "Each medication's rate is averaged. A dose you didn't record isn't counted as taken; fill it in later and it counts then."))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, CGFloat(JanjanSpacing.xxs))
+                }
             }
         }
     }
@@ -347,7 +362,7 @@ struct ReportView: View {
             // 않는다 - 약 탭은 0 으로 깎는데 여기만 "-16정" 을 보여 주면
             // 같은 앱이 두 말을 한다(QA 2026-09-21).
             Text(!counted
-                 ? t("재고 미기록", "Stock not tracked")
+                 ? t("남은 개수 미기록", "No count yet")
                  : (remaining < 0
                     ? t("확인 필요", "Needs recount")
                     : t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining))))

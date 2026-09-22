@@ -36,11 +36,13 @@ struct LogNearestDoseIntent: AppIntent {
             return .result(dialog: "\(text)")
         }
 
-        guard let line = TodayPlanReader.nearestPending(at: now, in: context) else {
-            let text = t(
-                "오늘 약은 이미 다 챙기셨어요.",
-                "You have already taken care of today's meds."
-            )
+        let slots = TodayPlanReader.slots(on: now, in: context)
+        guard let line = DayPlan.nearestPending(in: slots, at: now) else {
+            // 오늘 요일이 아니거나 필요시 약뿐이면 "다 챙기셨어요" 가 아니다
+            // (QA 2026-09-22).
+            let text = slots.isEmpty
+                ? t("오늘은 예정된 약이 없어요.", "No doses are planned for today.")
+                : t("오늘 약은 이미 다 챙기셨어요.", "You have already taken care of today's meds.")
             return .result(dialog: "\(text)")
         }
 

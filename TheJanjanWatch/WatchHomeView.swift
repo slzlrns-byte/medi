@@ -12,6 +12,8 @@ struct WatchHomeView: View {
     @State private var isShowingMood = false
     /// 눌러서 기록할 시간대. nil 이면 시트가 닫혀 있다.
     @State private var openSlot: WatchSnapshot.SlotLine?
+    /// 누른 필요시 약. 한 번 묻고 기록한다.
+    @State private var confirmingAsNeeded: WatchSnapshot.AsNeededLine?
 
     #if DEBUG
     /// 화면 찍기용 시트를 두 번 열지 않기 위한 표시.
@@ -34,7 +36,11 @@ struct WatchHomeView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else if session.snapshot.slots.isEmpty {
-                    Text(t("아이폰에서 약을 등록하면 여기 나옵니다.", "Add a medication on your iPhone to see it here."))
+                    // 필요시 약만 있는 사람에게 "등록하면 나온다" 고 하면 등록이
+                    // 안 된 줄 안다(QA 2026-09-22). 약이 있는 것이 보이면 갈라 말한다.
+                    Text(session.snapshot.asNeeded.isEmpty
+                         ? t("아이폰에서 약을 등록하면 여기 나옵니다.", "Add a medication on your iPhone to see it here.")
+                         : t("오늘은 예정된 약이 없어요.", "No doses are planned for today."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
@@ -116,6 +122,18 @@ struct WatchHomeView: View {
                 DoseQuickView(slot: slot)
                     .environmentObject(session)
             }
+            .confirmationDialog(
+                confirmingAsNeeded.map(asNeededConfirmTitle) ?? "",
+                isPresented: Binding(
+                    get: { confirmingAsNeeded != nil },
+                    set: { if !$0 { confirmingAsNeeded = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: confirmingAsNeeded
+            ) { line in
+                Button(t("먹었어요", "Took it")) { recordAsNeeded(line) }
+                Button(t("아니요", "No"), role: .cancel) {}
+            }
         }
     }
 
@@ -175,16 +193,30 @@ struct WatchHomeView: View {
         .padding(.vertical, 2)
     }
 
-    /// 필요시 약은 시간대가 없어 항상 눌린다 - 개수를 고르지 않고 바로 기록한다.
+    /// 필요시 약은 시간대가 없어 항상 눌린다 - 개수를 고르지 않고 기록한다.
     /// (작은 화면에서 결정을 받지 않는다는 원칙, 설계 10절.)
+    ///
+    /// 다만 **한 번은 묻는다.** 시간대 줄과 똑같이 생긴 줄이 스치는 순간
+    /// 비상약 한 알이 기록되고 재고가 줄었는데, 되돌리기는 아이폰에만
+    /// 있었다(QA 2026-09-22). 시간대 줄이 시트를 여는 것과 같은 무게다.
     private func asNeededRow(_ line: WatchSnapshot.AsNeededLine) -> some View {
         Button {
-            // 화면을 안 보고 누르는 경우가 많아 손목 진동으로 확인해 준다.
-            WKInterfaceDevice.current().play(.success)
-            session.recordAsNeeded(line)
+            confirmingAsNeeded = line
         } label: {
             asNeededRowBody(line)
         }
+    }
+
+    private func recordAsNeeded(_ line: WatchSnapshot.AsNeededLine) {
+        // 화면을 안 보고 누르는 경우가 많아 손목 진동으로 확인해 준다.
+        WKInterfaceDevice.current().play(.success)
+        session.recordAsNeeded(line)
+    }
+
+    private func asNeededConfirmTitle(_ line: WatchSnapshot.AsNeededLine) -> String {
+        let displayText = DecimalQuantity.display(line.quantity)
+        let englishText = displayText == "1" ? "1 pill" : "\(displayText) pills"
+        return t("\(line.title) \(displayText)정을 지금 먹었어요?", "Take \(englishText) of \(line.title) now?")
     }
 
     private func asNeededRowBody(_ line: WatchSnapshot.AsNeededLine) -> some View {

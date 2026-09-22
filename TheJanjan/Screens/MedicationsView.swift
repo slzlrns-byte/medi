@@ -145,7 +145,7 @@ struct MedicationsView: View {
                 // 목록에서 가려 둔 이름이 확인 창에서 새면 안 된다 - 가린 동안은 부르지 않는다.
                 if masksNames {
                     Text(t(
-                        "복용 기록·재고·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
+                        "복용 기록·남은 개수·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
                         "This removes its dose and stock records together. This can't be undone."
                     ))
                 } else {
@@ -247,8 +247,12 @@ struct MedicationsView: View {
     /// 바로 그 계산인데 이 카드만 그대로 읽어 주고 있었다(QA 2026-09-21).
     private var shortageCount: Int? {
         guard pro.isPro, nextVisit != nil else { return nil }
+        // 재고를 한 번도 안 센 약은 `remaining` 이 0 이라 "진료까지 남은 날
+        // 전부가 모자람" 이 된다. 아래 줄은 그런 약에 "남은 개수 미기록" 만
+        // 적으므로, 카드가 "1개 있어요" 라 해도 찾을 수 없었다(QA 2026-09-22).
+        // 오늘 탭·종이와 같이 재고 있는 약만 센다.
         let count = rows.filter {
-            $0.medication.status == .active && ($0.snapshot.shortfallDays ?? 0) > 0
+            $0.medication.status == .active && $0.hasStock && ($0.snapshot.shortfallDays ?? 0) > 0
         }.count
         return count
     }
@@ -256,8 +260,13 @@ struct MedicationsView: View {
     /// 모자라는 약 줄이 비었을 때 그 자리에 서는 말.
     private var shortageNoticeText: String {
         if nextVisit == nil {
-            return t("진료일과 받아 온 개수를 적어 두면 남은 날짜를 셀 수 있어요.",
-                     "Add a visit date and how many pills you picked up to count the days left.")
+            // 무료 사용자에게 "적어 두면 셀 수 있어요" 는 거짓 약속이다 - 적어도
+            // 계산은 Pro 다(QA 2026-09-22).
+            return pro.isPro
+                ? t("진료일과 받아 온 개수를 적어 두면 남은 날짜를 셀 수 있어요.",
+                    "Add a visit date and how many pills you picked up to count the days left.")
+                : t("진료일과 받아 온 개수를 적어 두면 Pro 에서 남은 날짜를 셀 수 있어요.",
+                    "Add a visit date and how many pills you picked up, and Pro counts the days left.")
         }
         guard pro.isPro else {
             return t("다음 진료까지 버틸 수 있는지는 Pro 에서 계산해 드려요.",
@@ -369,7 +378,7 @@ struct MedicationsView: View {
                     .foregroundStyle(Color.ink)
                 // "이름과 시간만으로" 는 옛말이다 - 용량(단위까지)과 요일도 받는다.
                 // 폼에 들어가 막히고 나서야 알면 첫인상이 거짓말이 된다(QA 2026-09-22).
-                Text(t("이름·용량·먹는 때만 적으면 돼요.", "Just the name, the dose, and when you take it."))
+                Text(t("이름·용량·먹는 때·요일만 적으면 돼요.", "Just the name, the dose, when you take it, and which days."))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
 
@@ -418,13 +427,14 @@ struct MedicationsView: View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.s)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
                         medicationNameText(row.medication)
                             .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
-                            // 이름이 두 줄이 되면 옆 칩이 줄 사이에 뜬다.
-                            // 목록에서는 한 줄로 자르고, 전체 이름은 상세에서 본다.
-                            .lineLimit(1)
+                            // SE 에서 "에스시탈…" 로 잘려 첫 세 글자로 약을 알아야
+                            // 했다(QA 2026-09-22). 두 줄까지 두고, 칩은 첫 줄의
+                            // 글자선에 맞춘다.
+                            .lineLimit(2)
                         if !row.medication.strengthText.isEmpty {
                             PillChip(text: row.medication.strengthText)
                         }
@@ -471,7 +481,7 @@ struct MedicationsView: View {
                                 .monospacedDigit()
                         }
                     } else {
-                        Text(t("재고 미기록", "No count yet"))
+                        Text(t("남은 개수 미기록", "No count yet"))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
@@ -565,7 +575,7 @@ struct AddMedicationEntryView: View {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 entryRow(
                     title: t("직접 입력", "Enter manually"),
-                    subtitle: t("이름 · 용량 · 시간을 하나씩 적어요.", "Enter the name, dose, and time one by one."),
+                    subtitle: t("이름 · 용량 · 먹는 때 · 요일을 하나씩 적어요.", "Enter the name, dose, time and days one by one."),
                     systemImage: "square.and.pencil"
                 ) {
                     isShowingForm = true

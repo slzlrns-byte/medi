@@ -140,15 +140,16 @@ final class NotificationManager: NSObject {
         }
 
         center.setNotificationCategories([
+            // 버튼 말은 앱·워치와 같은 "먹었어요/건너뛰었어요" 다(QA 2026-09-22).
             category(
                 DoseNotification.categoryID,
-                taken: t("복용함", "Taken"),
-                skipped: t("건너뜀", "Skip")
+                taken: t("먹었어요", "Took it"),
+                skipped: t("건너뛰었어요", "Skipped it")
             ),
             category(
                 DoseNotification.categoryAllID,
-                taken: t("전부 복용함", "All taken"),
-                skipped: t("전부 건너뜀", "Skip all")
+                taken: t("전부 먹었어요", "Took them all"),
+                skipped: t("전부 건너뛰었어요", "Skipped them all")
             )
         ])
     }

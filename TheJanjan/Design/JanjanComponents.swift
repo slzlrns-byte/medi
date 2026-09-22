@@ -88,10 +88,23 @@ struct MoodPickerRow: View {
     let pick: (Int) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(JanjanMood.scores, id: \.self) { score in
-                dot(score)
+        VStack(spacing: CGFloat(JanjanSpacing.xxs)) {
+            HStack(spacing: 0) {
+                ForEach(JanjanMood.scores, id: \.self) { score in
+                    dot(score)
+                }
             }
+            // 색 일곱 개만으로는 어느 쪽이 "좋음" 인지 알 수 없다 - 워치는
+            // "−3 매우 힘듦 → +3 좋음" 을 적는데 폰만 없었다(QA 2026-09-22).
+            // 양 끝에만 적는다. 원마다 라벨은 VoiceOver 가 읽는다.
+            HStack {
+                Text(CheckIn.Mood(JanjanMood.scores.first ?? -3).label(JanjanLanguage.current))
+                Spacer(minLength: 0)
+                Text(CheckIn.Mood(JanjanMood.scores.last ?? 3).label(JanjanLanguage.current))
+            }
+            .janjanBody(11)
+            .foregroundStyle(Color.muted)
+            .accessibilityHidden(true)
         }
     }
 
@@ -202,9 +215,10 @@ struct AnswerPillRow: View {
                         .janjanBody(13, weight: .medium)
                         .multilineTextAlignment(.center)
                         // 두 줄까지 접히고, 그래도 넘치면 조금 줄어든다.
-                        // 큰 글자 설정에서도 한 줄을 지키는 마지막 보루다.
+                        // 13pt × 0.75 는 9.75pt 라 읽을 수 없는 크기였다
+                        // (QA 2026-09-22). 11pt 아래로는 안 내려간다.
                         .lineLimit(2)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.85)
                         .foregroundStyle(Color.ink)
                         .padding(.horizontal, CGFloat(JanjanSpacing.xs))
                         .padding(.vertical, CGFloat(JanjanSpacing.xs))
@@ -447,7 +461,8 @@ struct StrengthUnitRow: View {
     }
 }
 
-/// 용량 표기에 단위가 빠졌는지. 빈 칸은 괜찮다 — 용량은 선택이다.
+/// 용량 표기에 단위가 빠졌는지. 빈 칸은 여기서는 통과다 — 비어 있는지는
+/// 부르는 쪽이 따로 본다(등록·고치기는 용량을 반드시 받는다).
 ///
 /// 소수점·쉼표·가운뎃점·빗금까지는 숫자의 일부로 본다("0.5", "1/2").
 ///

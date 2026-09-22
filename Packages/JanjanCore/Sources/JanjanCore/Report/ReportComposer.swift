@@ -56,7 +56,8 @@ public struct ReportContent: Hashable, Sendable {
 /// 해석은 진료실에서 사람이 한다(설계 01절 원칙).
 public enum ReportComposer {
 
-    /// 진료 앵커가 없을 때 보는 기간. 복약률과 같은 4주를 쓴다.
+    /// 진료 앵커가 없을 때 보는 기간. 복약률은 진료에서 받은 알 수로 세므로
+    /// 이 창과는 무관하다 - 기분·수면·복용 횟수만 이 창으로 본다.
     public static let windowDays = 28
     /// 지난 진료가 이보다 오래됐으면 4주로 되돌린다 —
     /// 반년치를 한 장에 접으면 요약이 아니라 목록이 된다.
@@ -140,10 +141,20 @@ public enum ReportComposer {
         // 기기 간 동기화로 같은 날 체크인이 두 줄이 됐어도 하루로 센다.
         let checkIns = CheckIn.collapsedByDay(checkIns, calendar: calendar)
 
+        // 오늘 진료를 적고 바로 뽑은 종이. 화면은 "내일부터 나와요" 로 가르는데
+        // 종이만 "적어 두면 나와요" 라고 하면 방금 적은 사람에게 저장이 안 된
+        // 것으로 읽힌다(QA 2026-09-22).
+        let loggedVisitToday = adherence == nil && prescriptions.contains { visit in
+            !visit.isScheduleOnly
+                && calendar.isDate(visit.visitDate, inSameDayAs: endDay)
+                && stockEvents.contains { $0.prescriptionID == visit.id }
+        }
+
         var lines: [ReportContent.Line] = []
         lines.append(contentsOf: adherenceLines(
             doseEvents: doseEvents,
             adherence: adherence,
+            loggedVisitToday: loggedVisitToday,
             from: start,
             to: endMoment,
             language: language,
@@ -237,6 +248,7 @@ public enum ReportComposer {
     private static func adherenceLines(
         doseEvents: [DoseEvent],
         adherence: InventoryCalculator.PrescriptionAdherence?,
+        loggedVisitToday: Bool = false,
         from start: Date,
         to end: Date,
         language: JanjanLanguage,
@@ -246,10 +258,9 @@ public enum ReportComposer {
         let en = language == .english
         var lines: [ReportContent.Line] = [.init(style: .heading, text: en ? "Medication" : "복약")]
 
-        // 바로 위 줄의 복약률은 하루·시간대로 묶은 값인데 이 세 숫자만 원본을
-        // 세고 있었다. 기기 둘이 같은 칸에 기록한 날이 있으면 같은 칸에
-        // "복약률 100%" 와 "복용 2회 · 건너뜀 1회"(=66%)가 나란히 찍혔다
-        // (QA 2026-09-21). 같은 집합에서 센다.
+        // 복약률은 기기 둘이 같은 칸에 기록한 날을 하루로 접는데 이 세 숫자만
+        // 원본을 세고 있었다. 그런 날이 있으면 "복약률 100%" 와 "복용 2회 ·
+        // 건너뜀 1회"(=66%)가 나란히 찍혔다(QA 2026-09-21). 같은 집합에서 센다.
         // **복약률과 같은 창, 같은 축으로 센다**(QA 2026-09-22). 예전에는 이
         // 세 숫자만 기간 전체를 `effectiveDate` 로 세어, 바로 위 캡션의
         // "복용 기록 37정" 옆에 "복용 39회" 가 섰다 - 오늘 아침 두 알이 한쪽에만
@@ -292,6 +303,13 @@ public enum ReportComposer {
                 text: en
                     ? "\(day) visit · \(adherence.items.count) medication\(adherence.items.count == 1 ? "" : "s") · \(DecimalQuantity.display(adherence.taken)) of \(DecimalQuantity.display(adherence.expected)) due so far recorded as taken (average of each medication's rate)"
                     : "\(day) 진료 · 약 \(adherence.items.count)종 · 지금까지 \(DecimalQuantity.display(adherence.expected))정 예정 중 복용 기록 \(DecimalQuantity.display(adherence.taken))정 (약별 복약률의 평균)"
+            ))
+        } else if loggedVisitToday {
+            lines.append(.init(
+                style: .caption,
+                text: en
+                    ? "Today's visit is logged. Adherence starts tomorrow."
+                    : "오늘 진료를 적었어요. 복약률은 내일부터 나와요."
             ))
         } else {
             lines.append(.init(

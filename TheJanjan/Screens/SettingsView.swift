@@ -160,13 +160,18 @@ struct SettingsView: View {
                     }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.janjan(.line2))
+                        .foregroundStyle(Color.janjan(.outline))
                 }
                 .contentShape(Rectangle())
             }
 
-            Button(t("구매 복원", "Restore purchase")) {
+            // 아래 두 줄과 알림의 "알림 켜기" 는 검정 글자만 있어 바로 위
+            // "상태 / Pro 사용 중" 같은 정보 줄과 구별이 안 됐다(QA 2026-09-22).
+            // Pro 줄과 같은 문법으로 오른쪽 끝에 작은 표시를 둔다.
+            Button {
                 Task { await pro.restore() }
+            } label: {
+                actionRow(t("구매 복원", "Restore purchase"), systemImage: "arrow.clockwise")
             }
             // 복원이 도는 동안은 눌리지 않는다는 것을 색으로도 보인다.
             .foregroundStyle(pro.isRestoring ? Color.muted : Color.ink)
@@ -176,8 +181,10 @@ struct SettingsView: View {
             // 애플 화면에서 빈 목록을 만난다(QA 2026-09-19).
             if pro.isPro, !pro.hasLifetime,
                let url = URL(string: ProProduct.manageSubscriptionsURLString) {
-                Link(t("구독 관리", "Manage subscription"), destination: url)
-                    .foregroundStyle(Color.ink)
+                Link(destination: url) {
+                    actionRow(t("구독 관리", "Manage subscription"), systemImage: "arrow.up.right")
+                }
+                .foregroundStyle(Color.ink)
             }
         } header: {
             Text("Pro")
@@ -198,6 +205,19 @@ struct SettingsView: View {
             return t("연 \(yearly.displayPrice)부터", "from \(yearly.displayPrice) / yr")
         }
         return nil
+    }
+
+    /// 설정 안에서 **누르면 무언가 하는** 줄. 오른쪽 끝의 작은 아이콘이
+    /// 정보 줄과 갈라 준다. 글자색은 부르는 쪽이 정한다(복원 중이면 muted).
+    private func actionRow(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(title)
+            Spacer(minLength: CGFloat(JanjanSpacing.xs))
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.janjan(.outline))
+        }
+        .contentShape(Rectangle())
     }
 
     private var proFooterKo: String {
@@ -277,11 +297,19 @@ struct SettingsView: View {
             // 여기 없으면 사용자는 왜 안 오는지 영영 알 수 없다.
             switch notificationStatus {
             case .notDetermined:
-                Button(t("알림 켜기", "Turn on notifications")) { isAskingNotification = true }
-                    .foregroundStyle(Color.ink)
+                Button {
+                    isAskingNotification = true
+                } label: {
+                    actionRow(t("알림 켜기", "Turn on notifications"), systemImage: "chevron.right")
+                }
+                .foregroundStyle(Color.ink)
             case .denied:
-                Button(t("iOS 설정에서 알림 켜기", "Turn on notifications in iOS Settings")) { openSystemSettings() }
-                    .foregroundStyle(Color.ink)
+                Button {
+                    openSystemSettings()
+                } label: {
+                    actionRow(t("iOS 설정에서 알림 켜기", "Turn on notifications in iOS Settings"), systemImage: "arrow.up.right")
+                }
+                .foregroundStyle(Color.ink)
             default:
                 LabeledContent(t("복용 알림", "Dose reminders")) {
                     Text(t("켜져 있어요", "On"))
@@ -502,7 +530,7 @@ struct SettingsView: View {
 
     private var privacyFooterKo: String {
         let hideNamesCaption = t(
-            "켜면 화면의 약 이름이 가려지고, 가려진 자리를 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실려요 - 의사에게 보여 주는 종이라서요.",
+            "켜면 화면의 약 이름이 뿌옇게 가려져요. 약 상세 같은 곳에서 가린 이름을 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실려요 - 의사에게 보여 주는 종이라서요.",
             "When this is on, medication names on screen are hidden, and tapping a hidden name shows it only in that spot. Names still print in full on the visit PDF, since that page is meant to be shown to your doctor."
         )
         let storageCaption = t(
@@ -538,7 +566,11 @@ struct SettingsView: View {
         } header: {
             Text(t("위기 상담", "Crisis support"))
         } footer: {
-            Text(t("응급 상황은 112 · 119.", "For emergencies: 112 · 119."))
+            // 위기 상담 연락처는 기기 지역으로 거르면서 한국 번호만 박혀
+            // 있었다(QA 2026-09-22). 한국 기기에서만 적는다.
+            if Janjan.isKoreaRegion {
+                Text(t("응급 상황은 112 · 119.", "For emergencies: 112 · 119."))
+            }
         }
     }
 

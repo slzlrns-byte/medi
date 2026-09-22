@@ -221,8 +221,8 @@ struct PrescriptionFormView: View {
                         .foregroundStyle(Color.muted)
                     CountStepper(
                         text: t("\(daysSupplied)일치", "\(daysSupplied) days"),
-                        decreaseLabelKo: t("처방 일수 줄이기", "Decrease days supplied"),
-                        increaseLabelKo: t("처방 일수 늘리기", "Increase days supplied"),
+                        decreaseLabelKo: t("받은 일수 줄이기", "Decrease days supplied"),
+                        increaseLabelKo: t("받은 일수 늘리기", "Increase days supplied"),
                         onDecrease: { changeDays(by: -7) },
                         onIncrease: { changeDays(by: 7) }
                     )
@@ -233,7 +233,8 @@ struct PrescriptionFormView: View {
                     .tint(Color.ink)
 
                 if hasNextVisit {
-                    // 시간까지 받는다(사용자 결정 2026-09-16) - 진료 알림이 그 시각에 맞춰진다.
+                    // 시간까지 받는다(사용자 결정 2026-09-16). 알림 시각은 여기서 고른
+                    // 시·분이 아니라 `AppointmentReminder` 가 정한다(전날 19시·당일 8시).
                     DatePicker(
                         t("다음 진료", "Next visit"),
                         selection: $nextVisitDate,
@@ -347,11 +348,26 @@ struct PrescriptionFormView: View {
                             .foregroundStyle(Color.muted)
                         Spacer(minLength: 0)
                     }
-                    Text(t("한 알도 안 남았으면 0 그대로 두세요. 이 개수 위에 받아 온 약이 더해져요.",
-                           "Leave it at 0 if none were left. What you picked up is added on top of this."))
+                    // 칸은 앱이 계산한 남은 개수로 미리 채워진다. "0 그대로" 는
+                    // 빈 칸이던 때의 말이었다(QA 2026-09-22).
+                    Text(t("앱이 계산한 남은 개수를 채워 뒀어요. 실제와 다르면 고치고, 한 알도 없으면 0 으로 해 주세요. 이 개수 위에 받아 온 약이 더해져요.",
+                           "This is the app's count. Correct it if it's off, and enter 0 if none were left. What you picked up is added on top of this."))
                         .janjanBody(11)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                    // 9/21 이전 빌드의 등록 폼은 "지금 남은 개수" 를 정정으로 남겼다.
+                    // 약국에서 받아 온 28정을 그 칸에 적고 바로 진료를 적으면, 미리
+                    // 채운 값(28) 위에 받아 온 28 이 더해져 56 이 된다(QA 2026-09-22).
+                    // 진료일에 만든 등록 정정이 있으면 그 사실을 짚어 준다.
+                    if let counted = registrationStockOnVisitDay(for: medication) {
+                        Text(t(
+                            "등록할 때 적은 \(DecimalQuantity.display(counted))정에 이번에 받아 온 약이 들어 있으면 0 으로 고쳐 주세요.",
+                            "If the \(DecimalQuantity.display(counted)) you entered at registration already includes this refill, change it to 0."
+                        ))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.janjan(.peachInk))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 doseChangeSection(medication)
@@ -430,8 +446,8 @@ struct PrescriptionFormView: View {
                 }
 
                 Text(t(
-                    "저장하면 이 약의 용량이 바로 바뀌고, 용량 변경 이력에도 남아요.",
-                    "Saving changes this medication's dose right away and records it in the dose change history."
+                    "저장하면 이 약의 용량이 바뀌고 용량 변경 이력에 남아요. 더 나중 날짜의 변경이 이미 있으면 이력에만 남아요.",
+                    "Saving changes this medication's dose and records it in the dose change history. If a later change already exists, only the history is updated."
                 ))
                     .janjanBody(11)
                     .foregroundStyle(Color.muted)
@@ -635,6 +651,17 @@ struct PrescriptionFormView: View {
             ), 0)
             leftoverTexts[medication.id] = DecimalQuantity.display(leftovers[medication.id] ?? 0)
         }
+    }
+
+    /// 옛 빌드의 등록 폼이 진료일과 같은 날에 남긴 "지금 남은 개수" 정정의 값.
+    /// 지금 빌드는 이런 정정을 만들지 않는다 - 옛 사용자의 저장소에만 있다.
+    private func registrationStockOnVisitDay(for medication: Medication) -> Decimal? {
+        let calendar = Calendar.current
+        return stockRecords.first {
+            $0.medicationID == medication.id
+                && $0.note == MedicationStore.registrationCorrectionNote
+                && calendar.isDate($0.occurredAt, inSameDayAs: visitDate)
+        }?.amount
     }
 
     /// 받기 전 개수 칸의 글자. 숫자로 읽히면 그대로 `leftovers` 에 옮긴다.

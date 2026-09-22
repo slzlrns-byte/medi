@@ -23,6 +23,8 @@ struct VisitHistoryView: View {
 
     /// 가장 최근 진료 말고 나머지도 펴 둘지(사용자 요청 2026-09-21).
     @State private var isShowingOlder = false
+    /// 빈 화면의 "진료 기록하기" 가 여는 폼.
+    @State private var isShowingPrescriptionForm = false
     /// 지우기 직전의 진료 기록. 확인을 한 번 거친다.
     @State private var pendingDeletion: PrescriptionRecord?
 
@@ -99,6 +101,9 @@ struct VisitHistoryView: View {
                     "Both the pills this visit added and what you counted that day are removed. If the remaining count looks off, recount it on the medication screen. Any dose change applied then stays as it is."
                 ))
             }
+            .sheet(isPresented: $isShowingPrescriptionForm) {
+                PrescriptionFormView { isShowingPrescriptionForm = false }
+            }
             .navigationTitle(t("지난 진료 기록", "Visit history"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -123,7 +128,7 @@ struct VisitHistoryView: View {
                     .foregroundStyle(Color.ink2)
                 Image(systemName: isShowingOlder ? "chevron.up" : "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.janjan(.line2))
+                    .foregroundStyle(Color.janjan(.outline))
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.xs))
@@ -244,12 +249,18 @@ struct VisitHistoryView: View {
                     .janjanDisplay(20)
                     .foregroundStyle(Color.ink)
                 Text(t(
-                    "약 탭의 \"진료 기록하기\" 로 남긴 진료가 여기 회차별로 쌓여요.",
-                    "Visits you log with \"Log a visit\" on the Meds tab stack up here."
+                    "진료 기록하기 로 남긴 진료가 여기 회차별로 쌓여요.",
+                    "Visits you log with \"Log a visit\" stack up here."
                 ))
                     .janjanBody(13)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
+                // 이 화면은 진료 준비 탭에서도 열리는데 거기엔 적을 문이 없었다
+                // (QA 2026-09-22). 빈 화면이 스스로 문을 연다.
+                WhitePillButton(title: t("진료 기록하기", "Log a visit"), systemImage: "plus") {
+                    isShowingPrescriptionForm = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xs))
             }
         }
     }

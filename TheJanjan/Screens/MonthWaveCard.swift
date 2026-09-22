@@ -361,8 +361,18 @@ private struct DayRecordSheet: View {
         doseRecords.filter { calendar.isDate($0.scheduledAt, inSameDayAs: date) }
     }
 
+    /// 사람이 남긴 것이 하나라도 있는지. 앱이 스스로 채운 "답 없음" 은
+    /// 기록이 아니다 - 그것까지 세면 아무것도 안 남긴 날에 "복용 0" 칩이
+    /// 서고 "남긴 기록이 없어요" 는 안 뜬다(QA 2026-09-22).
+    private var hasRecordedDose: Bool {
+        doses.contains {
+            !($0.statusRaw == DoseEvent.Status.unrecorded.rawValue
+              && $0.sourceRaw == DoseEvent.Source.automatic.rawValue)
+        }
+    }
+
     private var hasAnything: Bool {
-        checkIn != nil || !symptoms.isEmpty || !doses.isEmpty
+        checkIn != nil || !symptoms.isEmpty || hasRecordedDose
     }
 
     var body: some View {
@@ -372,7 +382,7 @@ private struct DayRecordSheet: View {
                     if let checkIn {
                         moodCard(checkIn)
                     }
-                    if !doses.isEmpty {
+                    if hasRecordedDose {
                         doseCard
                     }
                     if !symptoms.isEmpty {

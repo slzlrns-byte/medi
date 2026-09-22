@@ -211,8 +211,8 @@ struct PatternCard: View {
 
     private var legend: some View {
         Text(t(
-            "복약 ● 다 기록 · ◐ 일부 · ○ 기록 없음 · 빈 칸은 계획이 없던 날",
-            "Doses: ● all logged · ◐ some · ○ none · blank means nothing was planned"
+            "복약 ● 다 먹음 · ◐ 일부 · ○ 먹은 기록 없음 · 빈 칸은 계획이 없던 날",
+            "Doses: ● all taken · ◐ some · ○ none taken · blank means nothing was planned"
         ))
             .janjanBody(11)
             .foregroundStyle(Color.muted)

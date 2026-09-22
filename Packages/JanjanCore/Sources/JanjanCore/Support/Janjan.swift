@@ -134,6 +134,11 @@ public enum Janjan {
     /// **검증한 번호만 싣는다.** 틀린 번호를 내미는 것은 아무 번호도 없는 것보다 나쁘다.
     /// 아직 한국만 확인했고, 다른 지역에서는 빈 목록을 돌려주고 화면이
     /// `safetyCardWithoutContactsKo` 로 떨어진다.
+    /// 기기 지역이 한국인지. 응급 번호(112·119)처럼 지역에 매인 글은 이것으로 거른다.
+    public static var isKoreaRegion: Bool {
+        Locale.current.region?.identifier.uppercased() == "KR"
+    }
+
     public static func crisisContacts(regionCode: String?) -> [CrisisContact] {
         switch regionCode?.uppercased() {
         case "KR": return crisisContactsKR

@@ -247,7 +247,7 @@ enum MedicationStore {
                 // 이 정정은 **받기 전** 개수다. 진료를 지울 때 보충만 걷고
                 // 이것을 남기면 기준점이 그대로 서서 재고가 음수로 내려간다.
                 prescriptionID: prescription.id,
-                note: "진료일에 세어 둔 개수"
+                note: visitCorrectionNote
             )
             context.insert(StockEventRecord.make(from: event))
         }
@@ -287,6 +287,24 @@ enum MedicationStore {
             predicate: #Predicate { $0.prescriptionID == prescriptionID }
         ), in: context)
 
+        // 9/16~9/21 빌드가 적은 "받기 전 개수" 정정은 `prescriptionID` 가 없다
+        // (그 필드를 붙이기 전이다). 위 조건으로는 안 걷혀 기준점만 남고
+        // 보충이 사라져 재고가 음수로 갔다(QA 2026-09-22). 같은 날의 이름
+        // 없는 진료 정정을 함께 걷는다.
+        let note = visitCorrectionNote
+        if let record = try? context.fetch(FetchDescriptor<PrescriptionRecord>(
+            predicate: #Predicate { $0.id == prescriptionID }
+        )).first {
+            let calendar = Calendar.current
+            let orphaned = (try? context.fetch(FetchDescriptor<StockEventRecord>(
+                predicate: #Predicate { $0.prescriptionID == nil }
+            ))) ?? []
+            for event in orphaned
+            where event.note == note && calendar.isDate(event.occurredAt, inSameDayAs: record.visitDate) {
+                context.delete(event)
+            }
+        }
+
         delete(FetchDescriptor<PrescriptionRecord>(
             predicate: #Predicate { $0.id == prescriptionID }
         ), in: context)
@@ -295,6 +313,13 @@ enum MedicationStore {
     }
 
     /// 복용 중 ↔ 중단. 기록은 그대로 두고 앞으로의 일정에서만 뺀다.
+    /// 진료 폼이 적는 "받기 전 개수" 정정의 메모. 옛 빌드의 정정을 알아보는
+    /// 열쇠이기도 하니 바꾸지 않는다.
+    static let visitCorrectionNote = "진료일에 세어 둔 개수"
+    /// 9/21 이전 빌드의 등록 폼이 적던 정정의 메모. 이제는 만들지 않지만
+    /// 옛 사용자의 저장소에 남아 있다.
+    static let registrationCorrectionNote = "등록할 때 세어 둔 개수"
+
     static func setStatus(_ status: Medication.Status, for medicationID: UUID, in context: ModelContext) {
         guard let record = medicationRecord(medicationID, in: context) else { return }
         record.statusRaw = status.rawValue

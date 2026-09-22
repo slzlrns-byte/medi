@@ -316,7 +316,7 @@ struct MedicationDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let refill = StockEvent.lastRefillQuantity(of: medication.id, in: stock) {
-                        Text(t("지난 처방에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill)) last time"))
+                        Text(t("지난 진료에서 받아 온 \(DecimalQuantity.display(refill))정", "Refilled \(pillsEn(refill)) last time"))
                             .janjanBody(13)
                             .foregroundStyle(Color.muted)
                             .monospacedDigit()
@@ -502,7 +502,7 @@ struct MedicationDetailView: View {
                                 .foregroundStyle(Color.ink2)
                             Image(systemName: isShowingOlderDoseChanges ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.janjan(.line2))
+                                .foregroundStyle(Color.janjan(.outline))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(minHeight: 44)
@@ -767,7 +767,7 @@ struct MedicationDetailView: View {
             Button(t("그대로 두기", "Keep it"), role: .cancel) {}
         } message: {
             Text(t(
-                "이 약의 복용 기록과 재고도 함께 사라져요. 되돌릴 수 없어요. 잠시 쉬는 거라면 '복용 중단' 을 쓰세요.",
+                "이 약의 복용 기록과 남은 개수도 함께 사라져요. 되돌릴 수 없어요. 잠시 쉬는 거라면 '복용 중단' 을 쓰세요.",
                 "Its dose records and stock go too. This can't be undone. If you're just pausing, use \"Stop taking\"."
             ))
         }
@@ -931,6 +931,9 @@ private struct MedicationNoteComposer: View {
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
+            // 여러 줄 입력이라 리턴이 줄바꿈이다. 키보드를 내릴 손잡이가 없어
+            // 아래 증상 칩을 고르려면 키보드 위로 굴려야 했다(QA 2026-09-22).
+            .keyboardDoneBar()
             .navigationTitle(kind.title(lang))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1078,7 +1081,12 @@ private struct DoseChangeSheet: View {
     }
 
     private var isSavable: Bool {
-        guard !toText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let to = toText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !to.isEmpty else { return false }
+        // "이전" 칸은 지금 표기로 미리 채워진다. 그대로 두고 저장하면 표기가
+        // 같은 줄이 남는데, 화면과 종이는 그런 줄을 거르므로 보이지도 지울
+        // 수도 없다(QA 2026-09-22). 바뀐 것이 있을 때만 저장한다.
+        guard to != fromText.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
         // 단위 없이 넘기면 이력에 "10 → 15" 가 남는다. 고르개가 바로 위에 있다.
         return !strengthNeedsUnit(toText) && !strengthNeedsUnit(fromText)
     }
@@ -1464,10 +1472,10 @@ private struct StockRecountSheet: View {
                 VStack(spacing: CGFloat(JanjanSpacing.s)) {
                     JanjanCard {
                         VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
-                            Text(t("기록상 잔여", "On record"))
+                            Text(t("기록상 남은 개수", "On record"))
                                 .janjanBody(12, weight: .medium)
                                 .foregroundStyle(Color.muted)
-                            // 바로 위 라벨이 이미 "기록상 잔여" 라고 말한다.
+                            // 바로 위 라벨이 이미 "기록상 남은 개수" 라고 말한다.
                             // 값에 다시 붙이면 영어가 "On record / On record:
                             // 17 pills" 로 두 번 읽힌다(영어 캡처 2026-09-20).
                             Text(t(
@@ -1504,8 +1512,8 @@ private struct StockRecountSheet: View {
                                     .janjanBody(15, weight: .medium)
                                     .foregroundStyle(Color.ink)
                                 Text(t(
-                                    "어느 날인지 기억나면 골라 주세요. 기억나지 않아도 괜찮아요 — 방금 센 개수가 새 기준이 됩니다.",
-                                    "Pick the day if you remember. If not, that's okay — the count you just made becomes the new baseline."
+                                    "어느 날인지 기억나면 골라 주세요. 기억나지 않아도 괜찮아요 — '저장' 을 누르면 방금 센 개수가 새 기준이 돼요.",
+                                    "Pick the day if you remember. If not, that's okay — tap Save and the count you just made becomes the new baseline."
                                 ))
                                     .janjanBody(12)
                                     .foregroundStyle(Color.muted)
@@ -1535,7 +1543,9 @@ private struct StockRecountSheet: View {
                         .foregroundStyle(Color.ink)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(t("이 개수로 맞추기", "Set to this count")) {
+                    // "이 개수로 맞추기" 는 SE 에서 제목을 왼쪽으로 밀어냈다
+                    // (QA 2026-09-22). 뜻은 본문 안내가 말한다.
+                    Button(t("저장", "Save")) {
                         save()
                     }
                     .foregroundStyle(countedQuantity != nil ? Color.ink : Color.muted)

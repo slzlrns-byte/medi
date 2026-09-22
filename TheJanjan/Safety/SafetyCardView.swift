@@ -33,9 +33,13 @@ struct SafetyCardView: View {
                         contactCard(contact)
                     }
 
-                    Text(t("응급 상황은 112 · 119.", "In an emergency, call 112 or 119."))
-                        .janjanBody(13)
-                        .foregroundStyle(Color.muted)
+                    // 연락처처럼 지역을 따른다 - 해외 기기에 한국 번호를 적으면
+                    // "지역의 응급 번호로" 라는 윗글과 어긋난다(QA 2026-09-22).
+                    if Janjan.isKoreaRegion {
+                        Text(t("응급 상황은 112 · 119.", "In an emergency, call 112 or 119."))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.muted)
+                    }
 
                     MedicalDisclaimer()
                         .padding(.top, CGFloat(JanjanSpacing.s))

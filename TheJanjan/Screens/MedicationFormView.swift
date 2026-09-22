@@ -4,8 +4,9 @@ import JanjanCore
 
 /// 약 등록 폼 (설계 03절). **고치기도 같은 화면이 맡는다**(2026-09-19).
 ///
-/// 필수는 이름 하나뿐이다. 나머지는 비워 둬도 저장되고 나중에 채울 수 있다 —
-/// 등록 화면에서 막히면 앱을 아예 쓰지 않게 되기 때문이다.
+/// 필수는 이름·용량(단위까지)·시간대·요일이다(사용자 결정 2026-09-22). 용도와
+/// 제형은 비워 둬도 저장되고 나중에 채울 수 있다. 재고는 여기서 받지 않는다 —
+/// 진료 기록에서 받는다.
 ///
 /// 시스템 `Form` 을 쓰지 않고 흰 카드로 짠다. 회색 그룹 목록은 이 앱의 시각 언어가 아니다.
 ///
@@ -47,6 +48,12 @@ struct MedicationFormView: View {
     @State private var isConfirmingWeekdayChange = false
     /// 고치러 들어올 때의 요일. 바뀌었는지 이 값과 견준다.
     private let originalWeekdays: Set<Weekday>
+    /// 열릴 때의 폼 전체 지문. `hasEdits` 가 "손댔는지" 를 이 값과 견준다.
+    @State private var originalFingerprint: String?
+    /// 적던 것을 버리고 나갈지 묻는 창.
+    @State private var isConfirmingDiscard = false
+    /// 봉투 스캔이 채워 온 값으로 열렸는지. 그 값도 잃으면 아까운 내용이다.
+    private let hasPrefill: Bool
 
 
     private var lang: JanjanLanguage { .current }
@@ -57,6 +64,7 @@ struct MedicationFormView: View {
         self.onSaved = onSaved
         self.editingID = nil
         self.originalWeekdays = []
+        self.hasPrefill = prefill != nil
         _name = State(initialValue: prefill?.name ?? "")
         _strength = State(initialValue: prefill?.strengthText ?? "")
     }
@@ -65,6 +73,7 @@ struct MedicationFormView: View {
     init(existing: Existing) {
         self.onSaved = {}
         self.editingID = existing.medication.id
+        self.hasPrefill = false
         _name = State(initialValue: existing.medication.name)
         _strength = State(initialValue: existing.medication.strengthText)
         _purpose = State(initialValue: existing.medication.purposeLine)
@@ -84,6 +93,23 @@ struct MedicationFormView: View {
     }
 
     private var isEditing: Bool { editingID != nil }
+
+    /// 화면에 적힌 것 전부를 한 줄로 - 열릴 때 값과 견줘 손댔는지 안다.
+    private var fingerprint: String {
+        let slotPart = drafts.map { draft in
+            "\(draft.preset?.storageKey ?? "custom")|\(draft.isOn)|\(draft.timeOfDay.hour):\(draft.timeOfDay.minute)|\(draft.dose)"
+        }.joined(separator: ",")
+        let dayPart = weekdays.sorted().map { "\($0.rawValue)" }.joined(separator: ",")
+        return [name, strength, purpose, "\(form)", "\(kind)", dayPart, slotPart].joined(separator: "\u{1F}")
+    }
+
+    /// 열릴 때와 다른 것이 하나라도 있는지. 봉투 스캔으로 채워 온 새 등록은
+    /// 열리자마자 참이다 - 읽어 온 것도 잃으면 아까운 내용이다.
+    private var hasEdits: Bool {
+        if hasPrefill { return true }
+        guard let originalFingerprint else { return false }
+        return fingerprint != originalFingerprint
+    }
 
     /// 시간대 한 줄의 초안. 켜진 것만 스케줄이 된다.
     ///
@@ -212,6 +238,36 @@ struct MedicationFormView: View {
         .fogBackground()
         .scrollContentBackground(.hidden)
         .keyboardDoneBar()
+        // 이름·용량·시간대·요일을 다 적고 손가락이 미끄러져 시트를 내리거나
+        // 뒤로 스와이프하면 묻지 않고 전부 사라졌다(QA 2026-09-22). 진료
+        // 기록 폼과 같은 규칙: 손댔으면 쓸어내리기를 막고, 뒤로 가기는 한 번
+        // 묻는다. 뒤로 버튼을 가리면 가장자리 스와이프도 함께 꺼진다.
+        .interactiveDismissDisabled(hasEdits)
+        .navigationBarBackButtonHidden(hasEdits)
+        .toolbar {
+            if hasEdits {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        isConfirmingDiscard = true
+                    } label: {
+                        Label(t("뒤로", "Back"), systemImage: "chevron.backward")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .foregroundStyle(Color.ink)
+                }
+            }
+        }
+        .confirmationDialog(
+            t("적던 내용을 버릴까요?", "Discard what you've entered?"),
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button(t("버리기", "Discard"), role: .destructive) { dismiss() }
+            Button(t("계속 적기", "Keep editing"), role: .cancel) {}
+        }
+        .onAppear {
+            if originalFingerprint == nil { originalFingerprint = fingerprint }
+        }
         .confirmationDialog(
             t("요일을 바꾸면 지난 날의 계획이 새 요일로 다시 그려집니다. 괜찮으시겠어요?",
               "Changing the days re-plans your past days with the new schedule. Is that okay?"),
@@ -275,8 +331,8 @@ struct MedicationFormView: View {
                 Text(needsStrength
                      ? t("용량은 단위까지 적어 주세요. 예: 10mg · 0.5정 · 한 포",
                          "Enter the dose with its unit. For example: 10mg, 0.5 tablet.")
-                     : t("목록·알림·진료실 종이에 이 표기가 그대로 나가요.",
-                         "This is what appears in the list, the reminders and the report."))
+                     : t("목록과 진료실 종이에 이 표기가 그대로 나가요.",
+                         "This is what appears in the list and the report."))
                     .janjanBody(12)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -318,7 +374,7 @@ struct MedicationFormView: View {
                 .tint(Color.ink)
 
                 if !form.isSplittable {
-                    Text(t("이 제형은 쪼개 먹지 않는 것으로 보고 개수를 1정 단위로만 셉니다.", "This form isn't split, so counts are tracked in whole pills only."))
+                    Text(t("이 제형은 쪼개 먹지 않는 것으로 보고 1회 개수를 1정 단위로 셉니다.", "This form isn't split, so the per-dose count goes in whole pills."))
                         .janjanBody(12)
                         .foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
