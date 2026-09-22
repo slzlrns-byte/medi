@@ -1,8 +1,21 @@
 import SwiftUI
 import JanjanCore
 
+/// 다른 화면이 탭을 바꿔 달라고 부탁하는 문. 기록 탭의 "한 달 보기" 가 진료
+/// 준비 탭의 달력으로 건너갈 때 쓴다(2026-09-22). 환경에 꽂지 않고 공유
+/// 인스턴스인 이유는 `JanjanClock` 과 같다 - 시트 안에서도 같은 값을 본다.
+@MainActor
+final class TabRouter: ObservableObject {
+    static let shared = TabRouter()
+    /// 열어 달라는 탭. 루트가 읽고 나면 nil 로 되돌린다.
+    @Published var requested: RootTabView.Tab?
+
+    func open(_ tab: RootTabView.Tab) { requested = tab }
+}
+
 /// 탭 4개 + 설정 (설계 03절). "오늘" 이 허브이고 나머지는 관리·되돌아보기 용도다.
 struct RootTabView: View {
+    @ObservedObject private var router = TabRouter.shared
 
     @State private var selection: Tab = RootTabView.launchTab
     @State private var isShowingSettings = false
@@ -97,6 +110,11 @@ struct RootTabView: View {
             guard url.scheme == Janjan.urlScheme, url.host == "log" else { return }
             selection = .today
             isShowingSettings = false
+        }
+        .onReceive(router.$requested) { tab in
+            guard let tab else { return }
+            selection = tab
+            router.requested = nil
         }
     }
 }

@@ -99,9 +99,11 @@ struct DiaryView: View {
                     // 아니다. 지난 날을 고치러 들어온 화면에는 두지 않는다.
                     if !isDayEditor {
                         questionCard
-                        // 리포트에도 같은 카드가 있지만, 기분을 적는 자리에서 바로
-                        // 한 달을 돌아볼 수 있어야 한다. 계산은 MonthWave 한 곳이 한다.
-                        MonthWaveCard(checkIns: checkInRecords.map(\.core))
+                        // 한 달 달력은 진료 준비 탭 한 곳에만 둔다(사용자 결정
+                        // 2026-09-22). 한때 여기에도 같은 카드를 놓았는데, 오늘
+                        // 것을 적는 화면이 두 배로 길어지고 바로 아래 "지난 기록"
+                        // 과 같은 것을 두 번 보여 줬다. 대신 아래 카드 머리에
+                        // 달력으로 건너가는 손잡이를 둔다.
                         historyCard
                     }
                 }
@@ -557,9 +559,29 @@ struct DiaryView: View {
 
         return JanjanCard {
             VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
-                Text(t("지난 기록", "Past entries"))
-                    .janjanDisplay(20)
-                    .foregroundStyle(Color.ink)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(t("지난 기록", "Past entries"))
+                        .janjanDisplay(20)
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: CGFloat(JanjanSpacing.s))
+                    // 한 달을 돌아보는 그림은 진료 준비 탭에 있다. 기분을 적던
+                    // 자리에서 한 번에 건너간다.
+                    Button {
+                        TabRouter.shared.open(.report)
+                    } label: {
+                        HStack(spacing: CGFloat(JanjanSpacing.xxs)) {
+                            Text(t("한 달 보기", "Month view"))
+                                .janjanBody(13, weight: .medium)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.ink2)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text(t("진료 준비 탭의 달력을 엽니다", "Opens the calendar on the Visit prep tab")))
+                }
 
                 if past.isEmpty {
                     Text(t("아직 지난 기록이 없어요.", "No past entries yet."))
