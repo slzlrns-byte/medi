@@ -17,27 +17,31 @@ public enum JanjanColorScheme: String, Sendable, CaseIterable {
 /// 바탕·카드·글자·선은 세 테마가 똑같이 무채색이다 — 색이 있는 곳은 시간대
 /// 타일, 기분 원, 막대 같은 디자인 요소뿐이라, 테마의 차이는 포인트 색뿐이다.
 public enum JanjanTheme: String, Sendable, CaseIterable {
+    // 차례가 곧 설정 목록의 차례다. 무료가 위, Pro 가 아래(사용자 결정 2026-09-22).
+
     /// 맑은 하늘 — 파랑. 기분은 흐린 보라(힘듦)에서 맑은 파랑(좋음)으로.
     case sky
     /// 풋사과 크림 — 초록. 기존 물결(보라→초록)의 결을 잇는다.
     case sprout
     /// 복숭아 노을 — 살구. 기분은 노을 보라에서 살구빛으로.
     case sunset
+    /// 하늘 벚꽃 — 밝은 톤(사용자 요청 2026-09-22). 기분은 하늘빛에서 벚꽃 분홍으로.
+    case blossom
+    /// 파랑 레몬 — 밝은 톤(사용자 요청 2026-09-22). 기분은 짙은 파랑에서 레몬 노랑으로.
+    case lemon
     /// 밤 라일락 — Pro. 기분은 장미빛에서 라일락으로.
     case dawn
     /// 깊은 바다 — Pro. 기분은 남빛에서 청록으로.
     case sea
-    /// 하늘 벚꽃 — 무료, 밝은 톤(사용자 요청 2026-09-22). 기분은 하늘빛에서 벚꽃 분홍으로.
-    case blossom
-    /// 파랑 레몬 — 무료, 밝은 톤(사용자 요청 2026-09-22). 기분은 짙은 파랑에서 레몬 노랑으로.
-    case lemon
+    /// 제비꽃 분홍 — Pro(사용자 요청 2026-09-22). 기분은 짙은 보라에서 옅은 파스텔 분홍으로.
+    case violet
 
     /// 선택을 모르는 곳(워치 기본값·테스트)이 쓰는 값.
     public static let standard: JanjanTheme = .sprout
 
     /// 구독이 있어야 고를 수 있는 테마. 구독이 끝난 뒤에도 이미 고른 테마는
     /// 그대로 둔다 - 화면 색이 어느 날 갑자기 바뀌는 쪽이 더 나쁘다.
-    public static let proOnly: Set<JanjanTheme> = [.dawn, .sea]
+    public static let proOnly: Set<JanjanTheme> = [.dawn, .sea, .violet]
 
     public var isProOnly: Bool { Self.proOnly.contains(self) }
 
@@ -50,6 +54,7 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sea: return "깊은 바다"
         case .blossom: return "하늘 벚꽃"
         case .lemon: return "파랑 레몬"
+        case .violet: return "제비꽃 분홍"
         }
     }
 
@@ -62,6 +67,7 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sea: return "Deep sea"
         case .blossom: return "Sky blossom"
         case .lemon: return "Blue lemon"
+        case .violet: return "Violet blush"
         }
     }
 
@@ -78,6 +84,7 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sea: return "기분이 남빛에서 청록으로 흘러요."
         case .blossom: return "기분이 하늘빛에서 벚꽃 분홍으로 흘러요."
         case .lemon: return "기분이 짙은 파랑에서 레몬 노랑으로 흘러요."
+        case .violet: return "기분이 짙은 보라에서 옅은 파스텔 분홍으로 흘러요."
         }
     }
 
@@ -90,6 +97,7 @@ public enum JanjanTheme: String, Sendable, CaseIterable {
         case .sea: return "Mood flows from indigo to teal."
         case .blossom: return "Mood flows from sky blue to blossom pink."
         case .lemon: return "Mood flows from deep blue to lemon yellow."
+        case .violet: return "Mood flows from deep violet to pale blush pink."
         }
     }
 
@@ -194,6 +202,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#C2E1CE"
             case .blossom: return "#D3E3F5"
             case .lemon: return "#FFF0B3"
+            case .violet: return "#E3D9F2"
             }
         // 파스텔 위 ~Ink 값 몇 개가 3.92~4.43 으로 본문 기준(4.5)에 못 미쳤다
         // (QA 2026-09-21). 같은 색상·채도를 두고 명도만 한 단계 내려 다섯 테마
@@ -207,6 +216,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#2C5F3A"
             case .blossom: return "#2C5178"
             case .lemon: return "#6A5210"
+            case .violet: return "#4A2F86"
             }
         case .lav:
             switch theme {
@@ -217,6 +227,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#BDE9DD"
             case .blossom: return "#F5D8E6"
             case .lemon: return "#D2E1F7"
+            case .violet: return "#F6D9E6"
             }
         case .lavInk:
             switch theme {
@@ -227,6 +238,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#2C6B57"
             case .blossom: return "#7A3557"
             case .lemon: return "#1E4C89"
+            case .violet: return "#7E3A5A"
             }
         case .butter:
             switch theme {
@@ -237,6 +249,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#D4ECE5"
             case .blossom: return "#FBEAF0"
             case .lemon: return "#FFF6D0"
+            case .violet: return "#EFE5F7"
             }
         case .butterInk:
             switch theme {
@@ -247,6 +260,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#2E7256"
             case .blossom: return "#874565"
             case .lemon: return "#755610"
+            case .violet: return "#5B3C8A"
             }
         case .peach:
             switch theme {
@@ -257,6 +271,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#E4D4D9"
             case .blossom: return "#F7E2D9"
             case .lemon: return "#FCE4CF"
+            case .violet: return "#F8E0E8"
             }
         case .peachInk:
             switch theme {
@@ -267,6 +282,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#685059"
             case .blossom: return "#84503C"
             case .lemon: return "#854C28"
+            case .violet: return "#86475E"
             }
         case .mood1:
             switch theme {
@@ -277,6 +293,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#7C99BF"
             case .blossom: return "#7FA8E0"
             case .lemon: return "#4C86D4"
+            case .violet: return "#5B3FA8"
             }
         case .mood2:
             switch theme {
@@ -287,6 +304,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#9DAECA"
             case .blossom: return "#9FBCE6"
             case .lemon: return "#7BA5E0"
+            case .violet: return "#7E63BE"
             }
         case .mood3:
             switch theme {
@@ -297,6 +315,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#C2CBDA"
             case .blossom: return "#C5D3EC"
             case .lemon: return "#B3C9EC"
+            case .violet: return "#A48DD0"
             }
         case .mood4:
             switch theme {
@@ -307,6 +326,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#DEE1E0"
             case .blossom: return "#E6E4E8"
             case .lemon: return "#E6E6E2"
+            case .violet: return "#DDD6E3"
             }
         case .mood5:
             switch theme {
@@ -317,6 +337,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#B4E5CB"
             case .blossom: return "#F4D4E2"
             case .lemon: return "#FBEAA2"
+            case .violet: return "#E3B9D2"
             }
         case .mood6:
             switch theme {
@@ -327,6 +348,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#87DDB2"
             case .blossom: return "#F1B7CF"
             case .lemon: return "#F8DC68"
+            case .violet: return "#EDC3D9"
             }
         case .mood7:
             switch theme {
@@ -337,6 +359,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#46CF8E"
             case .blossom: return "#EE95BA"
             case .lemon: return "#F2C633"
+            case .violet: return "#F5CFE0"
             }
         }
     }
@@ -362,6 +385,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#1D3426"
             case .blossom: return "#22364B"
             case .lemon: return "#403814"
+            case .violet: return "#2E2447"
             }
         // 파스텔 위 ~Ink 값 몇 개가 3.92~4.43 으로 본문 기준(4.5)에 못 미쳤다
         // (QA 2026-09-21). 같은 색상·채도를 두고 명도만 한 단계 내려 다섯 테마
@@ -375,6 +399,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#95D5AD"
             case .blossom: return "#A9C9EC"
             case .lemon: return "#EAD16F"
+            case .violet: return "#C9B8EE"
             }
         case .lav:
             switch theme {
@@ -385,6 +410,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#1F3A35"
             case .blossom: return "#4A2838"
             case .lemon: return "#1F3352"
+            case .violet: return "#4A2A3A"
             }
         case .lavInk:
             switch theme {
@@ -395,6 +421,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#ACECDB"
             case .blossom: return "#E9B7CD"
             case .lemon: return "#ABC7F0"
+            case .violet: return "#EEB9D2"
             }
         case .butter:
             switch theme {
@@ -405,6 +432,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#223931"
             case .blossom: return "#4A3441"
             case .lemon: return "#433B18"
+            case .violet: return "#34284A"
             }
         case .butterInk:
             switch theme {
@@ -415,6 +443,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#A0E6CD"
             case .blossom: return "#F0C4D6"
             case .lemon: return "#EDD47C"
+            case .violet: return "#D3C1F0"
             }
         case .peach:
             switch theme {
@@ -425,6 +454,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#2D2628"
             case .blossom: return "#4A3128"
             case .lemon: return "#463020"
+            case .violet: return "#4A2E3C"
             }
         case .peachInk:
             switch theme {
@@ -435,6 +465,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#C7A8B1"
             case .blossom: return "#EAB9A7"
             case .lemon: return "#ECB790"
+            case .violet: return "#F0C0D4"
             }
         case .mood1:
             switch theme {
@@ -445,6 +476,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#6486AC"
             case .blossom: return "#4F7DBF"
             case .lemon: return "#2F63B0"
+            case .violet: return "#4A2F94"
             }
         case .mood2:
             switch theme {
@@ -455,6 +487,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#7B9AB8"
             case .blossom: return "#6A92C9"
             case .lemon: return "#4F80C4"
+            case .violet: return "#6A4FB4"
             }
         case .mood3:
             switch theme {
@@ -465,6 +498,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#8D9EAA"
             case .blossom: return "#8AA6CF"
             case .lemon: return "#7B9CCF"
+            case .violet: return "#8F78C6"
             }
         case .mood4: return "#8E8F8A"
         case .mood5:
@@ -476,6 +510,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#67AC8B"
             case .blossom: return "#B98DA4"
             case .lemon: return "#B9A54A"
+            case .violet: return "#B58AA6"
             }
         case .mood6:
             switch theme {
@@ -486,6 +521,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#52C18E"
             case .blossom: return "#D08CAE"
             case .lemon: return "#D5BB44"
+            case .violet: return "#CF9BBB"
             }
         case .mood7:
             switch theme {
@@ -496,6 +532,7 @@ public enum JanjanColor: String, Sendable, CaseIterable {
             case .sea: return "#42C690"
             case .blossom: return "#E680AF"
             case .lemon: return "#E9C531"
+            case .violet: return "#E7B4CC"
             }
         }
     }
