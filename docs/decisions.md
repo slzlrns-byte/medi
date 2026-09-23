@@ -393,4 +393,5 @@
 - ~~CloudKit 프로덕션 스키마 배포 여부를 확인하지 않았다.~~ 확인해 보니 개발·프로덕션
   모두 비어 있었다(모든 빌드가 CI 라 Xcode 직접 실행이 없었다). 같은 날 손으로 쓴
   `docs/cloudkit/janjan-schema.ckdb` 를 Import → Deploy 해 프로덕션에 9개 타입이
-  올라갔다. 실기기 검증은 별도.
+  올라갔다. 실기기 검증 완료: TestFlight 빌드 23 의 RecordSave 가 SUCCESS(존
+  com.apple.coredata.cloudkit.zone, CD_StockEventRecord 포함) - Decimal→DOUBLE 대응까지 맞았다.

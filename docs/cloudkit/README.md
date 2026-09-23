@@ -41,3 +41,8 @@ TestFlight·스토어 빌드는 프로덕션 환경을 쓰고, 프로덕션 스�
 Records → Private Database → `com.apple.coredata.cloudkit.zone` 에서
 `CD_MedicationRecord` 와 `CD_ScheduleRecord` 를 조회한다. 둘 다 나오면
 STRING·TIMESTAMP·DOUBLE·BYTES 가 전부 맞은 것이다.
+
+2026-09-23 검증 완료: 배포 뒤 TestFlight 빌드 23 의 RecordSave 가 프로덕션에서
+SUCCESS(6건 삽입, CD_StockEventRecord 포함). 대시보드에서 기록이 안 보이면
+"Act As iCloud Account" 의 계정이 아이폰의 Apple ID 와 같은지 먼저 본다 - 로그의
+`userId` 와 대행 계정 ID 가 다르면 다른 계정이다.
