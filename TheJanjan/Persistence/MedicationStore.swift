@@ -157,6 +157,9 @@ enum MedicationStore {
     ///   - newDosePerIntake: nil 이면 개수는 건드리지 않는다. 값이 오면 이 약의
     ///     **모든 시간대**에 같은 개수를 넣는다 - 시간대마다 개수가 다른 약은
     ///     화면에서 이 길을 막고 "약 고치기" 로 보낸다.
+    ///   - forceApply: 참이면 더 나중 변경이 있어도 지금 값을 바꾼다. 가장 나중
+    ///     진료의 용량은 시각과 무관하게 현재 용량이다(사용자 지적 2026-09-22 -
+    ///     같은 날 다른 시각의 변경에 밀려 최신 진료의 용량이 안 들어왔다).
     /// - Returns: 이력에 남긴 사건. 표기가 그대로면 nil 이다(개수만 바뀐 경우
     ///   "10mg → 10mg" 이라는 빈 화살표가 이력에 쌓이지 않게 한다).
     @discardableResult
@@ -166,6 +169,7 @@ enum MedicationStore {
         newDosePerIntake: Decimal?,
         changedAt: Date,
         note: String? = nil,
+        forceApply: Bool = false,
         in context: ModelContext
     ) -> DoseChange? {
         guard let record = medicationRecord(medicationID, in: context) else {
@@ -182,7 +186,7 @@ enum MedicationStore {
         // 순서를 안 보면 현재 표기가 15mg 으로 되돌아간다 - 재고와 소진
         // 예측까지 옛 개수로 계산된다(QA 2026-09-19). 이력에는 남기되
         // 지금 값은 건드리지 않는다.
-        let applies = !hasLaterChange(than: changedAt, for: medicationID, in: context)
+        let applies = forceApply || !hasLaterChange(than: changedAt, for: medicationID, in: context)
 
         if applies, let toText { record.strengthText = toText }
 
