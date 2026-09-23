@@ -205,7 +205,7 @@ struct PaywallView: View {
                     meaning: t("구독 · 해마다 갱신", "Subscription · renews yearly"),
                     price: t("\(yearly.displayPrice) / 년", "\(yearly.displayPrice) / yr"),
                     note: pro.yearlyMonthlyEquivalentText.map { t("월 \($0) 꼴", "≈ \($0) / mo") },
-                    tag: pro.isYearlyTrialEligible ? t("7일 무료", "7 days free") : nil
+                    tag: trialLength.map { t("\($0) 무료", "\($0) free") }
                 )
             }
             if let monthly = pro.monthlyProduct {
@@ -368,10 +368,15 @@ struct PaywallView: View {
 
     /// 체험을 받을 수 있을 때만 "무료" 라고 쓴다. 못 받는 계정에 무료라고 쓰면 3.1.2 위반이다.
     private var ctaTitle: String {
-        if selectedPlan == .yearly, pro.isYearlyTrialEligible {
-            return t("7일 무료로 시작하기", "Start 7 days free")
+        if selectedPlan == .yearly, let length = trialLength {
+            return t("\(length) 무료로 시작하기", "Start \(length) free")
         }
         return t("Pro 시작하기", "Start Pro")
+    }
+
+    /// 체험을 받을 수 있을 때의 기간 글자. 없으면 어디에도 "무료" 를 적지 않는다.
+    private var trialLength: String? {
+        pro.isYearlyTrialEligible ? pro.yearlyTrialLengthText : nil
     }
 
     private func buy() {
@@ -394,10 +399,10 @@ struct PaywallView: View {
         switch selectedPlan {
         case .yearly:
             guard let price = pro.yearlyProduct?.displayPrice else { return cancelSentence }
-            if pro.isYearlyTrialEligible {
+            if let length = trialLength {
                 return t(
-                    "7일 무료 체험 후 연 \(price)이 자동으로 결제돼요. \(cancelSentence)",
-                    "After a 7-day free trial, \(price) is billed yearly and auto-renews. \(cancelSentence)"
+                    "\(length) 무료 체험 후 연 \(price)이 자동으로 결제돼요. \(cancelSentence)",
+                    "After a \(length) free trial, \(price) is billed yearly and auto-renews. \(cancelSentence)"
                 )
             }
             return t(

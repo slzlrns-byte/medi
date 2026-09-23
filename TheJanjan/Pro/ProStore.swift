@@ -56,6 +56,10 @@ final class ProStore: ObservableObject {
 
     /// 연간 7일 무료 체험을 받을 수 있는지. 못 받는 계정에는 체험 문구를 아예 숨긴다(3.1.2(b)).
     @Published private(set) var isYearlyTrialEligible = false
+    /// 연간 상품의 무료 체험 기간을 사람 말로("7일" · "1개월"). StoreKit 이 준 값에서
+    /// 만든다 - 하드코딩 "7일" 은 ASC 에서 혜택을 바꾸면 거짓이 됐다(QA 2026-09-23).
+    /// 소개 혜택이 무료 체험이 아니면(할인가) nil 이라 "무료" 를 적지 않는다.
+    @Published private(set) var yearlyTrialLengthText: String?
 
     /// 상품을 못 불러온 상태. 네트워크일 수도, 계약·상품 상태일 수도 있다.
     @Published private(set) var storeUnavailable = false
@@ -156,7 +160,10 @@ final class ProStore: ObservableObject {
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             guard transaction.revocationDate == nil else { continue }
-            if let expiration = transaction.expirationDate, expiration <= Date() { continue }
+            // 만료일을 손으로 거르지 않는다. `currentEntitlements` 는 만료된 구독을
+            // 이미 빼고 주되, **결제 유예기간(Billing Grace Period)** 중에는 만료일이
+            // 지난 거래를 일부러 남겨 둔다. 그것까지 떨구면 카드 갱신에 실패한
+            // 사람이 유예 중에 Pro 를 잃는다(QA 2026-09-23). 애플의 판정을 믿는다.
             if ProProduct.allIDs.contains(transaction.productID) {
                 entitled = true
             }
@@ -170,19 +177,37 @@ final class ProStore: ObservableObject {
         return entitled
     }
 
-    /// 연간 상품에 소개 혜택(7일 무료)이 있고, 이 계정이 아직 써 본 적 없을 때만 true.
+    /// 연간 상품에 **무료 체험** 소개 혜택이 있고, 이 계정이 아직 써 본 적 없을
+    /// 때만 true. 기간은 StoreKit 값으로 `yearlyTrialLengthText` 에 적는다.
     @discardableResult
     func yearlyTrialEligible() async -> Bool {
         guard let subscription = yearlyProduct?.subscription,
-              subscription.introductoryOffer != nil
+              let offer = subscription.introductoryOffer,
+              offer.paymentMode == .freeTrial
         else {
             isYearlyTrialEligible = false
+            yearlyTrialLengthText = nil
             return false
         }
 
         let eligible = await subscription.isEligibleForIntroOffer
         isYearlyTrialEligible = eligible
+        yearlyTrialLengthText = Self.trialLengthText(offer.period)
         return eligible
+    }
+
+    /// "7일" · "2주" · "1개월" - 단위와 개수를 그대로 옮긴다.
+    static func trialLengthText(_ period: Product.SubscriptionPeriod) -> String {
+        let count = period.value
+        switch period.unit {
+        case .day: return t("\(count)일", count == 1 ? "1 day" : "\(count) days")
+        case .week:
+            // 1주는 "7일" 로 읽는 사람이 많다 - 스토어도 그렇게 적는다.
+            return count == 1 ? t("7일", "7 days") : t("\(count)주", "\(count) weeks")
+        case .month: return t("\(count)개월", count == 1 ? "1 month" : "\(count) months")
+        case .year: return t("\(count)년", count == 1 ? "1 year" : "\(count) years")
+        @unknown default: return t("\(count)일", "\(count) days")
+        }
     }
 
     // MARK: - 구매 · 복원

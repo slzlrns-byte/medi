@@ -14,7 +14,7 @@
 | 소셜 로그인 → Sign in with Apple 의무(4.8), 계정 삭제 의무(5.1.1(v)), client secret 6개월 갱신 | 카카오·구글 때문에 전부 해당 | **로그인 없음** → 전부 해당 없음 |
 | 사용자 생성 콘텐츠 → 신고·차단·24시간 처리(1.2) | 게시판·쪽지 때문에 필수 | **UGC 없음** → 해당 없음 |
 | 광고 SDK → ATT 팝업, 건강데이터 광고 금지(5.1.3) | AdMob | **AdMob 을 넣었다(2026-09-19). 비개인화(npa=1)만 요청하므로 ATT 팝업은 없고, 건강 데이터는 광고에 쓰지 않는다. 분석·크래시 SDK 는 여전히 없음** |
-| 소모성 IAP·서버 원장·웹훅 → 이중 지급/복원 실패 | 하트 팩 3종 | **구독 1그룹 2상품**, 서버 없음 |
+| 소모성 IAP·서버 원장·웹훅 → 이중 지급/복원 실패 | 하트 팩 3종 | **구독 1그룹 2상품 + 비소모성 평생 이용권 1**, 서버 없음 |
 | 서버 보유 → 개인정보 수집 표기·보안 감사 | Supabase | **서버 없음**, iCloud 개인 DB만 |
 
 ---
@@ -52,9 +52,9 @@
 |---|---|---|---|---|
 | 3.1 | 3.1.2(a) | 페이월 고지 부족 | 가격·기간·자동 갱신·체험 후 요금 한 문장("7일 무료 후 연 ₩19,900, 자동 갱신"), **이용약관(EULA)·개인정보처리방침 링크**, 복원 버튼, 구독 관리 링크 → `TheJanjan/Pro/PaywallView.swift` 에 다 있다. 금액은 `product.displayPrice` 에서 만들고, "무료 체험" 문구는 체험 자격이 있을 때만 나온다 | ✅ (구현됨) |
 | 3.2 | 3.1.2 | 메타데이터에 약관 링크 없음 | App Store Connect 앱 설명 하단 또는 **EULA 필드**에 이용약관 URL(애플 표준 EULA 링크로 대체 가능) | ☐ ⚠ |
-| 3.3 | 2.1 / 3.1.1 | 리뷰어가 눌렀는데 상품 안 뜸 **[러비티: "스토어에서 상품을 찾을 수 없어요"]** | 상품 2개가 "제출 준비 완료" 상태 + **첫 제출 시 앱 버전 페이지의 "앱 내 구입 및 구독" 섹션에 상품 첨부**(구독은 첫 번째 버전과 함께 제출해야 함) | ☐ ⚠ |
-| 3.4 | 3.1.1 | 상품 ID 불일치 **[러비티]** | 코드 `pro_monthly`/`pro_yearly` ↔ App Store Connect 글자 하나까지 동일. 한 문서(docs/decisions.md)에 적어두고 복붙만 | ☐ |
-| 3.10 | 2.3.1 | 페이월 약속 ↔ 실제 잠금 불일치 | 페이월 여섯 줄(스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치) = 실제 잠금과 일치, 테스트가 감시. **PDF 는 무료**(09-10)라 페이월에 없음. 로컬 storekit 구독 설명도 여섯 기능 문구로 갱신(09-16) - **ASC 구독 설명에 같은 문구 입력** | ✅ ☐ |
+| 3.3 | 2.1 / 3.1.1 | 리뷰어가 눌렀는데 상품 안 뜸 **[러비티: "스토어에서 상품을 찾을 수 없어요"]** | 상품 3개(pro_monthly · pro_yearly · pro_lifetime)가 "제출 준비 완료" 상태 + **첫 제출 시 앱 버전 페이지의 "앱 내 구입 및 구독" 섹션에 상품 첨부**(구독은 첫 번째 버전과 함께 제출해야 함) | ☐ ⚠ |
+| 3.4 | 3.1.1 | 상품 ID 불일치 **[러비티]** | 코드 `pro_monthly`/`pro_yearly`/`pro_lifetime` ↔ App Store Connect 글자 하나까지 동일. 한 문서(docs/decisions.md)에 적어두고 복붙만 | ☐ |
+| 3.10 | 2.3.1 | 페이월 약속 ↔ 실제 잠금 불일치 | 페이월 열두 줄(광고 없이·스캔·모양 찾기·패턴 보기·똑똑한 재알림·소진 예측·전후 비교·지난 진료 기록·이름 가리기·Pro 테마·워치·위젯 기록) = 실제 잠금과 일치, 테스트가 감시(2026-09-23 대조 완료). **PDF 는 무료**(09-10)라 페이월에 없음. 로컬 storekit 구독 설명도 여섯 기능 문구로 갱신(09-16) - **ASC 구독 설명에 같은 문구 입력** | ✅ ☐ |
 | 3.5 | 계약 | 유료 앱 계약 미체결 → 상품 로드 실패 **[러비티]** | 비즈니스 → 계약: **유료 앱** 계약 체결 + 세금·은행 정보 | ☐ ⚠ |
 | 3.6 | 2.1 | 상품 로드 실패 시 크래시/빈 화면 | StoreKit 2 실패해도 무료 기능 정상, 페이월엔 "지금은 스토어에 연결할 수 없어요" | ✅ |
 | 3.7 | 3.1.1 | 외부 결제 링크·"웹에서 더 싸게" 문구 | 없음. 약학정보원 등 외부 링크는 정부·공익 사이트만(구매 링크 없는 페이지) | ✅ |
@@ -115,7 +115,7 @@
 - [x] GitHub Pages 살아 있음 확인(09-16): https://janjan.loviti.app/site/privacy.html · support.html — 지원 URL 은 ASC 입력 완료
 - [ ] main 의 docs/site/privacy.html 이 2주 전 판이라 낱알 사진 핫링크 문단이 빠져 있다 - 심사 전 main 에 최신판 반영 필요(사용자 허락 대기)
 - [ ] App Store Connect: 앱 이름 "더잔잔"으로 통일, 부제 "더 잔잔한 하루를 위해", 카테고리(건강 및 피트니스 / 의료), **연령 등급 재확인**(의료·치료 정보: 자주)
-- [ ] 유료 앱 계약 체결(구독 만들기 전 필수) → 구독 그룹 "The잔잔 Pro" + 상품 2개(pro_yearly ₩19,900/년·7일 체험, pro_monthly ₩2,900/월) 생성, **구독 설명은 여섯 기능 문구**("약봉투 스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치를 열어요."), "제출 준비 완료" + 첫 버전 페이지에 첨부
+- [ ] 유료 앱 계약 체결(구독 만들기 전 필수) → 구독 그룹 "The잔잔 Pro" + 상품 2개(pro_yearly ₩19,900/년·7일 체험, pro_monthly ₩2,900/월) + 비소모성 평생 이용권 pro_lifetime 생성, **구독 설명은 여섯 기능 문구**("약봉투 스캔·모양 찾기·소진 예측·전후 비교·이름 가리기·워치를 열어요."), "제출 준비 완료" + 첫 버전 페이지에 첨부
 - [ ] EULA/약관 링크 기입(docs/site/terms.html 또는 애플 표준 EULA)
 - [ ] 스크린샷: **Pro Max 급으로 다시 찍은 세트**(4.3 참고 - 이전 세트는 규격 밖) + Apple Watch 세트, 한국어/영어(en-US) 로컬라이즈별 업로드. 홍보 이미지 4장(KR/EN, 1290×2796)은 세션 산출물로 확보됨
 - [ ] 앱 설명·키워드(한/영) 작성해 입력 - 아직 초안 없음(효능 표현 금지, 1.8)
@@ -133,7 +133,7 @@
 - 약 정보는 대한민국 식품의약품안전처 공공데이터(의약품 낱알식별 정보)를 인용하며 출처를 앱 안에 표기합니다. 앱은 진단, 약 추천, 용량 안내를 하지 않습니다. "약 모양으로 찾기"의 결과는 항상 "추측"으로 표시되고 의사·약사 확인 안내가 붙습니다.
 - 네트워크: 서버가 없습니다. 유일한 외부 요청은 "약 모양으로 찾기"에서 후보 약의 낱알 사진을 식약처 공식 서버(https://nedrug.mfds.go.kr)에서 실시간으로 불러오는 것뿐이며, 사진은 저장하지 않고 사용자 데이터는 어떤 것도 전송되지 않습니다. 그 외에는 사용자 본인 iCloud(CloudKit 개인 DB)와 App Store 결제뿐입니다.
 - 정신건강 관련 앱으로, 위기 상담 연락처(109, 1577-0199)를 안전 카드와 설정 > 안전에서 제공합니다.
-- 구독: pro_monthly / pro_yearly (연간 7일 무료 체험). 페이월 확인 경로: 설정 > Pro 알아보기, 약 탭 > + > 약봉투 스캔 또는 약 모양으로 찾기, 약 상세 > 용량 변경 "전후 보기", 설정 > 약 이름 가리기. 복원은 설정 > 구매 복원. 진료용 리포트 PDF 내보내기는 무료입니다.
+- 인앱 결제: 자동 갱신 구독 pro_monthly / pro_yearly (연간은 7일 무료 체험) 와 비소모성 평생 이용권 pro_lifetime. 셋 중 무엇이든 같은 Pro 기능 12개(광고 없이, 약봉투 스캔, 약 모양으로 찾기, 패턴 보기 4주, 똑똑한 재알림, 소진 예측, 용량 변경 전후 비교, 지난 진료 기록 전체, 약 이름 가리기, Pro 테마, Apple Watch 앱, 위젯에서 바로 기록)를 엽니다. 페이월 확인 경로: 설정 > Pro 시작하기, 약 탭 > + > 약봉투 스캔 또는 약 모양으로 찾기, 진료 준비 탭 > 패턴 보기 자물쇠. 복원은 설정 > 구매 복원. 진료용 리포트 PDF 내보내기는 무료이며, 무료 사용자는 짧은 보상형 광고(AdMob, 비개인화)를 보고 내보냅니다. 서버 없이 StoreKit 2 의 현재 권한만 기기에서 확인합니다.
 
 [English]
 - No account or login. All features are available immediately. Korean is the default language; English can be chosen in Settings.
@@ -141,5 +141,5 @@
 - Medication appearance data quotes public data from the Korean MFDS, with the source shown in the app. The app does not diagnose, recommend medications, or suggest dosages. "Find by appearance" results are always labeled as guesses with a "confirm with your doctor or pharmacist" note.
 - Networking: there is no server. The only external request is loading candidate pill photos in "Find by appearance" from the official MFDS server (https://nedrug.mfds.go.kr) on demand; photos are not stored and no user data is ever sent. Everything else is the user's own iCloud (CloudKit private DB) and App Store billing.
 - Mental-health related: crisis hotlines (109, 1577-0199 - Korea) are offered via a safety card and in Settings.
-- Subscriptions: pro_monthly / pro_yearly (7-day trial on yearly). Paywall entry points: Settings > Learn about Pro; Meds tab > + > Pharmacy bag scan or Find by appearance; medication detail > dose change "Compare"; Settings > Hide medication names. Restore: Settings > Restore purchase. The visit-report PDF export is free.
+- In-app purchases: auto-renewable subscriptions pro_monthly / pro_yearly (7-day free trial on yearly) and a non-consumable lifetime purchase pro_lifetime. Any of the three unlocks the same 12 Pro features (no ads, pharmacy-bag scan, find by appearance, 4-week pattern view, smart follow-up reminders, run-out forecast, dose-change before/after, full visit history, hide medication names, Pro themes, Apple Watch app, log from the widget). Paywall entry points: Settings > Get Pro; Meds tab > + > Pharmacy bag scan or Find by appearance; Visit prep tab > pattern view lock. Restore: Settings > Restore purchase. The visit-report PDF export is free; free users watch a short rewarded ad (AdMob, non-personalized) to export. No server — StoreKit 2 current entitlements are checked on device only.
 ```
