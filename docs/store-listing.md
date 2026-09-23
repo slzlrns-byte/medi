@@ -78,9 +78,9 @@
 Pro 연간 ₩19,900(7일 무료 체험) · 월간 ₩2,900 · 평생 이용권 ₩49,000(한 번 결제, 자동 갱신 없음). 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신되며, iOS 설정의 구독 관리에서 언제든 해지할 수 있습니다.
 ```
 
-### 키워드 (100자 제한, 아래 85자)
+### 키워드 (100자 제한, 아래 100자)
 ```
-복약,약알림,복용알림,약기록,복약체크,정신과,기분일기,감정일기,무드트래커,우울,불안,수면기록,낱알식별,알약검색,진료준비,약봉투,정신과약,약먹기,ADHD약
+복약,약알림,복용알림,약기록,복약체크,정신과,기분일기,감정일기,무드트래커,우울,불안,수면기록,낱알식별,알약검색,진료준비,약봉투,정신과약,약먹기,ADHD약,조울증,양극성,불면,수면제
 ```
 - 이름·부제에 이미 있는 단어(더잔잔, 잔잔한, 하루)는 넣지 않는다(검색에 자동 포함).
 - 경쟁 앱 이름 금지(2.3).
@@ -163,11 +163,14 @@ This app is not a medical device and does not provide medical advice; follow you
 Pro: KRW 19,900/year (7-day free trial) · KRW 2,900/month · KRW 49,000 lifetime (one-time, nothing auto-renews). Subscriptions renew automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
 ```
 
-### Keywords (100, 아래 97자)
+### Keywords (100, 아래 100자)
 ```
-medication,reminder,pill,mood,tracker,journal,psychiatry,depression,anxiety,adhd,sleep,identifier
+medication,reminder,pill,mood,tracker,journal,psychiatry,depression,anxiety,adhd,sleep,bipolar,diary
 ```
 - 애플이 단어를 조합해 검색어를 만들므로 영어는 낱말 단위가 넓게 걸린다.
+- 2026-09-23: 100자를 꽉 채웠다(사용자 요청). `identifier` 를 빼고 `bipolar,diary` 를 넣었다 -
+  낱알 자료가 식약처 것뿐이라 영어권 "pill identifier" 검색으로 온 사람은 실망하고,
+  기분 일기를 찾는 사람이 이 앱의 손님이다.
 
 ### What's New (first version)
 ```
