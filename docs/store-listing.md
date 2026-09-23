@@ -160,7 +160,7 @@ Pattern view is free for the last 7 days, and visit history is free up to your p
 
 This app is not a medical device and does not provide medical advice; follow your doctor's instructions for diagnosis and prescriptions.
 
-Pro: KRW 19,900/year (7-day free trial) · KRW 2,900/month · KRW 49,000 lifetime (one-time, nothing auto-renews). Subscriptions renew automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
+Pro: yearly (with a 7-day free trial), monthly, or a one-time lifetime purchase that never renews. Prices are shown in the app in your local currency. Subscriptions renew automatically unless canceled at least 24 hours before the period ends, and can be canceled anytime in your iOS subscription settings.
 ```
 
 ### Keywords (100, 아래 100자)
@@ -168,6 +168,9 @@ Pro: KRW 19,900/year (7-day free trial) · KRW 2,900/month · KRW 49,000 lifetim
 medication,reminder,pill,mood,tracker,journal,psychiatry,depression,anxiety,adhd,sleep,bipolar,diary
 ```
 - 애플이 단어를 조합해 검색어를 만들므로 영어는 낱말 단위가 넓게 걸린다.
+- 영어 설명의 Pro 줄에는 금액을 적지 않는다(2026-09-23). 원화 기준가를 애플이
+  나라마다 환산하므로 미국 달러 값을 우리가 미리 알 수 없고, 적어 두면 어느
+  나라에선가 거짓이 된다. 앱 안의 페이월이 그 나라 통화로 보여 준다.
 - 2026-09-23: 100자를 꽉 채웠다(사용자 요청). `identifier` 를 빼고 `bipolar,diary` 를 넣었다 -
   낱알 자료가 식약처 것뿐이라 영어권 "pill identifier" 검색으로 온 사람은 실망하고,
   기분 일기를 찾는 사람이 이 앱의 손님이다.
