@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import JanjanCore
 
 /// 약 — 처방·재고 관리 (설계 03절).
@@ -7,46 +8,166 @@ import JanjanCore
 /// InventoryCalculator 가 사건에서 매번 다시 계산한 값이다.
 struct MedicationsView: View {
 
-    @State private var isShowingAddFlow = false
+    @Environment(\.modelContext) private var context
+    @EnvironmentObject private var pro: ProStore
 
-    private var today: Date { Date() }
+    @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var doseRecords: [DoseEventRecord]
+    @Query private var stockRecords: [StockEventRecord]
+    @Query(sort: \PrescriptionRecord.visitDate, order: .reverse)
+    private var prescriptionRecords: [PrescriptionRecord]
+    // 화면 찍기 전용 인자가 용량 변경이 달린 약을 고를 때만 쓴다.
+    @Query private var doseChangeRecords: [DoseChangeRecord]
+
+    @State private var isShowingAddFlow = false
+    /// 화면 찍기 전용: 실행 인자로 약 상세를 바로 열 때 쓰는 길.
+    @State private var path: [UUID] = []
+    @State private var isShowingPrescription = false
+    @State private var isShowingVisitHistory = false
+    @State private var pendingDeletion: Row?
+
+    /// 자정을 넘기면 값이 바뀌어 화면이 다시 그려진다(JanjanClock).
+    @ObservedObject private var clock = JanjanClock.shared
+    private var today: Date { clock.today }
+    private var endOfToday: Date { clock.endOfToday }
+    private var lang: JanjanLanguage { .current }
+
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(spacing: CGFloat(JanjanSpacing.s)) {
+                    prescriptionCard
+                    // 약에서 바로 변동 내역을 볼 수 있게(사용자 요청 2026-09-21).
+                    // 지난 진료가 없으면 스스로 그리지 않는다.
+                    ChangesSinceVisitCard()
+                    if sections.isEmpty {
+                        emptyCard
+                    }
                     ForEach(sections, id: \.title) { section in
                         sectionHeader(section.title)
                         ForEach(section.rows) { row in
-                            medicationRow(row)
+                            NavigationLink(value: row.id) {
+                                medicationRow(row)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("medicationRow")
                         }
                     }
                 }
                 .padding(.horizontal, CGFloat(JanjanSpacing.m))
-                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
             }
             .fogBackground()
             .scrollContentBackground(.hidden)
-            .navigationTitle("약")
+            .navigationTitle(t("약", "Meds"))
             .navigationBarTitleDisplayMode(.large)
-            .overlay(alignment: .bottomTrailing) {
-                BlackCircleButton(systemImage: "plus", accessibilityLabelKo: "약 추가") {
-                    isShowingAddFlow = true
+            // 약을 더하는 손잡이는 제목 줄에 둔다. 오늘 화면의 설정 버튼과 같은 자리다.
+            //
+            // 원래는 떠 있는 검은 원 버튼이었는데 두 번 고치고도 계속 목록을 가렸다.
+            // 처음에는 아래 여백으로, 다음에는 safeAreaInset 으로 막으려 했다.
+            // 둘 다 틀렸다 - safeAreaInset 은 '마지막 줄까지 스크롤로 닿게' 해 줄 뿐,
+            // 목록 중간에서 버튼 밑으로 내용이 지나가는 것은 그대로다. 사진에서
+            // '로라제팜 10정' 의 개수가 세 번째로 가려진 것을 보고 접었다.
+            //
+            // 떠 있는 버튼은 구조상 늘 무언가를 덮는다. 그리고 약을 더하는 일은
+            // 자주 하는 일이 아니다 - 처음에 몇 번 하고 나면 거의 안 한다.
+            // 화면에서 가장 큰 손잡이를 줄 만한 동작이 아니었다.
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isShowingAddFlow = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(Color.ink2)
+                    }
+                    .accessibilityLabel(Text(t("약 추가", "Add medication")))
                 }
-                .padding(CGFloat(JanjanSpacing.l))
             }
             .sheet(isPresented: $isShowingAddFlow) {
                 AddMedicationEntryView()
+            }
+            #if DEBUG
+            // 화면 찍기 전용: simctl 로만 띄우는 캡처는 눌러 들어갈 수가 없다.
+            // 영어 세트는 이 인자들이 없으면 찍을 길이 아예 없다(2026-09-20).
+            .onAppear {
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("-JanjanShowPillFinder") {
+                    isShowingAddFlow = true
+                }
+                if arguments.contains("-JanjanShowPrescription") {
+                    isShowingPrescription = true
+                }
+                // 용량 변경이 달린 약(에스시탈로프람)으로 들어간다. 첫 줄을
+                // 잡으면 변경 기록이 없는 약에 들어가 버린다 - 한국어 세트가
+                // 그래서 두 번 비었다.
+                if arguments.contains("-JanjanShowMedication")
+                    || arguments.contains("-JanjanShowDoseCompare")
+                    || arguments.contains("-JanjanShowRecount") {
+                    let rows = sections.flatMap(\.rows)
+                    let target = rows.first { row in
+                        doseChangeRecords.contains { $0.medicationID == row.id }
+                    } ?? rows.first
+                    if let target, path.isEmpty { path = [target.id] }
+                }
+            }
+            #endif
+            .navigationDestination(for: UUID.self) { id in
+                MedicationDetailView(medicationID: id)
+            }
+            .sheet(isPresented: $isShowingPrescription) {
+                NavigationStack {
+                    // 진료일·처방일수·약별 개수·남은 개수·용량 변경·메모까지
+                    // 다 적어 놓고 손가락이 미끄러지면 전부 날아갔다
+                    // (QA 2026-09-21). 적은 것이 있으면 닫기를 한 번 거친다.
+                    PrescriptionFormView { isShowingPrescription = false }
+                }
+            }
+            .sheet(isPresented: $isShowingVisitHistory) {
+                VisitHistoryView()
+            }
+            .confirmationDialog(
+                t("이 약의 기록을 모두 지울까요?", "Delete all records for this medication?"),
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    // 바깥을 눌러 닫았을 때도 고른 줄을 놓아 준다.
+                    // .constant 로 두면 한 번 닫힌 뒤 다시는 열리지 않는다.
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingDeletion
+            ) { row in
+                Button(t("삭제", "Delete"), role: .destructive) { delete(row) }
+                Button(t("취소", "Cancel"), role: .cancel) { pendingDeletion = nil }
+            } message: { row in
+                // 목록에서 가려 둔 이름이 확인 창에서 새면 안 된다 - 가린 동안은 부르지 않는다.
+                if masksNames {
+                    Text(t(
+                        "복용 기록·남은 개수·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
+                        "This removes its dose and stock records together. This can't be undone."
+                    ))
+                } else {
+                    Text(t(
+                        "\(row.medication.name) 의 복용 기록·재고·적어 둔 메모·용량 변경 이력이 함께 사라져요. 되돌릴 수 없어요.",
+                        "This removes \(row.medication.name)'s dose and stock records together. This can't be undone."
+                    ))
+                }
             }
         }
     }
 
     // MARK: - 데이터
 
-    private struct Row: Identifiable {
+    struct Row: Identifiable {
         let id: UUID
         let medication: Medication
         let snapshot: InventoryCalculator.Snapshot
+        /// 재고를 한 번도 세지 않았으면 잔여를 숫자로 말하지 않는다.
+        let hasStock: Bool
+        /// 마지막 재고 사건 이후의 총량·소비량. "17/28정 · 총 9정 복용" 의 재료.
+        let cycle: InventoryCalculator.CycleStatus?
     }
 
     private struct RowGroup {
@@ -54,22 +175,48 @@ struct MedicationsView: View {
         let rows: [Row]
     }
 
-    private var rows: [Row] {
-        let stock = SampleData.stockEvents(referenceDate: today)
-        let doses = SampleData.doseEvents(referenceDate: today)
-        let nextVisit = SampleData.prescription(referenceDate: today).nextVisitDate
+    private var medications: [Medication] { medicationRecords.map { $0.core.displayReady } }
+    private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+    private var doseEvents: [DoseEvent] { doseRecords.map(\.core) }
+    private var stockEvents: [StockEvent] { stockRecords.map(\.core) }
 
-        return SampleData.medications.map { medication in
+    /// 가장 가까운 다음 진료. 부족 판단의 기준선이다.
+    ///
+    /// **날 단위로 센다.** `today` 는 앱을 켠 그 순간이라 시각으로 견주면
+    /// 오전 10시 진료가 오후에는 "지난 것" 이 되어 이 탭만 "다음 진료 미정"
+    /// 으로 바뀌었다 - 같은 시각 오늘 탭은 "오늘 진료" 라고 했다
+    /// (QA 2026-09-21).
+    private var nextVisit: Date? {
+        let startOfToday = Calendar.current.startOfDay(for: today)
+        return prescriptionRecords
+            .compactMap { $0.core.nextVisitDate }
+            .filter { $0 >= startOfToday }
+            .min()
+    }
+
+    private var rows: [Row] {
+        let stock = stockEvents
+        let doses = doseEvents
+        let visit = nextVisit
+
+        return medications.map { medication in
             Row(
                 id: medication.id,
                 medication: medication,
                 snapshot: InventoryCalculator.snapshot(
                     medicationID: medication.id,
-                    schedules: SampleData.schedules,
+                    schedules: schedules,
                     stockEvents: stock,
                     doseEvents: doses,
-                    nextVisit: nextVisit,
-                    asOf: today
+                    nextVisit: visit,
+                    asOf: endOfToday
+                ),
+                hasStock: stock.contains { $0.medicationID == medication.id },
+                cycle: InventoryCalculator.cycleStatus(
+                    for: medication.id,
+                    stockEvents: stock,
+                    doseEvents: doses,
+                    asOf: endOfToday
                 )
             )
         }
@@ -78,108 +225,426 @@ struct MedicationsView: View {
     private var sections: [RowGroup] {
         let all = rows
         return [
-            RowGroup(title: "복용 중", rows: all.filter { $0.medication.kind == .scheduled }),
-            RowGroup(title: "필요시", rows: all.filter { $0.medication.kind == .asNeeded })
+            RowGroup(title: t("복용 중", "Taking"), rows: all.filter {
+                $0.medication.status == .active && $0.medication.kind == .scheduled
+            }),
+            RowGroup(title: t("비상약", "Rescue meds"), rows: all.filter {
+                $0.medication.status == .active && $0.medication.kind == .asNeeded
+            }),
+            RowGroup(title: t("중단", "Stopped"), rows: all.filter { $0.medication.status == .stopped })
         ]
         .filter { !$0.rows.isEmpty }
     }
 
     // MARK: - 조각
 
+    /// 다음 진료와 처방 기록 입구.
+    ///
+    /// 검은 원 버튼은 화면당 하나(약 추가)라서 여기서는 흰 알약을 쓴다(설계 02절).
+    /// 다음 진료까지 못 버티는 복용 중 약의 개수. 진료일이 없으면 nil(계산 불가).
+    /// 이 숫자는 소진 예측(Pro)의 답이다. 약 줄에서는 잠기고, 오늘 화면에서는
+    /// 흐려지고, 종이에서는 `nextVisit: pro.isPro ? … : nil` 로 아예 빠지는
+    /// 바로 그 계산인데 이 카드만 그대로 읽어 주고 있었다(QA 2026-09-21).
+    private var shortageCount: Int? {
+        guard pro.isPro, nextVisit != nil else { return nil }
+        // 재고를 한 번도 안 센 약은 `remaining` 이 0 이라 "진료까지 남은 날
+        // 전부가 모자람" 이 된다. 아래 줄은 그런 약에 "남은 개수 미기록" 만
+        // 적으므로, 카드가 "1개 있어요" 라 해도 찾을 수 없었다(QA 2026-09-22).
+        // 오늘 탭·종이와 같이 재고 있는 약만 센다.
+        let count = rows.filter {
+            $0.medication.status == .active && $0.hasStock && ($0.snapshot.shortfallDays ?? 0) > 0
+        }.count
+        return count
+    }
+
+    /// 모자라는 약 줄이 비었을 때 그 자리에 서는 말.
+    private var shortageNoticeText: String {
+        if nextVisit == nil {
+            // 무료 사용자에게 "적어 두면 셀 수 있어요" 는 거짓 약속이다 - 적어도
+            // 계산은 Pro 다(QA 2026-09-22).
+            return pro.isPro
+                ? t("진료일과 받아 온 개수를 적어 두면 남은 날짜를 셀 수 있어요.",
+                    "Add a visit date and how many pills you picked up to count the days left.")
+                : t("진료일과 받아 온 개수를 적어 두면 Pro 에서 남은 날짜를 셀 수 있어요.",
+                    "Add a visit date and how many pills you picked up, and Pro counts the days left.")
+        }
+        guard pro.isPro else {
+            return t("다음 진료까지 버틸 수 있는지는 Pro 에서 계산해 드려요.",
+                     "Pro works out whether this lasts until your next visit.")
+        }
+        return t("다음 진료 전에 모자라는 약이 없어요.",
+                 "No medication runs short before the next visit.")
+    }
+
+    private var prescriptionCard: some View {
+        JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(nextVisitText)
+                        .janjanBody(15, weight: .medium)
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: 0)
+                }
+
+                // 모자라는 약이 있으면 이 카드가 먼저 말한다(사용자 요청 2026-09-16).
+                // 색만으로 구분하지 않는다 - 아이콘과 문장이 같은 말을 한다.
+                if let shortage = shortageCount, shortage > 0 {
+                    HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.ink)
+                        Text(t(
+                            "다음 진료 전에 모자라는 약이 \(shortage)개 있어요. 아래 약 줄에서 확인해 주세요.",
+                            "\(shortage) medication\(shortage == 1 ? "" : "s") will run short before the next visit. Check the rows below."
+                        ))
+                        .janjanBody(12, weight: .semibold)
+                        .foregroundStyle(Color.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    // 무료에게 "적어 두면 켜져요" 라고만 말하면, 돈이 아니라
+                    // 입력만 하면 되는 줄 안다. 다 적어도 안 켜진다(QA 2026-09-21).
+                    // Pro 라고 적어 두고 누를 자리를 안 주면 읽고 끝난다.
+                    // 그 문장일 때만 문을 단다 - 재료가 없다는 안내까지
+                    // 페이월로 보내면 돈이 아니라 입력이 필요한 사람을
+                    // 엉뚱한 데로 보낸다(QA 2026-09-21).
+                    if nextVisit != nil, !pro.isPro {
+                        Text(shortageNoticeText)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .proGated(.runOutForecast, showsBadge: false)
+                    } else {
+                        Text(shortageNoticeText)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                // 처방일수와 다음 진료일이 둘 다 들어와 계산 재료가 막 갖춰졌을 때.
+                if hasForecastMaterial {
+                    ProMomentNote(moment: .forecastReady)
+                }
+
+                // HStack 이 아니라 FlowRow: 큰 글씨 설정에서 두 캡슐이 카드 폭을
+                // 넘으면 잘리는 대신 줄을 바꾼다(QA 2026-09-19).
+                FlowRow(spacing: CGFloat(JanjanSpacing.xs)) {
+                    WhitePillButton(title: t("진료 기록하기", "Log a visit"), systemImage: "doc.text") {
+                        isShowingPrescription = true
+                    }
+
+                    // 남긴 진료가 있어야 여는 문을 보여 준다 - 빈 화면으로 이끌지 않는다.
+                    if hasVisitHistory {
+                        WhitePillButton(title: t("지난 진료", "Past visits"), systemImage: "clock") {
+                            isShowingVisitHistory = true
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, CGFloat(JanjanSpacing.s))
+    }
+
+    /// 소진 예측을 권할 재료가 갖춰졌는지 - 다음 진료일이 있고, 받아 온 개수를
+    /// 세어 둔 약이 하나라도 있어야 계산이 나온다.
+    private var hasForecastMaterial: Bool {
+        nextVisit != nil && rows.contains { $0.hasStock }
+    }
+
+    /// 실제로 다녀온 진료가 하나라도 있는지. VisitHistoryView 와 같은 규칙으로 센다.
+    private var hasVisitHistory: Bool {
+        prescriptionRecords.contains { !$0.core.isScheduleOnly && $0.visitDate < endOfToday }
+    }
+
+    private var nextVisitText: String {
+        guard let nextVisit else { return t("다음 진료 미정", "Next visit not set") }
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: today),
+            to: Calendar.current.startOfDay(for: nextVisit)
+        ).day ?? 0
+        return days == 0
+            ? t("오늘 진료", "Visit today")
+            : t("다음 진료 D-\(days)", "Next visit in \(days) days")
+    }
+
+    private var emptyCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(t("첫 약을 등록해 볼까요", "Let's add your first medication"))
+                    .janjanDisplay(20)
+                    .foregroundStyle(Color.ink)
+                // "이름과 시간만으로" 는 옛말이다 - 용량(단위까지)과 요일도 받는다.
+                // 폼에 들어가 막히고 나서야 알면 첫인상이 거짓말이 된다(QA 2026-09-22).
+                Text(t("이름·용량·남은 개수·먹는 때·요일을 적으면 돼요.", "Just the name, the dose, how many you have, when you take it, and which days."))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.muted)
+
+                // 손이 문구 바로 아래로 가게 등록 입구를 카드 안에 둔다
+                // (사용자 요청 2026-09-19 - 이전 문구는 "오른쪽 아래 +" 라고
+                // 안내했는데 실제 + 는 오른쪽 위에 있었다).
+                WhitePillButton(title: t("약 등록하기", "Add a medication"), systemImage: "plus") {
+                    isShowingAddFlow = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xxs))
+            }
+        }
+        .padding(.top, CGFloat(JanjanSpacing.s))
+    }
+
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(JanjanFont.body(13, weight: .medium))
+            .janjanBody(13, weight: .medium)
             .foregroundStyle(Color.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, CGFloat(JanjanSpacing.s))
             .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
     }
 
+    /// 목록 행 안의 약 이름.
+    ///
+    /// 이 줄은 `MaskedNameText` 를 그대로 쓰지 않는다 — 행 전체가 `NavigationLink` 라
+    /// 이름 자리에 따로 탭 손짓을 얹으면 행 탭(상세로 이동)과 겹친다. 그래서 여기서는
+    /// 가려졌을 때 점 표기만 보이고, 다시 누르면 보이는 동작은 두지 않는다. 이름을
+    /// 보려면 상세로 들어가면 된다 - 거기서는 `MaskedNameText` 가 제대로 동작한다.
+    private func medicationNameText(_ medication: Medication) -> some View {
+        Group {
+            if masksNames {
+                // 이름 자체를 블러로 가린다(사용자 결정 2026-09-16). 글자로 보려면
+                // 상세로 들어간다 - 거기서 MaskedNameText 를 누르면 보인다.
+                Text(medication.name)
+                    .blur(radius: MaskedNameText.blurRadius)
+                    .accessibilityLabel(Text(t("가려진 약 이름", "Hidden medication name")))
+            } else {
+                Text(medication.name)
+            }
+        }
+    }
+
+    private func nameLine(_ medication: Medication) -> some View {
+        medicationNameText(medication)
+            .janjanBody(16, weight: .medium)
+            .foregroundStyle(Color.ink)
+    }
+
+    @ViewBuilder
+    private func strengthChip(_ medication: Medication) -> some View {
+        if !medication.strengthText.isEmpty {
+            PillChip(text: medication.strengthText)
+        }
+    }
+
     private func medicationRow(_ row: Row) -> some View {
         JanjanCard(padding: CGFloat(JanjanSpacing.m)) {
             HStack(alignment: .top, spacing: CGFloat(JanjanSpacing.s)) {
                 VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
-                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
-                        Text(row.medication.name)
-                            .font(JanjanFont.body(16, weight: .medium))
-                            .foregroundStyle(Color.ink)
-                        if !row.medication.strengthText.isEmpty {
-                            PillChip(text: row.medication.strengthText)
+                    // SE 에서 "에스시탈…" 로 잘려 첫 세 글자로 약을 알아야 했고,
+                    // 두 줄을 허용하니 "라모트리 / 진" 으로 어절 중간에서 꺾였다
+                    // (런 47). 이름과 칩이 한 줄에 들면 그대로, 안 들면 칩이 이름
+                    // 아래로 내려간다 - 이름은 카드 폭을 통째로 쓴다.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: CGFloat(JanjanSpacing.xs)) {
+                            nameLine(row.medication).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                            strengthChip(row.medication)
+                        }
+                        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                            nameLine(row.medication).lineLimit(2)
+                            strengthChip(row.medication)
                         }
                     }
                     if !row.medication.purposeLine.isEmpty {
                         Text(row.medication.purposeLine)
-                            .font(JanjanFont.body(13))
+                            .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
                 }
 
                 Spacer(minLength: CGFloat(JanjanSpacing.xs))
 
+                // 오른쪽 열에 상한을 둔다. 영어의 "5 days short before the
+                // visit" 는 180pt 를 요구하는데(한국어는 100pt) 두 열이 다
+                // 유연해서 이름 몫이 100pt 안팎까지 밀렸다 - SE 영어판에서
+                // "Escitalo…" 가 됐다(QA 2026-09-21).
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(DecimalQuantity.display(row.snapshot.remaining))정")
-                        .font(JanjanFont.display(20))
-                        .foregroundStyle(Color.ink)
-                        .monospacedDigit()
-                    if let text = runOutText(row) {
-                        Text(text)
-                            .font(JanjanFont.body(12))
+                    if row.hasStock {
+                        // "17/28정" - 남은 숫자만으로는 많은지 적은지 모른다.
+                        // 이번 구간의 총량이 눈금이 된다(사용자 결정 2026-09-16).
+                        // 남은 개수는 굵고 크게, 총량은 얇고 작게 - 눈이 먼저 잡을 것은
+                        // 지금 남은 쪽이다(사용자 요청 2026-09-16).
+                        let remaining = max(row.snapshot.remaining, 0)
+                        if let cycle = row.cycle, cycle.total > 0 {
+                            (
+                                Text(DecimalQuantity.display(remaining))
+                                    .font(JanjanFont.displayStrong(20).monospacedDigit())
+                                    .foregroundColor(Color.ink)
+                                + Text(t("/\(DecimalQuantity.display(cycle.total))정", "/\(DecimalQuantity.display(cycle.total)) pills"))
+                                    .font(JanjanFont.display(15).monospacedDigit())
+                                    .foregroundColor(Color.muted)
+                            )
+                        } else {
+                            Text(t("\(DecimalQuantity.display(remaining))정", pillsEn(remaining)))
+                                .janjanDisplay(20)
+                                .foregroundStyle(Color.ink)
+                                .monospacedDigit()
+                        }
+                        if let cycle = row.cycle, cycle.consumed > 0 {
+                            Text(t("총 \(DecimalQuantity.display(cycle.consumed))정 복용", "\(DecimalQuantity.display(cycle.consumed)) taken so far"))
+                                .janjanBody(12)
+                                .foregroundStyle(Color.muted)
+                                .monospacedDigit()
+                        }
+                    } else {
+                        Text(t("남은 개수 미기록", "No count yet"))
+                            .janjanBody(13)
                             .foregroundStyle(Color.muted)
                     }
+                    if let text = runOutText(row) {
+                        Text(text)
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if showsLockedForecast(row) {
+                        // 무료에게 이 줄을 통째로 숨기면 소진 예측이 있다는
+                        // 사실조차 모른다 - 스토어에서는 파는데 앱에는 흔적이
+                        // 없던 유일한 Pro 였다(2026-09-19).
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .regular))
+                            Text(t("소진 예측", "Run-out forecast"))
+                                .janjanBody(12)
+                        }
+                        .foregroundStyle(Color.muted)
+                    }
+                }
+                .frame(maxWidth: 130, alignment: .trailing)
+            }
+        }
+        .contextMenu {
+            if row.medication.status == .active {
+                Button(t("복용 중단", "Stop taking")) {
+                    MedicationStore.setStatus(.stopped, for: row.id, in: context)
+                    rescheduleReminders()
+                }
+            } else {
+                Button(t("다시 복용", "Resume")) {
+                    MedicationStore.setStatus(.active, for: row.id, in: context)
+                    rescheduleReminders()
                 }
             }
+            Button(t("삭제", "Delete"), role: .destructive) { pendingDeletion = row }
         }
     }
 
+    /// 무료에게 "소진 예측" 자물쇠 줄을 보일지. 세어 둔 재고가 있고 계산이
+    /// 실제로 나오는 줄에만 단다 - 보여 줄 것도 없는데 자물쇠만 붙이면
+    /// 목록이 잠금 표시로 뒤덮인다.
+    private func showsLockedForecast(_ row: Row) -> Bool {
+        guard !pro.isPro, row.hasStock, row.snapshot.remaining >= 0 else { return false }
+        return row.snapshot.daysRemaining != nil || (row.snapshot.shortfallDays ?? 0) > 0
+    }
+
+    /// 잔여 개수는 무료다 — 사용자가 직접 센 숫자이므로.
+    /// **앞으로 며칠 남는지 내다보는 것만 Pro** 다(ASC 구독 설명이 약속한 네 가지 중 하나).
     private func runOutText(_ row: Row) -> String? {
-        guard let days = row.snapshot.daysRemaining else { return nil }
-        let whole = DecimalQuantity.floorToInt(days)
-        guard whole >= 0 else { return nil }
-        if let shortfall = row.snapshot.shortfallDays {
-            return "진료 전 \(shortfall)일 모자람"
+        guard row.hasStock else { return nil }
+
+        // 세어 둔 것보다 많이 먹은 것으로 계산되면 음수가 나온다.
+        // 0 으로 깎아 보이되 그 사실을 숨기지는 않는다 — 다시 세어 달라고 말한다.
+        if row.snapshot.remaining < 0 { return t("다시 세어 주세요", "Please recount") }
+        guard pro.isPro else { return nil }
+
+        if let shortfall = row.snapshot.shortfallDays, shortfall > 0 {
+            return t("진료 전 \(shortfall)일 모자람", "\(shortfall) days short before the visit")
         }
-        return "약 \(whole)일치"
+        guard let days = row.snapshot.daysRemaining else { return nil }
+        return t("약 \(DecimalQuantity.floorToInt(days))일치", "About \(DecimalQuantity.floorToInt(days)) days' worth")
+    }
+
+    // MARK: - 손대기
+
+    private func delete(_ row: Row) {
+        MedicationStore.delete(medicationID: row.id, in: context)
+        pendingDeletion = nil
+        rescheduleReminders()
+    }
+
+    private func rescheduleReminders() {
+        Task { await ReminderPlanner.reschedule(using: context) }
     }
 }
 
 /// 약 추가의 첫 갈림길. 직접 입력은 무료, 약봉투 스캔은 Pro다(유도 세 곳 중 하나).
-private struct AddMedicationEntryView: View {
+// 오늘 탭의 빈 카드도 같은 갈림길을 연다 - 파일 밖에서 쓴다.
+struct AddMedicationEntryView: View {
 
     @Environment(\.dismiss) private var dismiss
+    @State private var isShowingForm = false
+    @State private var isShowingScan = false
+    @State private var isShowingPillFinder = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: CGFloat(JanjanSpacing.s)) {
                 entryRow(
-                    title: "직접 입력",
-                    subtitle: "이름 · 용량 · 시간을 하나씩 적어요.",
+                    title: t("직접 입력", "Enter manually"),
+                    subtitle: t("이름 · 용량 · 남은 개수 · 먹는 때 · 요일을 하나씩 적어요.", "Enter the name, dose, count on hand, time and days one by one."),
                     systemImage: "square.and.pencil"
                 ) {
-                    // TODO: 약 등록 폼 (이름 검색 → 용량 → 시간대 → 재고)
+                    isShowingForm = true
                 }
+                // 카드 안에 글자가 두 줄이라 이름만으로는 UI 테스트가 못 찾는다.
+                .accessibilityIdentifier("directEntry")
 
                 entryRow(
-                    title: ProFeature.pharmacyScan.titleKo,
-                    subtitle: "봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.",
+                    title: ProFeature.pharmacyScan.title(.current),
+                    subtitle: t("봉투 사진에서 약 이름을 읽어 와요. 사진은 저장되지 않아요.", "Reads medication names from a photo of the bag. The photo isn't saved."),
                     systemImage: "camera"
                 ) {
-                    // TODO: 온디바이스 Vision 텍스트 인식 → 확인 화면 → 저장
+                    isShowingScan = true
                 }
                 .proGated(.pharmacyScan)
+
+                entryRow(
+                    title: ProFeature.pillFinder.title(.current),
+                    subtitle: t("모양·색·각인으로 어떤 약인지 좁혀 봐요.", "Narrow it down by shape, color, and imprint."),
+                    systemImage: "circle.grid.2x2"
+                ) {
+                    isShowingPillFinder = true
+                }
+                .proGated(.pillFinder)
 
                 Spacer()
             }
             .padding(.horizontal, CGFloat(JanjanSpacing.m))
             .padding(.top, CGFloat(JanjanSpacing.m))
             .fogBackground()
-            .navigationTitle("약 추가")
+            .navigationTitle(t("약 추가", "Add medication"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
             }
+            .navigationDestination(isPresented: $isShowingForm) {
+                MedicationFormView { dismiss() }
+            }
+            .navigationDestination(isPresented: $isShowingScan) {
+                PharmacyScanView { dismiss() }
+            }
+            .navigationDestination(isPresented: $isShowingPillFinder) {
+                PillFinderView { dismiss() }
+            }
+            #if DEBUG
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("-JanjanShowPillFinder") {
+                    isShowingPillFinder = true
+                }
+            }
+            #endif
         }
     }
 
@@ -195,10 +660,10 @@ private struct AddMedicationEntryView: View {
                     CircleGlyph(systemImage: systemImage)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(JanjanFont.body(16, weight: .medium))
+                            .janjanBody(16, weight: .medium)
                             .foregroundStyle(Color.ink)
                         Text(subtitle)
-                            .font(JanjanFont.body(12))
+                            .janjanBody(12)
                             .foregroundStyle(Color.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -212,5 +677,6 @@ private struct AddMedicationEntryView: View {
 
 #Preview {
     MedicationsView()
+        .modelContainer(for: JanjanSchema.allModels, inMemory: true)
         .environmentObject(ProStore())
 }

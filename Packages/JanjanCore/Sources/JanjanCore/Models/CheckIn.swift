@@ -14,6 +14,11 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
             "매우 힘듦", "힘듦", "조금 힘듦", "그저 그럼", "조금 괜찮음", "괜찮음", "좋음"
         ]
 
+        /// 영어도 같은 결: 평가하는 말(bad/great) 대신 무게를 말한다.
+        public static let labelsEn: [String] = [
+            "Very hard", "Hard", "A bit hard", "So-so", "A bit okay", "Okay", "Good"
+        ]
+
         public var score: Int
 
         public init(_ score: Int) {
@@ -24,6 +29,11 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         public var index: Int { score - Mood.range.lowerBound }
 
         public var labelKo: String { Mood.labelsKo[index] }
+        public var labelEn: String { Mood.labelsEn[index] }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
 
         public static func < (lhs: Mood, rhs: Mood) -> Bool { lhs.score < rhs.score }
     }
@@ -41,6 +51,18 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
             case .good: return "잘 잠"
             }
         }
+
+        public var labelEn: String {
+            switch self {
+            case .poor: return "Slept poorly"
+            case .fair: return "So-so"
+            case .good: return "Slept well"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
     }
 
     public var id: UUID
@@ -56,6 +78,16 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
     public var sleepMinutes: Int?
     public var sleepQuality: SleepQuality?
     public var dreamed: Bool?
+    // 꿈 3척도 (강점 결정서 D15). SSRI 계열의 생생한 꿈은 부작용 축에서 함께
+    // 보는 것이 이 앱의 차별점이라, 척도만 받고 해석은 하지 않는다.
+    /// 얼마나 생생했는지. 1~3, 안 고르면 nil.
+    public var dreamVividness: Int?
+    /// 악몽이었는지. 안 고르면 nil.
+    public var nightmare: Bool?
+    /// 얼마나 기억나는지. 1~3, 안 고르면 nil.
+    public var dreamRecall: Int?
+    /// 꿈 한 줄 메모.
+    public var dreamNote: String?
     /// 활동 태그. 외출·운동·사람·술·카페인 등.
     public var activities: [String]
     /// 1층에서 조용히 펼쳐지는 한 줄.
@@ -76,6 +108,10 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         sleepMinutes: Int? = nil,
         sleepQuality: SleepQuality? = nil,
         dreamed: Bool? = nil,
+        dreamVividness: Int? = nil,
+        nightmare: Bool? = nil,
+        dreamRecall: Int? = nil,
+        dreamNote: String? = nil,
         activities: [String] = [],
         note: String? = nil,
         longText: String? = nil,
@@ -91,11 +127,39 @@ public struct CheckIn: Identifiable, Hashable, Codable, Sendable {
         self.sleepMinutes = sleepMinutes.map { max(0, $0) }
         self.sleepQuality = sleepQuality
         self.dreamed = dreamed
+        self.dreamVividness = dreamVividness.map { min(max($0, 1), 3) }
+        self.nightmare = nightmare
+        self.dreamRecall = dreamRecall.map { min(max($0, 1), 3) }
+        self.dreamNote = dreamNote
         self.activities = activities
         self.note = note
         self.longText = longText
         self.questionCardID = questionCardID
         self.updatedAt = updatedAt
+    }
+
+    /// 같은 날의 체크인이 여러 줄이면 가장 나중에 손댄 것만 남긴다.
+    ///
+    /// 하루 1개는 CheckInRecorder 가 지키지만, 오프라인 두 기기가 각자 적은 뒤
+    /// iCloud 로 만나면 같은 날 두 줄이 생길 수 있다. 리포트가 그대로 세면
+    /// "꿈을 기록한 날" 같은 일수가 부풀어 거짓말이 된다(QA 2026-09-10).
+    /// MonthWave 와 같은 규칙: updatedAt 이 나중인 쪽, 같으면 id 가 큰 쪽.
+    public static func collapsedByDay(
+        _ checkIns: [CheckIn],
+        calendar: Calendar = .current
+    ) -> [CheckIn] {
+        var latest: [Date: CheckIn] = [:]
+        for checkIn in checkIns {
+            let day = calendar.startOfDay(for: checkIn.date)
+            if let kept = latest[day], isLater(kept, than: checkIn) { continue }
+            latest[day] = checkIn
+        }
+        return latest.values.sorted { $0.date < $1.date }
+    }
+
+    private static func isLater(_ lhs: CheckIn, than rhs: CheckIn) -> Bool {
+        if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
+        return lhs.id.uuidString > rhs.id.uuidString
     }
 
     /// 1층만 채운 최소 기록인지. 리포트에서 "가볍게 남긴 날" 로 구분한다.

@@ -1,18 +1,65 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 import JanjanCore
+
+/// 알림 델리게이트를 **첫 프레임보다 먼저** 건다.
+///
+/// 예전에는 `AppServices.start`(화면의 `.task` 안, 구독 확인 뒤)에서만 걸었다.
+/// 앱을 완전히 끈 상태에서 잠금화면 알림의 "복용함" 을 누르면 iOS 가 앱을
+/// 백그라운드로 깨우는데, 그때 화면의 `.task` 가 돈다는 보장이 없어 액션이
+/// 아무 데도 닿지 않을 수 있었다(QA 2026-09-22). `didFinishLaunching` 은
+/// 어느 길로 깨어나든 가장 먼저 돈다.
+@MainActor
+final class JanjanAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        NotificationManager.shared.bootstrap()
+        return true
+    }
+}
 
 @main
 struct TheJanjanApp: App {
 
+    @UIApplicationDelegateAdaptor(JanjanAppDelegate.self) private var appDelegate
+
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appLock = AppLockManager()
     @StateObject private var proStore = ProStore()
+    @AppStorage(JanjanLanguage.defaultsKey) private var languageRaw = JanjanLanguage.standard.rawValue
 
     private let modelContainer: ModelContainer
 
     init() {
+        // **AppLockManager 보다 먼저다.** 그 객체는 만들어지는 순간
+        // 키체인에 번호가 있는지를 읽어 잠금 상태를 정한다. 앱을 지웠다
+        // 다시 깐 기기에는 옛 번호가 남아 있어, 걷어 내지 않으면 기록이
+        // 하나도 없는 새 앱이 네 자리를 묻는 화면부터 띄운다.
+        PasscodeStore.clearIfReinstalled()
+
         modelContainer = JanjanModelContainer.make()
+
+        // 화면을 찍기 위한 예시 기록. 실행 인자가 있을 때만, 그리고 DEBUG 에서만 돈다.
+        // 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없으므로,
+        // CI 의 macOS 러너가 이 데이터를 심은 앱을 띄우고 화면을 찍는다.
+        #if DEBUG
+        if DemoSeed.isRequested {
+            MainActor.assumeIsolated {
+                DemoSeed.apply(to: modelContainer.mainContext)
+            }
+        }
+        #endif
+    }
+
+    /// 앱 전체를 덮어야 하는 상태인가. 잠금은 사용자가 푸는 것이라 되돌리는 쪽은 비워 둔다.
+    private var isFullyLocked: Binding<Bool> {
+        Binding(
+            get: { appLock.isEnabled && appLock.isLocked },
+            set: { _ in }
+        )
     }
 
     var body: some Scene {
@@ -21,21 +68,87 @@ struct TheJanjanApp: App {
                 .task {
                     // 화면이 올라온 뒤 한 번만. 여기서 알림 권한을 조르지는 않는다 —
                     // 권한은 온보딩에서 "왜 필요한지" 한 문장을 보여 준 뒤에 묻는다.
-                    await AppServices.shared.start(container: modelContainer)
-                    // 상품·권한 확인. 실패해도 무료 기능은 그대로 돈다(체크리스트 3.6).
+                    //
+                    // **구독 판정이 activate() 보다 먼저다.** 워치가 큐에 쌓아 둔
+                    // 기록은 세션이 열리자마자 도착하는데, 그때 isPro 가 아직
+                    // 기본값(false)이면 유료 사용자의 기록이 조용히 버려진다
+                    // (QA 2026-09-10). 상품 확인이 실패해도 무료 기능은 그대로
+                    // 돈다(체크리스트 3.6).
                     await proStore.reload()
+                    AppServices.shared.updatePro(proStore.isPro)
+
+                    // 광고 SDK 는 무료 사용자에게만, 그리고 배너가 붙기 전에
+                    // 미리 깨운다. 붙는 순간에 깨우면 시동과 첫 요청이 겹쳐
+                    // 첫 화면이 늘 빈자리가 된다(QA 2026-09-19).
+                    // 구독 판정이 끝난 뒤라, Pro 인 사람의 기기에서는 켜지지 않는다.
+                    if !proStore.isPro { JanjanAds.startIfNeeded() }
+                    await AppServices.shared.start(container: modelContainer)
                 }
-                .overlay {
-                    // "일기만 잠그기" 를 켠 경우에는 앱 전체를 덮지 않고,
-                    // RootTabView 의 기록 탭 안에서만 덮는다.
-                    if appLock.isEnabled, appLock.isLocked, !appLock.diaryOnly {
-                        LockScreenView()
-                    }
+                // 시트가 아니라 fullScreenCover 로 덮는다.
+                //
+                // .overlay 는 화면 **위에 올라온 시트 아래**에 깔린다. 복용 기록 시트나
+                // 리포트 공유 시트를 열어 둔 채로 앱을 내렸다 다시 열면, 잠겼는데도
+                // 그 시트가 그대로 보이고 잠금 화면은 시트 뒤에 숨는다.
+                // fullScreenCover 는 모달 계층의 맨 위로 올라가서 그 경로를 막는다.
+                //
+                .fullScreenCover(isPresented: isFullyLocked) {
+                    LockScreenView()
+                        .environmentObject(appLock)
+                }
+                // 기기 인증으로 되찾아 들어왔으면 새 번호를 정하게 한다.
+                // 잊은 번호를 그대로 두면 다음에 앱을 열 때 같은 자리에서 또 막힌다.
+                .fullScreenCover(isPresented: $appLock.needsNewPasscode) {
+                    PasscodeSetupView(mode: .reset) {}
+                        .environmentObject(appLock)
                 }
                 .environmentObject(appLock)
                 .environmentObject(proStore)
+                // 화면 글자는 설정에서 고른 언어를 따르는데 DatePicker 같은 시스템 부품은
+                // 기기 로케일을 따로 본다. 그대로 두면 한국어 화면인데 "Aug 26, 2026" 처럼
+                // 어긋난 표기가 나온다(반대도 마찬가지). 그래서 로케일을 설정의 언어에 맞춘다.
+                //
+                // 위기 상담 연락처는 이것과 무관하게 기기의 **지역**을 본다
+                // (Locale.current.region) — 한국어를 쓰지만 해외에 있는 사람에게
+                // 한국 번호를 내밀면 안 되기 때문이다.
+                .environment(\.locale, Locale(identifier: (JanjanLanguage(rawValue: languageRaw) ?? .standard).localeIdentifier))
+                .onChange(of: proStore.isPro) { _, isPro in
+                    AppServices.shared.updatePro(isPro)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     appLock.handle(scenePhase: phase)
+
+                    // 구독이 밤사이 끝나도 Transaction.updates 는 새 거래가 없으면
+                    // 울리지 않는다. 앱을 다시 켤 때 권한을 한 번 더 확인하지 않으면
+                    // 만료된 채로 Pro 화면이 열려 있게 된다.
+                    //
+                    // 권한 확인 → 알림 다시 깔기 순서를 지킨다 - 되물음 예약이
+                    // Pro 그림자 값을 읽는데, 나란히 돌리면 지난 값으로 깐다.
+                    if phase == .active {
+                        Task {
+                            _ = await proStore.refreshEntitlements()
+                            // 되물음(Pro)은 하루치만 걸려 있다 - 날이 바뀌었을 수
+                            // 있으니 앱이 앞으로 나올 때마다 오늘치를 다시 깐다.
+                            await ReminderPlanner.reschedule(using: modelContainer.mainContext)
+                            // 날이 바뀌었으면 어제까지의 빈 자리를 미기록으로
+                            // 채운다. 채워도 "기록 없이 지나간 시간대" 는
+                            // 그대로 물어본다 - 채우는 것은 답이 아니다.
+                            UnrecordedBackfill.run(in: modelContainer.mainContext)
+                        }
+                    }
+                }
+                // 앞으로 나올 때만 날을 새로 읽으면, 앱을 한 번도 안 내린
+                // 사람에게는 영영 어제다(QA 2026-09-19). 자정 자체를 듣는다.
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                    Task {
+                        UnrecordedBackfill.run(in: modelContainer.mainContext)
+                        // 되물음은 하루치만 걸려 있다. 날이 바뀌었으니 오늘치를 깐다.
+                        await ReminderPlanner.reschedule(using: modelContainer.mainContext)
+                        // 밤사이 끝난 구독은 새 거래가 없어 Transaction.updates 가
+                        // 울리지 않는다. 날이 바뀔 때 한 번 확인한다.
+                        _ = await proStore.refreshEntitlements()
+                        // 워치도 어제 계획을 들고 있다.
+                        AppServices.shared.pushWatchSnapshot()
+                    }
                 }
         }
         .modelContainer(modelContainer)
@@ -52,13 +165,19 @@ final class AppServices {
     static let shared = AppServices()
 
     private(set) var doseLogger: SwiftDataDoseLogger?
+    private(set) var container: ModelContainer?
     private var hasStarted = false
+
+    /// 워치 앱 전체가 Pro 기능이라, 워치로 무엇을 보낼지 정하려면 구독 상태를 알아야 한다.
+    /// 워치에는 StoreKit 을 올리지 않는다 — 판단은 폰에서 하고 결과만 건너간다.
+    private(set) var isPro = false
 
     private init() {}
 
     func start(container: ModelContainer) {
         guard !hasStarted else { return }
         hasStarted = true
+        self.container = container
 
         let logger = SwiftDataDoseLogger(container: container)
         doseLogger = logger
@@ -66,9 +185,51 @@ final class AppServices {
         NotificationManager.shared.doseLogger = logger
         NotificationManager.shared.bootstrap()
 
+        // 기록이 남으면 그 시간대 되물음을 걷는다. DoseRecorder 가 직접 부르지
+        // 못하는 이유는 그 파일 주석에 있다(위젯 타깃).
+        DoseRecorder.onScheduledRecordToday = { slotKey in
+            NotificationManager.shared.clearFollowUps(slotKey: slotKey)
+        }
+
         PhoneSessionManager.shared.doseLogger = logger
-        // TODO: 실제 저장소에서 오늘 요약을 만들어 보낸다. 지금은 예시 데이터.
-        PhoneSessionManager.shared.snapshotProvider = { SampleData.watchSnapshot() }
+        PhoneSessionManager.shared.snapshotProvider = { [weak self] in
+            WatchSnapshotBuilder.snapshot(
+                using: container.mainContext,
+                isPro: self?.isPro ?? false
+            )
+        }
         PhoneSessionManager.shared.activate()
+
+        // 알림은 매주 반복이라 한 번 깔면 유지되지만, 앱을 지웠다 깔거나
+        // 다른 기기에서 iCloud 로 스케줄이 넘어왔을 때는 비어 있다. 열 때마다 맞춰 둔다.
+        Task { await ReminderPlanner.reschedule(using: container.mainContext) }
+
+        // 답 없이 지나간 시간대를 미기록으로 채운다. 이것이 없으면 복약률의
+        // 분모가 "답한 횟수" 가 되어, 앱을 가끔만 여는 사람일수록 숫자가
+        // 더 좋게 나온다(QA 2026-09-19).
+        UnrecordedBackfill.run(in: container.mainContext)
+    }
+
+    /// 기록이 바뀌었으니 워치 화면도 새로 그리라고 밀어 준다.
+    /// 워치가 없거나 꺼져 있으면 조용히 아무 일도 일어나지 않는다.
+    func pushWatchSnapshot() {
+        // 기록이 바뀌면 홈 위젯도 다시 그린다. 예전에는 위젯 자신이 적을 때만
+        // 다시 그려서, 앱에서 "먹었어요" 를 눌러도 위젯은 다음 시간대까지
+        // "아침 1개 남음 / 먹었어요" 를 보여 줬다(QA 2026-09-22). 워치를 미는
+        // 자리마다 위젯도 함께 - 저장 경로가 이 문을 지난다.
+        WidgetCenter.shared.reloadAllTimelines()
+        guard let container else { return }
+        PhoneSessionManager.shared.pushSnapshot(
+            WatchSnapshotBuilder.snapshot(using: container.mainContext, isPro: isPro)
+        )
+    }
+
+    /// 구독 상태가 바뀌었다. 워치가 들고 있는 그림도 따라가야 한다 —
+    /// 구독이 끝났는데 워치에 오늘 일정이 그대로 남아 있으면 안 되고,
+    /// 방금 구독했는데 잠긴 화면이 남아 있어도 안 된다.
+    func updatePro(_ isPro: Bool) {
+        guard self.isPro != isPro else { return }
+        self.isPro = isPro
+        pushWatchSnapshot()
     }
 }

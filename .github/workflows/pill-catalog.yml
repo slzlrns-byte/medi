@@ -1,0 +1,64 @@
+# 낱알식별 데이터(pill_catalog.json)를 식약처 공공데이터에서 받아 커밋한다.
+#
+# 손으로만 돌린다(workflow_dispatch). 데이터가 바뀌는 일은 드물고,
+# 공공 API 를 스케줄로 두드릴 이유가 없다.
+#
+# 먼저 필요한 것: 공공데이터포털(data.go.kr)에서 "의약품 낱알식별 정보"
+# 활용신청 → 일반 인증키(Decoding) → 저장소 시크릿 MFDS_SERVICE_KEY 로 저장.
+name: Pill catalog
+
+# workflow_dispatch 는 기본 브랜치에 있어야 등록된다. 작업 브랜치에서 돌릴 수
+# 있게 화면 찍기와 같은 방식을 쓴다 - 이 파일을 건드린 푸시에만 돈다.
+# 실행 기록: 2026-09-15 1차 (MFDS_SERVICE_KEY 등록 직후)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/pill-catalog.yml
+      - scripts/build_pill_catalog.py
+
+concurrency:
+  group: pill-catalog-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 낱알 데이터 만들기
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 식약처 데이터 받아 추리기
+        # 식약처 API 는 해외 IP 에 시간대별로 되다 안 되다 한다(런 4·5·6의 교훈:
+        # 같은 코드가 2분 만에 전부 받기도, 첫 접속부터 전부 타임아웃이기도 했다).
+        # 사람이 다시 누르는 대신 5분 간격으로 최대 6번, 뚫리는 순간을 기다린다.
+        env:
+          MFDS_SERVICE_KEY: ${{ secrets.MFDS_SERVICE_KEY }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            echo "=== 시도 $attempt ==="
+            if python3 scripts/build_pill_catalog.py; then
+              exit 0
+            fi
+            [ "$attempt" -lt 6 ] && sleep 300
+          done
+          echo "::error::여섯 번 모두 실패했습니다. API 가 열리는 시간대에 다시 돌려 주세요."
+          exit 1
+
+      - name: 바뀐 것이 있으면 커밋
+        run: |
+          # 먼저 add 해야 한다 - git diff 는 처음 생긴(untracked) 파일을 못 본다.
+          git add Packages/JanjanCore/Sources/JanjanCore/Resources/pill_catalog.json
+          if git diff --cached --quiet; then
+            echo "pill_catalog.json 에 변화 없음 - 커밋하지 않는다."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "낱알 데이터 갱신 (식약처 의약품 낱알식별 정보, 공공누리 제1유형)"
+          git push

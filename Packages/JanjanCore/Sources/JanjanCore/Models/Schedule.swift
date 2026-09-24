@@ -34,12 +34,28 @@ public struct TimeOfDay: Hashable, Codable, Sendable, Comparable, CustomStringCo
     }
 
     /// 주어진 날짜에 이 시각을 얹은 `Date`.
+    ///
+    /// 서머타임으로 그 시각이 아예 없는 날이 있다(봄에 02:00~03:00 이 통째로 사라진다).
+    /// 그때 `calendar.date(from:)` 은 nil 을 돌려주는데, 예전처럼 `?? day` 로 넘기면
+    /// 넘겨받은 자정이 그대로 나가서 02:30 약이 00:00 약이 된다 — 두 시간 반이 조용히 어긋난다.
+    /// 없는 시각이면 그 다음으로 실제 존재하는 시각을 찾는다.
     public func date(on day: Date, calendar: Calendar = .current) -> Date {
         var components = calendar.dateComponents([.year, .month, .day], from: day)
         components.hour = hour
         components.minute = minute
         components.second = 0
-        return calendar.date(from: components) ?? day
+
+        if let exact = calendar.date(from: components) { return exact }
+
+        let startOfDay = calendar.startOfDay(for: day)
+        if let next = calendar.nextDate(
+            after: startOfDay,
+            matching: DateComponents(hour: hour, minute: minute),
+            matchingPolicy: .nextTime
+        ) {
+            return next
+        }
+        return startOfDay
     }
 }
 
@@ -65,16 +81,41 @@ public enum Weekday: Int, Codable, Sendable, CaseIterable, Comparable {
         }
     }
 
+    public var labelEn: String {
+        switch self {
+        case .sunday: return "Sun"
+        case .monday: return "Mon"
+        case .tuesday: return "Tue"
+        case .wednesday: return "Wed"
+        case .thursday: return "Thu"
+        case .friday: return "Fri"
+        case .saturday: return "Sat"
+        }
+    }
+
+    public func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
+    }
+
     public static func < (lhs: Weekday, rhs: Weekday) -> Bool { lhs.rawValue < rhs.rawValue }
 
     public static let everyday: Set<Weekday> = Set(Weekday.allCases)
+
+    /// 화면에 늘어놓는 순서. `allCases` 는 Calendar 규약대로 일요일부터라
+    /// 그대로 그리면 한국 달력과 어긋난다.
+    public static let displayOrderKo: [Weekday] = [
+        .monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday
+    ]
 
     public static func from(date: Date, calendar: Calendar = .current) -> Weekday {
         Weekday(rawValue: calendar.component(.weekday, from: date)) ?? .monday
     }
 }
 
-/// 복용 시간대. 아침·점심·저녁·취침 네 개가 기본이고, 나머지는 사용자 정의.
+/// 복용 시간대. 아침·점심·저녁·자기전 네 개가 기본이고, 나머지는 사용자 정의.
+///
+/// 저장 키(`storageKey`)는 `bedtime` 그대로다 - 이미 깔린 기기의 기록이
+/// 그 키로 매여 있어서, 라벨만 바꾼다("취침" → "자기전", 사용자 2026-09-21).
 public enum DoseSlot: Hashable, Codable, Sendable {
     case morning
     case noon
@@ -89,9 +130,23 @@ public enum DoseSlot: Hashable, Codable, Sendable {
         case .morning: return "아침"
         case .noon: return "점심"
         case .evening: return "저녁"
-        case .bedtime: return "취침"
+        case .bedtime: return "자기전"
         case .custom(let time): return time.description
         }
+    }
+
+    public var labelEn: String {
+        switch self {
+        case .morning: return "Morning"
+        case .noon: return "Noon"
+        case .evening: return "Evening"
+        case .bedtime: return "Bedtime"
+        case .custom(let time): return time.description
+        }
+    }
+
+    public func label(_ language: JanjanLanguage) -> String {
+        language == .english ? labelEn : labelKo
     }
 
     /// 설정을 건드리지 않았을 때의 기본 시각.
@@ -103,6 +158,15 @@ public enum DoseSlot: Hashable, Codable, Sendable {
         case .bedtime: return TimeOfDay(hour: 22, minute: 30)
         case .custom(let time): return time
         }
+    }
+
+    /// 직접 넣은 시간대인가.
+    ///
+    /// 직접 넣은 시간대의 labelKo 는 시각 그 자체다("14:30"). 라벨과 시각을 나란히
+    /// 그리는 화면들이 같은 말을 두 번 하지 않으려면 이걸 물어봐야 한다.
+    public var isCustom: Bool {
+        if case .custom = self { return true }
+        return false
     }
 
     /// 저장·알림 식별자에 쓰는 안정적인 문자열.
@@ -170,9 +234,15 @@ public struct Schedule: Identifiable, Hashable, Codable, Sendable {
     }
 
     /// 그 날짜에 이 스케줄이 살아 있는지.
+    ///
+    /// 양끝을 **날 단위로** 본다. 시작일은 그 날 0시부터, 종료일은 그 날이 다 갈 때까지다.
+    /// 종료일만 날짜로 자르지 않으면, 8월 20일까지인 약이 20일 오후에 이미 끝난 것으로
+    /// 취급돼 마지막 날 알림이 하루 일찍 사라진다.
     public func isActive(on day: Date, calendar: Calendar = .current) -> Bool {
         if let start = startDate, day < calendar.startOfDay(for: start) { return false }
-        if let end = endDate, day > end { return false }
+        if let end = endDate, calendar.startOfDay(for: day) > calendar.startOfDay(for: end) {
+            return false
+        }
         return weekdays.contains(Weekday.from(date: day, calendar: calendar))
     }
 }

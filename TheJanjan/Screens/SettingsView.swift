@@ -1,23 +1,51 @@
 import SwiftUI
+import SwiftData
+import UIKit
+import UserNotifications
 import JanjanCore
 
 /// 설정 — 오늘 탭 우상단 톱니에서 올라온다 (설계 03절).
 struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @Environment(\.modelContext) private var context
     @EnvironmentObject private var lock: AppLockManager
+
+    /// 번호를 정하는 화면을 띄울 이유. nil 이면 닫혀 있다.
+    @State private var setupMode: PasscodeSetupView.Mode?
+
+    @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isAskingNotification = false
     @EnvironmentObject private var pro: ProStore
 
-    @AppStorage("janjan.notifications.hideMedicationNames") private var hidesMedicationNames = false
+    @AppStorage(NotificationManager.hideNamesDefaultsKey) private var hidesMedicationNames = false
+    @AppStorage(JanjanPrivacy.hideNamesKey) private var hidesMedicationNamesOnScreen = false
+    @AppStorage(ReminderPlanner.appointmentLeadDaysKey)
+    private var appointmentLeadDays = AppointmentReminder.defaultLeadDays
 
     @State private var isShowingDeleteConfirmation = false
+    /// "삭제" 를 직접 적게 하는 두 번째 문.
+    @State private var isShowingDeleteTypeIn = false
+    /// 실제로 지웠을 때만 마지막 알림을 띄우기 위한 표시.
+    @State private var didDeleteEverything = false
+    @State private var isShowingDeleteDone = false
     @State private var isShowingPaywall = false
+    @State private var isShowingLicenses = false
+
+    @AppStorage(JanjanFontChoice.defaultsKey) private var fontChoiceRaw = JanjanFontChoice.standard.rawValue
+    @AppStorage(JanjanTheme.defaultsKey) private var themeRaw = JanjanTheme.standard.rawValue
+    @AppStorage(JanjanLanguage.defaultsKey) private var languageRaw = JanjanLanguage.standard.rawValue
+    // 똑똑한 재알림(Pro). 예약을 굽는 쪽(NotificationManager)과 같은 키를 본다.
+    @AppStorage(DoseNotification.followUpMinutesKey) private var followUpMinutes = 0
+    @AppStorage(DoseNotification.followUpCountKey) private var followUpCount = 2
 
     var body: some View {
         NavigationStack {
             Form {
                 proSection
+                fontSection
                 notificationsSection
                 securitySection
                 privacySection
@@ -26,11 +54,18 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.fog.ignoresSafeArea())
-            .navigationTitle("설정")
+            .task { await refreshNotificationStatus() }
+            // "iOS 설정에서 알림 켜기" 로 나갔다 돌아오면 그 줄이 그대로였다.
+            // 알림은 이미 살아 있는데 화면만 옛 상태를 말했다(QA 2026-09-22).
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await refreshNotificationStatus() }
+            }
+            .navigationTitle(t("설정", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
+                    Button(t("닫기", "Close")) { dismiss() }
                         .foregroundStyle(Color.ink)
                 }
             }
@@ -38,16 +73,57 @@ struct SettingsView: View {
                 PaywallView()
             }
             .confirmationDialog(
-                "모든 데이터를 삭제할까요?",
+                t("모든 데이터를 삭제할까요?", "Delete everything?"),
                 isPresented: $isShowingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("삭제", role: .destructive) {
-                    // TODO: SwiftData 저장소 전체 삭제 + iCloud 레코드 삭제
-                }
-                Button("취소", role: .cancel) {}
+                // 여기서 바로 지우지 않는다. 되돌릴 수 없는 일에는 손이 한 번
+                // 더 가는 문을 둔다 - 실수로 두 번 누르는 것과 글자를 적는 것은
+                // 다른 일이다(사용자 결정 2026-09-22).
+                Button(t("삭제", "Delete"), role: .destructive) { isShowingDeleteTypeIn = true }
+                Button(t("취소", "Cancel"), role: .cancel) {}
             } message: {
-                Text("되돌릴 수 없습니다. 기록·약·설정이 모두 사라집니다.")
+                Text(deleteWarningKo)
+            }
+            .sheet(
+                isPresented: $isShowingDeleteTypeIn,
+                // 시트가 닫힌 **뒤에** 알린다. 시트 위에 알림을 겹쳐 올리면
+                // 둘이 서로를 밀어낸다.
+                onDismiss: {
+                    guard didDeleteEverything else { return }
+                    didDeleteEverything = false
+                    isShowingDeleteDone = true
+                }
+            ) {
+                DeleteEverythingSheet(warning: deleteWarningKo) {
+                    deleteEverything()
+                    didDeleteEverything = true
+                    isShowingDeleteTypeIn = false
+                }
+            }
+            .alert(
+                t("삭제되었습니다", "Everything was deleted"),
+                isPresented: $isShowingDeleteDone
+            ) {
+                Button(t("확인", "OK"), role: .cancel) {}
+            } message: {
+                Text(deleteDoneMessage)
+            }
+            .sheet(isPresented: $isShowingLicenses) {
+                LicenseNoticeView()
+            }
+            .fullScreenCover(isPresented: $isAskingNotification) {
+                NotificationPermissionView {
+                    NotificationPermissionGate.hasAsked = true
+                    Task {
+                        await refreshNotificationStatus()
+                        await ReminderPlanner.reschedule(using: context)
+                    }
+                }
+            }
+            .sheet(item: $setupMode) { mode in
+                PasscodeSetupView(mode: mode) { setupMode = nil }
+                    .environmentObject(lock)
             }
         }
     }
@@ -57,25 +133,58 @@ struct SettingsView: View {
     /// 심사자가 복원 버튼을 찾는 곳이기도 하다(심사 노트에 "복원은 설정 > Pro" 라고 적었다).
     private var proSection: some View {
         Section {
-            LabeledContent("상태") {
-                Text(pro.isPro ? "Pro 사용 중" : "무료")
+            LabeledContent(t("상태", "Status")) {
+                Text(pro.isPro ? t("Pro 사용 중", "Using Pro") : t("무료", "Free"))
                     .foregroundStyle(Color.muted)
             }
 
-            Button("Pro 알아보기") {
+            // 예전에는 "Pro 알아보기" 라는 맨 글자 한 줄이었다. 바로 아래
+            // "구매 복원" 과 생김새가 같아서, 여기가 결제하는 자리인지
+            // 알 수가 없었다(사용자 지적 2026-09-21).
+            //
+            // 값을 줄에 띄우고 꺾쇠를 붙인다. 설정의 다른 줄들과 같은
+            // 문법이라 튀지 않으면서, 돈이 드는 자리라는 것은 분명해진다.
+            // 광고 카드를 만들지는 않는다 - 유도 지점은 설계가 정한 세 곳뿐이고
+            // 설정은 사용자가 스스로 찾아오는 자리다.
+            Button {
                 isShowingPaywall = true
+            } label: {
+                HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(pro.isPro ? t("Pro 기능 보기", "See what Pro includes")
+                                   : t("Pro 시작하기", "Get Pro"))
+                        .foregroundStyle(Color.ink)
+                    Spacer(minLength: CGFloat(JanjanSpacing.xs))
+                    if let price = proEntryPriceText {
+                        Text(price)
+                            .foregroundStyle(Color.muted)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.janjan(.outline))
+                }
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(Color.ink)
 
-            Button("구매 복원") {
+            // 아래 두 줄과 알림의 "알림 켜기" 는 검정 글자만 있어 바로 위
+            // "상태 / Pro 사용 중" 같은 정보 줄과 구별이 안 됐다(QA 2026-09-22).
+            // Pro 줄과 같은 문법으로 오른쪽 끝에 작은 표시를 둔다.
+            Button {
                 Task { await pro.restore() }
+            } label: {
+                actionRow(t("구매 복원", "Restore purchase"), systemImage: "arrow.clockwise")
             }
-            .foregroundStyle(Color.ink)
-            .disabled(pro.isLoading)
+            // 복원이 도는 동안은 눌리지 않는다는 것을 색으로도 보인다.
+            .foregroundStyle(pro.isRestoring ? Color.muted : Color.ink)
+            .disabled(pro.isRestoring)
 
-            if pro.isPro, let url = URL(string: ProProduct.manageSubscriptionsURLString) {
-                Link("구독 관리", destination: url)
-                    .foregroundStyle(Color.ink)
+            // 평생 이용권 구매자에게는 보이지 않는다 - 해지할 구독이 없어
+            // 애플 화면에서 빈 목록을 만난다(QA 2026-09-19).
+            if pro.isPro, !pro.hasLifetime,
+               let url = URL(string: ProProduct.manageSubscriptionsURLString) {
+                Link(destination: url) {
+                    actionRow(t("구독 관리", "Manage subscription"), systemImage: "arrow.up.right")
+                }
+                .foregroundStyle(Color.ink)
             }
         } header: {
             Text("Pro")
@@ -84,61 +193,273 @@ struct SettingsView: View {
         }
     }
 
+    /// 설정의 Pro 줄에 띄우는 값. **가장 싸게 시작하는 한 번의 결제**를 적는다 -
+    /// 월간이 있으면 그것, 없으면 연간. 값은 언제나 애플이 준 문자열 그대로다.
+    /// 이미 Pro 면 살 것이 없으므로 적지 않는다.
+    private var proEntryPriceText: String? {
+        guard !pro.isPro else { return nil }
+        if let monthly = pro.monthlyProduct {
+            return t("월 \(monthly.displayPrice)부터", "from \(monthly.displayPrice) / mo")
+        }
+        if let yearly = pro.yearlyProduct {
+            return t("연 \(yearly.displayPrice)부터", "from \(yearly.displayPrice) / yr")
+        }
+        return nil
+    }
+
+    /// 설정 안에서 **누르면 무언가 하는** 줄. 오른쪽 끝의 작은 아이콘이
+    /// 정보 줄과 갈라 준다. 글자색은 부르는 쪽이 정한다(복원 중이면 muted).
+    private func actionRow(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(title)
+            Spacer(minLength: CGFloat(JanjanSpacing.xs))
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.janjan(.outline))
+        }
+        .contentShape(Rectangle())
+    }
+
     private var proFooterKo: String {
         if let message = pro.lastError { return message }
-        if pro.isPro {
-            return "기간과 해지는 \"구독 관리\" 에서 확인할 수 있어요."
+        if pro.hasLifetime {
+            // 바로 위의 "구독 관리" 줄이 평생권에는 숨겨져 있다. 그 줄로 가라고
+            // 말하면 없는 곳을 가리킨다(QA 2026-09-22).
+            return t("한 번 결제한 이용권이라 갱신도 해지도 없어요.",
+                     "This is a one-time purchase — nothing renews and there's nothing to cancel.")
         }
-        return "무료 기능은 구독 없이 계속 쓸 수 있어요."
+        if pro.isPro {
+            return t(
+                "기간과 해지는 \"구독 관리\" 에서 확인할 수 있어요.",
+                "You can check the period and cancel it under \"Manage subscription.\""
+            )
+        }
+        return t("무료 기능은 구독 없이 계속 쓸 수 있어요.", "Free features keep working without a subscription.")
     }
 
     // MARK: - 알림
 
+    private var fontSection: some View {
+        Section {
+            Picker(t("언어", "Language"), selection: $languageRaw) {
+                ForEach(JanjanLanguage.allCases, id: \.rawValue) { language in
+                    Text(language.labelNative).tag(language.rawValue)
+                }
+            }
+            .onChange(of: languageRaw) { _, newValue in
+                // 위젯도 같은 언어를 읽도록 앱 그룹에 함께 쓰고, 워치 화면도 새로 밀어 준다.
+                let language = JanjanLanguage(rawValue: newValue) ?? .standard
+                JanjanLanguage.store(language)
+                AppServices.shared.pushWatchSnapshot()
+            }
+            Picker(t("테마", "Theme"), selection: $themeRaw) {
+                ForEach(JanjanTheme.allCases, id: \.rawValue) { theme in
+                    Text(themeRowLabel(theme)).tag(theme.rawValue)
+                }
+            }
+            // 고른 테마의 기분 색 일곱 개. 이름만으로는 색을 알 수 없다
+            // (사용자 지적 2026-09-22).
+            LabeledContent(t("기분 색", "Mood colors")) {
+                ThemeSwatch(theme: JanjanTheme(rawValue: themeRaw) ?? .standard)
+            }
+            .onChange(of: themeRaw) { old, new in
+                guard old != new else { return }
+                // Pro 테마를 무료로 고르면 되돌리고 페이월을 연다 - 반쯤 적용된
+                // 채 남기지 않는다. 되돌아갈 곳(old)마저 Pro 테마면(구독이 끝난 뒤
+                // 남아 있던 경우) 기본 테마로 내린다 - 서로를 되돌리며 무한히
+                // 오가는 재진입을 막는다(QA 2026-09-19).
+                let theme = JanjanTheme(rawValue: new) ?? .standard
+                if theme.isProOnly && !pro.isPro {
+                    let previous = JanjanTheme(rawValue: old) ?? .standard
+                    themeRaw = previous.isProOnly ? JanjanTheme.standard.rawValue : old
+                    isShowingPaywall = true
+                    return
+                }
+                // 워치의 기분 원도 같은 색을 쓰게 새 스냅샷을 민다.
+                AppServices.shared.pushWatchSnapshot()
+            }
+            Picker(t("서체", "Typeface"), selection: $fontChoiceRaw) {
+                ForEach(JanjanFontChoice.allCases, id: \.rawValue) { choice in
+                    Text(choice.label(JanjanLanguage.current)).tag(choice.rawValue)
+                }
+            }
+        } header: {
+            Text(t("화면", "Appearance"))
+        } footer: {
+            Text(footerForScreenSection)
+        }
+    }
+
+    private var footerForScreenSection: String {
+        let theme = JanjanTheme(rawValue: themeRaw) ?? .standard
+        let font = JanjanFontChoice(rawValue: fontChoiceRaw)?.detail(JanjanLanguage.current) ?? ""
+        return "\(theme.detail(JanjanLanguage.current))\n\(font)"
+    }
+
     private var notificationsSection: some View {
         Section {
-            Toggle("잠금화면에서 약 이름 숨기기", isOn: $hidesMedicationNames)
+            // 권한이 없으면 알림은 한 건도 뜨지 않는다. 그 사실과 켜는 길이
+            // 여기 없으면 사용자는 왜 안 오는지 영영 알 수 없다.
+            switch notificationStatus {
+            case .notDetermined:
+                Button {
+                    isAskingNotification = true
+                } label: {
+                    actionRow(t("알림 켜기", "Turn on notifications"), systemImage: "chevron.right")
+                }
+                .foregroundStyle(Color.ink)
+            case .denied:
+                Button {
+                    openSystemSettings()
+                } label: {
+                    actionRow(t("iOS 설정에서 알림 켜기", "Turn on notifications in iOS Settings"), systemImage: "arrow.up.right")
+                }
+                .foregroundStyle(Color.ink)
+            default:
+                LabeledContent(t("복용 알림", "Dose reminders")) {
+                    Text(t("켜져 있어요", "On"))
+                        .foregroundStyle(Color.muted)
+                }
+            }
+
+            Toggle(t("잠금화면에서 약 이름 숨기기", "Hide medication names on lock screen"), isOn: $hidesMedicationNames)
+                .onChange(of: hidesMedicationNames) { _, newValue in
+                    // 잠금화면 위젯도 같은 값을 봐야 한다 - 앱 그룹에도 쓴다.
+                    JanjanPrivacy.storeLockScreenPreference(newValue)
+                    // 이미 예약된 알림은 문구가 구워진 채로 남아 있다. 다시 깔아야 바뀐다.
+                    Task { await ReminderPlanner.reschedule(using: context) }
+                    AppServices.shared.pushWatchSnapshot()
+                }
+
+            Picker(t("진료 알림", "Appointment reminders"), selection: $appointmentLeadDays) {
+                ForEach(AppointmentReminder.allowedLeadDays, id: \.self) { days in
+                    Text(AppointmentReminder.leadLabel(forDays: days, language: JanjanLanguage.current)).tag(days)
+                }
+            }
+            .onChange(of: appointmentLeadDays) { _, _ in
+                Task { await ReminderPlanner.rescheduleAppointments(using: context) }
+            }
+
+            // 똑똑한 재알림(Pro) - 답이 없으면 몇 분 뒤 몇 번 더 물을지.
+            if pro.isPro {
+                Picker(t("안 먹으면 다시 알리기", "Re-remind if not logged"), selection: $followUpMinutes) {
+                    Text(t("끄기", "Off")).tag(0)
+                    ForEach(DoseNotification.followUpMinuteChoices, id: \.self) { minutes in
+                        Text(t("\(minutes)분 간격", "Every \(minutes) min")).tag(minutes)
+                    }
+                }
+                .onChange(of: followUpMinutes) { _, _ in
+                    Task { await ReminderPlanner.reschedule(using: context) }
+                }
+                if followUpMinutes > 0 {
+                    Picker(t("다시 알리는 횟수", "How many times"), selection: $followUpCount) {
+                        ForEach(DoseNotification.followUpCountChoices, id: \.self) { count in
+                            Text(t("\(count)번", count == 1 ? "Once" : "\(count) times")).tag(count)
+                        }
+                    }
+                    .onChange(of: followUpCount) { _, _ in
+                        Task { await ReminderPlanner.reschedule(using: context) }
+                    }
+                }
+            } else {
+                Button {
+                    isShowingPaywall = true
+                } label: {
+                    HStack {
+                        Text(t("안 먹으면 다시 알리기", "Re-remind if not logged"))
+                            .foregroundStyle(Color.ink)
+                        Spacer(minLength: 0)
+                        ProBadge()
+                    }
+                }
+            }
         } header: {
-            Text("알림")
+            Text(t("알림", "Notifications"))
         } footer: {
-            Text("켜면 알림에 \"취침 약 2종\" 처럼 개수만 보입니다.")
+            Text(notificationFooterKo)
         }
+    }
+
+    private var notificationFooterKo: String {
+        switch notificationStatus {
+        case .denied:
+            return t(
+                "iOS 설정에서 알림을 꺼 두셔서 복용 알림이 오지 않습니다. 기록은 앱에서 직접 남길 수 있어요.",
+                "Notifications are off in iOS Settings, so dose reminders won't arrive. You can still log doses directly in the app."
+            )
+        case .notDetermined:
+            return t(
+                "켜면 약 시간에 알려드리고, 알림에서 바로 복용함·건너뜀을 누를 수 있어요.",
+                "Turning this on notifies you at dose time, and you can tap Taken or Skipped right from the notification."
+            )
+        default:
+            return t(
+                "이름 숨기기를 켜면 알림에 \"자기전 약 2종\" 처럼 개수만 보여요. 진료 알림은 진료 기록에 다음 진료일을 적어 두면 가요.",
+                "Turning on name hiding shows only a count in the notification, like \"2 bedtime medications.\" Appointment reminders go out once a prescription has a next visit date."
+            )
+        }
+    }
+
+    private func refreshNotificationStatus() async {
+        notificationStatus = await NotificationManager.shared.authorizationStatus()
+    }
+
+    /// Pro 테마에는 무료 사용자에게만 작은 표시를 붙인다 - 구독 중에는 군더더기다.
+    private func themeRowLabel(_ theme: JanjanTheme) -> String {
+        let name = theme.label(JanjanLanguage.current)
+        return theme.isProOnly && !pro.isPro ? "\(name) · Pro" : name
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(url)
     }
 
     // MARK: - 보안
 
     private var securitySection: some View {
         Section {
-            Toggle("앱 잠금 (Face ID / 암호)", isOn: appLockBinding)
+            Toggle(t("앱 잠금 (네 자리 번호)", "App lock (4-digit code)"), isOn: appLockBinding)
 
             if lock.isEnabled {
-                Toggle("일기만 잠그기", isOn: diaryOnlyBinding)
+                Button(t("번호 바꾸기", "Change code")) { setupMode = .change }
+                    .foregroundStyle(Color.ink)
 
-                Picker("다시 잠그기", selection: graceSecondsBinding) {
+                Toggle(t("생체인식으로도 열기", "Also unlock with biometrics"), isOn: biometricsBinding)
+
+                Picker(t("다시 잠그기", "Lock again"), selection: graceSecondsBinding) {
                     ForEach(LockPolicy.allowedGraceSeconds, id: \.self) { seconds in
-                        Text(LockPolicy.graceLabelKo(forSeconds: seconds)).tag(seconds)
+                        // LockPolicy 는 코어에 한국어 라벨만 있다(그래프 라벨에 언어 인자가 없음).
+                        Text(LockPolicy.graceLabel(forSeconds: seconds, language: JanjanLanguage.current)).tag(seconds)
                     }
                 }
             }
         } header: {
-            Text("보안")
+            Text(t("보안", "Security"))
         } footer: {
             Text(securityFooterKo)
         }
     }
 
-    /// 켤 때는 먼저 한 번 열어 본다. 열리지 않으면 켜지 않는다 —
-    /// 잠금 방법이 없는 기기에서 사용자가 자기 기록에서 잠겨 나가는 일을 막는다.
+    /// 켤 때는 번호를 정하는 화면을 띄우고, 그 화면이 성공해야 켜진다.
+    /// 끌 때는 지금 열려 있는 사람이 누르는 것이므로 곧바로 끈다.
     private var appLockBinding: Binding<Bool> {
         Binding(
             get: { lock.isEnabled },
-            set: { wanted in Task { await lock.setEnabled(wanted) } }
+            set: { wanted in
+                if wanted {
+                    setupMode = .create
+                } else {
+                    lock.disable()
+                }
+            }
         )
     }
 
-    private var diaryOnlyBinding: Binding<Bool> {
+    private var biometricsBinding: Binding<Bool> {
         Binding(
-            get: { lock.diaryOnly },
-            set: { lock.diaryOnly = $0 }
+            get: { lock.usesBiometrics },
+            set: { lock.usesBiometrics = $0 }
         )
     }
 
@@ -150,48 +471,94 @@ struct SettingsView: View {
     }
 
     private var securityFooterKo: String {
-        if let message = lock.failureMessageKo { return message }
+        if let message = lock.failureMessage { return message }
         if lock.isEnabled {
-            return "Face ID · Touch ID 또는 기기 암호로 열립니다. 일기만 잠그면 오늘 · 약 · 리포트는 그대로 열립니다."
+            guard lock.canRecoverWithDevice else {
+                return t(
+                    "앱을 열 때 네 자리 번호를 눌러요. 이 기기에는 기기 암호가 없어서, 번호를 잊으면 기록을 열 방법이 없어요.",
+                    "You enter your 4-digit code to open the app. This device has no passcode set, so if you forget your code, there is no way to open your records."
+                )
+            }
+            return t(
+                "앱을 열 때 네 자리 번호를 눌러요. 번호를 잊으면 Face ID · Touch ID 또는 기기 암호로 되찾을 수 있어요.",
+                "You enter your 4-digit code to open the app. If you forget it, you can recover with Face ID, Touch ID, or your device passcode."
+            )
         }
-        return "Face ID · Touch ID 또는 기기 암호로 열립니다. 켤 때 한 번 확인해서, 열 수 없는 상태로 잠기는 일을 막습니다."
+        return t(
+            "켜면 앱을 열 때 네 자리 번호를 눌러요. 번호는 이 기기에만 저장되고 다른 기기로 따라가지 않아요.",
+            "Turning this on requires a 4-digit code to open the app. The code is stored only on this device and does not carry over to others."
+        )
     }
 
     // MARK: - 개인정보
 
+    private var hideNamesToggle: some View {
+        Toggle(ProFeature.hideNames.title(.current), isOn: $hidesMedicationNamesOnScreen)
+            .onChange(of: hidesMedicationNamesOnScreen) { _, newValue in
+                // 위젯도 같은 값을 읽도록 앱 그룹에도 쓰고, 워치 화면도 새로 밀어 준다.
+                JanjanPrivacy.store(newValue)
+                AppServices.shared.pushWatchSnapshot()
+                Task { await ReminderPlanner.reschedule(using: context) }
+            }
+    }
+
     private var privacySection: some View {
         Section {
-            LabeledContent("저장 위치") {
-                Text(JanjanModelContainer.activeStorage.labelKo)
+            // **파는 것은 켜는 일이지 끄는 일이 아니다.** 토글 전체에 문을 달면
+            // 구독이 끝난 사람이 끄지도 못한다 - 유일한 길이 "모든 데이터 삭제"
+            // 였다(QA 2026-09-22). 켜져 있으면 문 없이 그린다.
+            //
+            // 바꾸면 알림도 다시 깐다. 본문은 예약할 때 굽기 때문에, 켜고 앱을
+            // 내리면 첫 알림이 옛 본문(약 이름 그대로)으로 온다.
+            if hidesMedicationNamesOnScreen || pro.isPro {
+                hideNamesToggle
+            } else {
+                hideNamesToggle.proGated(.hideNames)
+            }
+
+            LabeledContent(t("저장 위치", "Storage")) {
+                Text(JanjanModelContainer.activeStorage.label)
                     .foregroundStyle(Color.muted)
             }
 
             Button(role: .destructive) {
                 isShowingDeleteConfirmation = true
             } label: {
-                Text("모든 데이터 삭제")
+                Text(t("모든 데이터 삭제", "Delete everything"))
             }
         } header: {
-            Text("개인정보")
+            Text(t("개인정보", "Privacy"))
         } footer: {
-            Text("로그인도 서버도 없습니다. 기록은 이 기기와 사용자의 iCloud에만 있습니다.")
+            Text(privacyFooterKo)
         }
+    }
+
+    private var privacyFooterKo: String {
+        let hideNamesCaption = t(
+            "켜면 화면의 약 이름이 뿌옇게 가려져요. 약 상세 같은 곳에서 가린 이름을 누르면 그 자리에서만 보여요. 진료용 PDF 에는 이름이 그대로 실려요 - 의사에게 보여 주는 종이라서요.",
+            "When this is on, medication names on screen are hidden, and tapping a hidden name shows it only in that spot. Names still print in full on the visit PDF, since that page is meant to be shown to your doctor."
+        )
+        let storageCaption = t(
+            "로그인도 서버도 없어요. 기록은 이 기기와 내 iCloud 에만 있어요.",
+            "There is no sign-in and no server. Your records live only on this device and in your own iCloud."
+        )
+        return "\(hideNamesCaption)\n\n\(storageCaption)"
     }
 
     // MARK: - 위기 상담
 
     private var safetySection: some View {
         Section {
-            ForEach(Janjan.crisisContactsKR) { contact in
+            ForEach(Janjan.crisisContactsForCurrentRegion) { contact in
                 Button {
                     call(contact)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(contact.titleKo)
+                            Text(contact.title(JanjanLanguage.current))
                                 .foregroundStyle(Color.ink)
-                            Text(contact.subtitleKo)
-                                .font(JanjanFont.body(12))
+                            Text(contact.subtitle(JanjanLanguage.current))
+                                .janjanBody(12)
                                 .foregroundStyle(Color.muted)
                         }
                         Spacer()
@@ -202,9 +569,13 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Text("위기 상담")
+            Text(t("위기 상담", "Crisis support"))
         } footer: {
-            Text("응급 상황은 112 · 119.")
+            // 위기 상담 연락처는 기기 지역으로 거르면서 한국 번호만 박혀
+            // 있었다(QA 2026-09-22). 한국 기기에서만 적는다.
+            if Janjan.isKoreaRegion {
+                Text(t("응급 상황은 112 · 119.", "For emergencies: 112 · 119."))
+            }
         }
     }
 
@@ -219,30 +590,105 @@ struct SettingsView: View {
         Section {
             // 원본은 저장소의 docs/site/, GitHub Pages 로 낸다.
             if let url = URL(string: Janjan.privacyPolicyURLString) {
-                Link("개인정보처리방침", destination: url)
+                Link(t("개인정보처리방침", "Privacy Policy"), destination: url)
                     .foregroundStyle(Color.ink)
             }
             if let url = URL(string: Janjan.supportURLString) {
-                Link("지원 · 자주 묻는 질문", destination: url)
+                Link(t("지원 · 자주 묻는 질문", "Support · FAQ"), destination: url)
                     .foregroundStyle(Color.ink)
             }
             if let url = URL(string: Janjan.termsURLString) {
-                Link("이용약관", destination: url)
+                Link(t("이용약관", "Terms of Use"), destination: url)
                     .foregroundStyle(Color.ink)
             }
-            Button("오픈소스 라이선스") {
-                // TODO: SUIT · Pretendard (SIL OFL 1.1) 고지 화면
+            Button(t("오픈소스 라이선스", "Open source licenses")) {
+                isShowingLicenses = true
             }
-            LabeledContent("버전") {
+            .foregroundStyle(Color.ink)
+            LabeledContent(t("버전", "Version")) {
                 Text(appVersionText)
                     .foregroundStyle(Color.muted)
                     .monospacedDigit()
             }
         } header: {
-            Text("기타")
+            Text(t("기타", "More"))
         } footer: {
-            Text(Janjan.medicalDisclaimerKo)
+            Text(Janjan.medicalDisclaimer(JanjanLanguage.current))
         }
+    }
+
+    /// iCloud 를 쓰는 중이면 삭제가 동기화를 타고 다른 기기에서도 사라진다.
+    /// 그 사실을 누르기 전에 말해 준다.
+    private var deleteWarningKo: String {
+        let base = t("되돌릴 수 없어요. 기록·약·설정이 모두 사라져요.", "This cannot be undone. Records, medications, and settings will all be gone.")
+        guard JanjanModelContainer.activeStorage == .cloudKit else { return base }
+        return base + " " + t("iCloud 로 연결된 다른 기기에서도 사라져요.", "It will also disappear from other devices connected through iCloud.")
+    }
+
+    private var deleteDoneMessage: String {
+        let base = t("기록·약·설정이 모두 지워졌어요.",
+                     "Your records, medications and settings are gone.")
+        guard JanjanModelContainer.activeStorage == .cloudKit else { return base }
+        return base + " " + t("iCloud 로 연결된 다른 기기에도 곧 반영돼요.",
+                              "Connected iCloud devices will catch up shortly.")
+    }
+
+    /// 저장된 것을 전부 지운다.
+    ///
+    /// 지우는 순서가 중요하다. 알림을 먼저 걷어야 이미 예약된 알림이
+    /// 사라진 약의 이름을 잠금화면에 띄우는 일이 없다.
+    /// iCloud 레코드는 따로 부를 것이 없다 — SwiftData 가 지운 행이 그대로 동기화된다.
+    private func deleteEverything() {
+        NotificationManager.shared.cancelAllDoseReminders()
+        MedicationStore.deleteEverything(in: context)
+
+        // SwiftData 밖에도 기록이 남는다. 여기서 같이 걷지 않으면
+        // "모두 사라집니다" 라고 적어 놓고 거짓말을 하는 셈이 된다.
+        //
+        //  · 내보낸 리포트 PDF — 약 이름·복약률·기분·의사에게 물어볼 말이 들어 있다.
+        //  · 진료 질문 메모 — iCloud 로 안 넘어가는 대신 이 기기에 남는다.
+        ReportPDF.removeExportedFiles()
+        UserDefaults.standard.removeObject(forKey: ReportView.questionsDefaultsKey)
+
+        // 설정도 지운다고 적어 놓고 테마·서체·언어·가리기·알림 설정을 남겨
+        // 두고 있었다(QA 2026-09-19). 기기를 넘기려고 누른 사람에게는
+        // 그것들이 남는 것이 곧 약속을 어긴 것이다.
+        for key in [
+            NotificationManager.hideNamesDefaultsKey,
+            JanjanPrivacy.hideNamesKey,
+            ReminderPlanner.appointmentLeadDaysKey,
+            JanjanFontChoice.defaultsKey,
+            JanjanTheme.defaultsKey,
+            JanjanLanguage.defaultsKey,
+            DoseNotification.followUpMinutesKey,
+            DoseNotification.followUpCountKey
+        ] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
+        // **앱 그룹에도 같은 값이 산다.** 가리기·언어·Pro 사본은 위젯과
+        // 워치가 읽도록 두 곳에 쓰는데(`JanjanPrivacy.store` 등), 지울 때는
+        // standard 만 걷고 있었다(QA 2026-09-21). 앱은 비었는데 위젯은
+        // 지난 설정 그대로였고, 다음에 앱이 값을 읽으면 그룹 쪽이 먼저라
+        // 지웠던 설정이 되살아났다.
+        if let group = UserDefaults(suiteName: Janjan.appGroupID) {
+            // Pro 사본(`JanjanEntitlement.proKey`)은 남긴다. 사용자 데이터가
+            // 아니라 StoreKit 권한의 그림자이고, 지우면 돈을 낸 사람의 위젯만
+            // 다음 갱신까지 잠긴 채로 보인다.
+            for key in [
+                JanjanPrivacy.hideNamesKey,
+                JanjanPrivacy.lockScreenHideNamesKey,
+                JanjanLanguage.defaultsKey
+            ] {
+                group.removeObject(forKey: key)
+            }
+        }
+
+        // 잠금 번호도 설정이다. "설정이 모두 사라집니다" 라고 적어 놓고 남기지 않는다.
+        // 키체인 항목은 앱을 지워도 남으므로, 여기서 걷지 않으면 새로 깔아도 따라온다.
+        lock.disable()
+
+        AppServices.shared.pushWatchSnapshot()
     }
 
     private var appVersionText: String {
@@ -253,8 +699,151 @@ struct SettingsView: View {
     }
 }
 
+/// "삭제" 를 직접 적어야 지워지는 두 번째 문 (사용자 결정 2026-09-22).
+///
+/// **왜 한 겹 더 두는가.** 이 버튼은 기록·약·설정을 되돌릴 수 없이 지우고,
+/// iCloud 로 묶여 있으면 다른 기기의 것까지 함께 지운다. 확인 창의 "삭제" 를
+/// 한 번 더 누르는 것은 실수로도 일어나지만, 글자를 적는 일은 실수로
+/// 일어나지 않는다.
+///
+/// 적는 말은 화면에 그대로 보여 준다 - 맞혀야 하는 암호가 아니라,
+/// 손을 한 번 멈추게 하는 장치다.
+private struct DeleteEverythingSheet: View {
+
+    let warning: String
+    let onConfirm: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var typed = ""
+
+    /// 한국어는 "삭제", 영어는 "DELETE". 화면에 보이는 말을 그대로 받는다.
+    private var keyword: String { t("삭제", "DELETE") }
+
+    private var matches: Bool {
+        typed.trimmingCharacters(in: .whitespacesAndNewlines) == keyword
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+                    JanjanCard {
+                        Text(warning)
+                            .janjanBody(14)
+                            .foregroundStyle(Color.ink2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text(t("지우려면 아래 칸에 \(keyword) 라고 적어 주세요.",
+                           "To erase everything, type \(keyword) in the box below."))
+                        .janjanBody(15)
+                        .foregroundStyle(Color.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    JanjanField(label: t("확인 문구", "Confirmation"), placeholder: keyword, text: $typed)
+
+                    BlackPillButton(
+                        title: t("모든 데이터 삭제", "Delete everything"),
+                        isEnabled: matches
+                    ) {
+                        onConfirm()
+                    }
+
+                    // 버튼이 왜 꺼져 있는지 버튼 옆에서 말한다.
+                    if !matches {
+                        Text(t("\(keyword) 라고 정확히 적으면 버튼이 켜져요.",
+                               "The button turns on once \(keyword) is typed exactly."))
+                            .janjanBody(12)
+                            .foregroundStyle(Color.muted)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, CGFloat(JanjanSpacing.m))
+                .padding(.top, CGFloat(JanjanSpacing.s))
+                .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .keyboardDoneBar()
+            .navigationTitle(t("모든 데이터 삭제", "Delete everything"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(t("취소", "Cancel")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+    }
+}
+
+/// 번들 서체 고지 (SIL OFL 1.1).
+///
+/// 원본은 서체와 같은 폴더의 `OFL-NOTICE.txt` 다. 파일 하나만 두고 화면이 그걸 읽는다 —
+/// 같은 문구를 코드에도 적어 두면 서체를 갈아 끼울 때 한쪽만 고치게 된다.
+private struct LicenseNoticeView: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(noticeText)
+                    .janjanBody(13)
+                    .foregroundStyle(Color.ink2)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(CGFloat(JanjanSpacing.m))
+            }
+            .fogBackground()
+            .scrollContentBackground(.hidden)
+            .navigationTitle(t("오픈소스 라이선스", "Open source licenses"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("닫기", "Close")) { dismiss() }
+                        .foregroundStyle(Color.ink)
+                }
+            }
+        }
+    }
+
+    /// 번들 안 OFL-NOTICE.txt 는 원문(한국어) 그대로 낸다 — 라이선스 고지문 자체는
+    /// 번역 대상이 아니고, 없을 때만 앱이 들고 있는 대체 문구를 언어에 맞춰 보여 준다.
+    private var noticeText: String {
+        guard let url = Bundle.main.url(forResource: "OFL-NOTICE", withExtension: "txt"),
+              let text = try? String(contentsOf: url, encoding: .utf8)
+        else { return t(Self.fallbackKo, Self.fallbackEn) }
+        return text
+    }
+
+    /// 번들에서 못 찾았을 때도 고지 없이 넘어가지는 않는다 — OFL 이 요구하는 것이다.
+    private static let fallbackKo = """
+    번들 서체 라이선스 고지 (SIL Open Font License 1.1)
+
+    Pretendard (c) Kil Hyung-jin — https://github.com/orioncactus/pretendard
+    SUIT (c) SUNN — https://github.com/sun-typeface/SUIT
+
+    두 서체 모두 SIL Open Font License 1.1 로 배포됩니다.
+    전문: https://openfontlicense.org
+    """
+
+    private static let fallbackEn = """
+    Bundled font license notice (SIL Open Font License 1.1)
+
+    Pretendard (c) Kil Hyung-jin — https://github.com/orioncactus/pretendard
+    SUIT (c) SUNN — https://github.com/sun-typeface/SUIT
+
+    Both fonts are distributed under the SIL Open Font License 1.1.
+    Full text: https://openfontlicense.org
+    """
+}
+
 #Preview {
     SettingsView()
         .environmentObject(AppLockManager())
         .environmentObject(ProStore())
+        .modelContainer(for: JanjanSchema.allModels, inMemory: true)
 }

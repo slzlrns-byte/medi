@@ -1,0 +1,571 @@
+# 더잔잔 — 화면 찍기 (런 48: 심사 제출 직전 최종 세트)
+#
+# 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없다. 이 워크플로가 macOS 러너에서
+# 예시 기록을 심은 앱을 띄우고 화면마다 사진을 찍어, PNG 를 `ci/screenshots` 브랜치에
+# 올린다. 아티팩트가 아니라 브랜치인 이유: 아티팩트 저장소(blob.core.windows.net)는
+# 개발 환경의 네트워크 정책에 막혀 있고 git 은 뚫려 있다.
+#
+# 수동 실행만 한다. 느리고, 평소 CI 는 컴파일·단위 테스트만 보면 된다.
+# 마지막 실행: 2026-09-23 전체 재촬영(WATCH_ONLY=0).
+#
+# **왜 전부 다시 찍나.** 런 47 뒤로 스토어 사진에 드는 화면이 또 바뀌었다 -
+# 기록 탭에서 달력이 빠지고 "한 달 보기" 가 생겼고, 설정에 "기분 색" 줄과 새
+# 테마 셋이 들어왔고, 진료 기록 폼이 개편됐다. 심사 제출 직전 최종 세트다.
+#
+#   볼 것 (2026-09-23)
+#   - 기록 탭: 달력 카드가 없고 "지난 기록" 머리 오른쪽에 "한 달 보기 ›" 가 있는지.
+#     펼침 버튼이 "마음·잠·활동 적기" 인지.
+#   - 설정: 테마 줄 아래 "기분 색" 일곱 원. 테마 목록이 무료 다섯 → Pro 셋 차례인지.
+#   - 진료 기록 폼: "받아 온 개수" 가 검정 라벨 + 숫자칸, 아래 "남아 있던 약을 받아 온
+#     약에 더할까요?" 토글, "용량이 바뀌었나요?" 예/아니오 알약, "새 약 등록" 버튼.
+#   - 약 등록 폼: "지금 남은 개수" 칸이 용량 카드 다음에 서고, 용량 칸 아래 단위
+#     버튼(mg·mcg·mL·정·개)이 숫자 전에도 보이는지.
+#   - 페이월: "Pro 테마" 줄 아래 밤 라일락·깊은 바다·제비꽃 분홍 색 견본 세 줄.
+#   - 리포트: 복약률 캡션이 진료 시각 기준으로 서는지(예시 데이터 9/6 진료).
+#   - 배너는 안 나온다(JANJAN_FORCE_PRO=1 로 찍으므로). 일부러 그렇다.
+
+name: Screenshots
+
+on:
+  # workflow_dispatch 는 워크플로 파일이 기본 브랜치에 있어야 먹힌다.
+  # 아직 main 에 없으므로, 그때까지는 작업 브랜치에 이 기계를 건드려 밀 때 돈다.
+  # main 에 들어간 뒤로는 Actions 탭에서 손으로 부르면 된다.
+  workflow_dispatch:
+  # **이 워크플로가 가장 비싸다.** UI 테스트라 8분쯤 걸리고 macOS 는 10배 청구라
+  # 한 번에 80분이 깎인다. 그래서 이 파일을 **일부러 건드릴 때만** 돈다.
+  #
+  # 앱 코드나 UI 테스트가 바뀌었다고 자동으로 돌지 않는다 — 그렇게 뒀더니
+  # 화면을 볼 생각이 없는 커밋에서도 두 번 돌아 한도를 먹었다.
+  # main 에 들어간 뒤로는 Actions 탭에서 손으로 부르면 된다.
+  push:
+    branches:
+      - claude/local-work-app-integration-5fnhoc
+    paths:
+      - '.github/workflows/screenshots.yml'
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+env:
+  # "1" 이면 아이폰 단계를 전부 건너뛰고 워치만 찍는다. 워치 화면만 고친
+  # 런에서 45분짜리 전체 촬영을 다시 돌 이유가 없다. 이때 ci/screenshots 의
+  # 아이폰 사진은 지우지 않고 그대로 두고 워치 사진만 덮는다.
+  WATCH_ONLY: "0"
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    name: 화면 찍기
+    runs-on: macos-15
+    # 캡처가 늘며 45분을 넘기기 시작했다(런 33: 워치 단계에서 잘림).
+    timeout-minutes: 75
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Xcode 선택 (latest-stable)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: 시뮬레이터 두 대 고르기
+        id: simulator
+        if: env.WATCH_ONLY != '1'
+        # 넓은 기기 하나, 좁은 기기 하나.
+        #
+        # 예전에는 "그 런타임의 첫 번째 아이폰" 을 썼다. 우연히 402x874 짜리가
+        # 잡혔고, 그 화면에서만 확인하다 보니 좁고 짧은 기기에서 무엇이 잘리는지
+        # 알 수가 없었다. SE 는 375x667 로 27pt 좁고 179pt 짧다 - 넘치는 것은
+        # 거기서 먼저 넘친다.
+        run: |
+          set -o pipefail
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+
+          NARROW = ["iPhone SE (3rd generation)", "iPhone SE (2nd generation)",
+                    "iPhone 13 mini", "iPhone 12 mini", "iPhone SE"]
+
+          # 스토어 제출 스크린샷은 6.9"(1320x2868) 또는 6.7"(1290x2796)만 받는다.
+          # "첫 번째 아이폰" 을 그냥 잡으면 16 Pro(1206x2622)가 걸려 규격 밖이 된다.
+          WIDE = ["iPhone 17 Pro Max", "iPhone 16 Pro Max", "iPhone 15 Pro Max",
+                  "iPhone 17 Plus", "iPhone 16 Plus", "iPhone 15 Plus"]
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          newest, phones = None, []
+          for identifier, devices in runtimes.items():
+              if "iOS" not in identifier:
+                  continue
+              available = [d for d in devices
+                           if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not available:
+                  continue
+              if newest is None or version(identifier) > newest:
+                  newest, phones = version(identifier), available
+
+          if not phones:
+              sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
+
+          def find(name):
+              return next((d for d in phones if d["name"] == name), None)
+
+          wide = next((d for name in WIDE if (d := find(name))), phones[0])
+          narrow = next((d for name in NARROW if (d := find(name))), None)
+
+          lines = ["wide_udid=" + wide["udid"], "wide_name=" + wide["name"]]
+          if narrow and narrow["udid"] != wide["udid"]:
+              lines += ["narrow_udid=" + narrow["udid"], "narrow_name=" + narrow["name"]]
+              sys.stderr.write("좁은 기기: {}\n".format(narrow["name"]))
+          else:
+              # 좁은 기기가 없으면 넓은 것만 찍는다. 사진이 아예 없는 것보다 낫다.
+              lines += ["narrow_udid=", "narrow_name="]
+              sys.stderr.write("좁은 기기를 못 찾았습니다. 넓은 기기만 찍습니다.\n")
+
+          sys.stderr.write("넓은 기기: {}\n".format(wide["name"]))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+              handle.write("\n".join(lines) + "\n")
+          '
+
+      - name: 시뮬레이터 미리 켜 두기
+        if: env.WATCH_ONLY != '1'
+        # 두 번째 기기에서 앱 실행이 타임아웃으로 죽은 적이 있다
+        # ("Timed out while requesting launch progress", 2026-09-01).
+        # xcodebuild 가 부팅까지 떠맡으면 느린 러너에서 실행 대기가 초과된다.
+        # 미리 켜고 부팅이 끝날 때까지 기다린 뒤에 테스트를 시작한다.
+        run: |
+          xcrun simctl boot "${{ steps.simulator.outputs.wide_udid }}" 2>/dev/null || true
+          if [ -n "${{ steps.simulator.outputs.narrow_udid }}" ]; then
+            xcrun simctl boot "${{ steps.simulator.outputs.narrow_udid }}" 2>/dev/null || true
+          fi
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.wide_udid }}" -b || true
+          if [ -n "${{ steps.simulator.outputs.narrow_udid }}" ]; then
+            xcrun simctl bootstatus "${{ steps.simulator.outputs.narrow_udid }}" -b || true
+          fi
+
+      - name: UI 테스트로 화면 찍기 (넓은 기기)
+        if: env.WATCH_ONLY != '1'
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.simulator.outputs.wide_udid }}" \
+            -resultBundlePath build/wide.xcresult \
+            -skipPackagePluginValidation \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 480 \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: UI 테스트로 화면 찍기 (좁은 기기)
+        # 좁은 기기가 실패해도 넓은 기기 사진은 이미 있다. 여기서 멈추지 않는다.
+        if: always() && env.WATCH_ONLY != '1' && steps.simulator.outputs.narrow_udid != ''
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme Screenshots \
+            -destination "id=${{ steps.simulator.outputs.narrow_udid }}" \
+            -resultBundlePath build/narrow.xcresult \
+            -skipPackagePluginValidation \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 480 \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: 영어 화면 넉 장 (넓은 기기)
+        # UI 테스트는 한국어 라벨로 이동하므로 영어로는 못 걸어 다닌다. 대신
+        # 테스트가 설치해 둔 앱을 영어 인자로 다시 띄워 화면마다 한 장씩 찍는다.
+        # 탭·시트는 DEBUG 전용 인자(-JanjanTab, -JanjanShowUnrecorded)로 연다 -
+        # 영어 스토어 스크린샷 세트의 재료다.
+        if: always() && env.WATCH_ONLY != '1'
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.simulator.outputs.wide_udid }}"
+          BUNDLE="com.thejanjan.app"
+          mkdir -p build/named
+          shot () {
+            name="$1"; shift
+            xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+            # 시뮬레이터에는 iCloud 계정이 없어 CloudKit 경로로 들어가면 죽는다(런 26).
+            if ! SIMCTL_CHILD_JANJAN_DISABLE_CLOUDKIT=1 SIMCTL_CHILD_JANJAN_FORCE_PRO=1 \
+                xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -janjan.language en "$@"; then
+              echo "::warning::${name} 을 띄우지 못했습니다."
+              return 0
+            fi
+            sleep 12
+            if xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "thejanjan.app"; then
+              xcrun simctl io "$UDID" screenshot "build/named/${name}.png" \
+                || echo "::warning::${name} 을 찍지 못했습니다."
+            else
+              echo "::warning::${name}: 앱이 뜬 뒤에 사라졌습니다."
+            fi
+          }
+          shot "17-오늘-영어"
+          shot "21-리포트-영어" -JanjanTab report
+          shot "22-가림-영어" -janjan.hideNames 1
+          shot "23-지나간-영어" -JanjanShowUnrecorded
+          shot "25-모양찾기-영어" -JanjanTab meds -JanjanShowPillFinder
+
+      - name: 약 모양으로 찾기 (넓은 기기, 한국어)
+        # 원형·하양이 미리 골라진 채 열려 후보 목록이 보인다(-JanjanShowPillFinder).
+        # 낱알 사진은 식약처 서버 핫링크라 넉넉히 기다린다 - 못 불러와도
+        # 글만으로 성립하는 화면이니 그대로 찍는다.
+        if: always() && env.WATCH_ONLY != '1'
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.simulator.outputs.wide_udid }}"
+          BUNDLE="com.thejanjan.app"
+          xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+          for attempt in 1 2; do
+            if ! SIMCTL_CHILD_JANJAN_DISABLE_CLOUDKIT=1 SIMCTL_CHILD_JANJAN_FORCE_PRO=1 \
+                xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -JanjanTab meds -JanjanShowPillFinder; then
+              echo "::warning::모양찾기 인자로 앱을 띄우지 못했습니다(시도 $attempt)."
+              continue
+            fi
+            sleep 20
+            if xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "thejanjan.app"; then
+              mkdir -p build/named
+              xcrun simctl io "$UDID" screenshot "build/named/24-모양찾기.png" && break
+              echo "::warning::모양찾기 화면을 찍지 못했습니다(시도 $attempt)."
+            else
+              echo "::warning::앱이 뜬 뒤에 사라졌습니다(시도 $attempt)."
+            fi
+          done
+
+      - name: 가림 화면 한 장 (넓은 기기)
+        # 약 이름 가리기(Pro)가 켜진 오늘 화면. 인자 도메인으로 설정을 켜고,
+        # 시뮬레이터에는 구독이 없으므로 디버그 백도어(JANJAN_FORCE_PRO)로 Pro 를 연다.
+        if: always() && env.WATCH_ONLY != '1'
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.simulator.outputs.wide_udid }}"
+          BUNDLE="com.thejanjan.app"
+          xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+          for attempt in 1 2; do
+            if ! SIMCTL_CHILD_JANJAN_DISABLE_CLOUDKIT=1 SIMCTL_CHILD_JANJAN_FORCE_PRO=1 \
+                xcrun simctl launch "$UDID" "$BUNDLE" -JanjanSeedDemoData -janjan.hideNames 1; then
+              echo "::warning::가림 인자로 앱을 띄우지 못했습니다(시도 $attempt)."
+              continue
+            fi
+            sleep 12
+            if xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "thejanjan.app"; then
+              mkdir -p build/named
+              xcrun simctl io "$UDID" screenshot "build/named/19-오늘-가림.png" && break
+              echo "::warning::가림 화면을 찍지 못했습니다(시도 $attempt)."
+            else
+              echo "::warning::앱이 뜬 뒤에 사라졌습니다(시도 $attempt)."
+            fi
+          done
+
+      - name: 첨부에서 PNG 꺼내기
+        # 테스트가 걸려 죽어도 이미 찍힌 것은 꺼낸다. 지난번에 이게 없어서
+        # 25분 멈춘 뒤 찍어 둔 사진까지 통째로 잃었다.
+        if: always() && env.WATCH_ONLY != '1'
+        continue-on-error: true
+        env:
+          WIDE_NAME: ${{ steps.simulator.outputs.wide_name }}
+          NARROW_NAME: ${{ steps.simulator.outputs.narrow_name }}
+        run: |
+          set -o pipefail
+          mkdir -p build/named
+
+          # 두 기기의 결과 꾸러미를 차례로 푼다. 좁은 기기 사진은 이름 뒤에
+          # -좁은화면 을 붙여 한 폴더에 나란히 둔다 - 같은 화면을 위아래로
+          # 놓고 봐야 무엇이 잘렸는지 보인다.
+          for pass in wide narrow; do
+            bundle="build/${pass}.xcresult"
+            [ -d "$bundle" ] || { echo "$bundle 없음 - 건너뜁니다"; continue; }
+
+            raw="build/raw-${pass}"
+            mkdir -p "$raw"
+
+            # Xcode 판에 따라 이 하위 명령이 없을 수 있다. 없으면 무엇이 있는지
+            # 찍어 두고 멈춘다 - 조용히 빈 손으로 끝나면 왜 사진이 없는지 알 길이 없다.
+            if ! xcrun xcresulttool export attachments --path "$bundle" --output-path "$raw"; then
+              echo "::error::xcresulttool export attachments 가 실패했습니다($pass). 쓸 수 있는 하위 명령:"
+              xcrun xcresulttool --help || true
+              continue
+            fi
+
+            SUFFIX=""
+            [ "$pass" = "narrow" ] && SUFFIX="-좁은화면"
+            RAW="$raw" OUT=build/named SUFFIX="$SUFFIX" python3 - <<'PY'
+          import json, os, shutil
+
+          root = os.environ["RAW"]
+          out = os.environ["OUT"]
+          suffix = os.environ["SUFFIX"]
+          os.makedirs(out, exist_ok=True)
+
+          def copy(source, stem):
+              shutil.copyfile(source, os.path.join(out, stem + suffix + ".png"))
+
+          named = 0
+          manifest_path = os.path.join(root, "manifest.json")
+
+          # export 는 파일을 해시 이름으로 떨구고 manifest.json 에 원래 이름을 적어 둔다.
+          # 사람이 읽을 이름으로 바꾸되, manifest 형식이 달라지면 이름만 포기하고
+          # 사진은 건진다 - 이름 때문에 빈 손으로 끝나는 것이 가장 나쁘다.
+          if os.path.exists(manifest_path):
+              try:
+                  with open(manifest_path, encoding="utf-8") as handle:
+                      manifest = json.load(handle)
+                  entries = manifest if isinstance(manifest, list) else [manifest]
+                  for test in entries:
+                      for attachment in (test or {}).get("attachments", []):
+                          exported = attachment.get("exportedFileName")
+                          if not exported:
+                              continue
+                          source = os.path.join(root, exported)
+                          if not os.path.exists(source):
+                              continue
+                          label = (
+                              attachment.get("suggestedHumanReadableName")
+                              or attachment.get("name")
+                              or exported
+                          )
+                          copy(source, os.path.splitext(label)[0])
+                          named += 1
+              except Exception as error:
+                  print("manifest 를 읽지 못했습니다:", error)
+
+          if named == 0:
+              for entry in sorted(os.listdir(root)):
+                  if entry.lower().endswith(".png"):
+                      copy(os.path.join(root, entry), os.path.splitext(entry)[0])
+                      named += 1
+
+          print("{} 사진 {}장".format(root, named))
+          PY
+          done
+
+          ls -la build/named
+          test "$(ls build/named/*.png 2>/dev/null | wc -l)" -gt 0 \
+            || { echo "::error::사진을 하나도 꺼내지 못했습니다."; exit 1; }
+
+          echo "넓은 기기: ${WIDE_NAME:-?} / 좁은 기기: ${NARROW_NAME:-없음}"
+
+      - name: 아이폰 사진을 먼저 올려 둔다
+        # 런 33의 교훈 - 워치 단계가 늘어져 시간 상한에 잘리면, 이미 찍은
+        # 아이폰 사진까지 러너와 함께 사라진다. 여기서 한 번 올려 두면
+        # 뒤가 어떻게 되든 아이폰 몫은 남는다. 마지막 단계가 전체(워치 포함)로
+        # 다시 덮어쓴다.
+        if: always() && env.WATCH_ONLY != '1'
+        continue-on-error: true
+        run: |
+          set -e
+          ls build/named/*.png >/dev/null 2>&1 || { echo "올릴 사진 없음"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          current="$(git rev-parse HEAD)"
+          mkdir -p /tmp/shots-early
+          cp build/named/*.png /tmp/shots-early/
+          git checkout --orphan screenshots-early
+          git rm -rf --cached . > /dev/null
+          rm -rf shots && mkdir -p shots
+          cp /tmp/shots-early/*.png shots/
+          {
+            echo "# 시뮬레이터 화면 (아이폰 몫 중간 업로드)"
+            echo
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo "- 찍은 때: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          } > README.md
+          git add -f shots README.md
+          git commit -q -m "화면(아이폰 먼저) ${GITHUB_SHA:0:7}"
+          git push -f origin HEAD:ci/screenshots
+          git checkout -f "$current"
+          rm -rf shots README.md && git checkout -- README.md 2>/dev/null || true
+
+      # ── 워치 ────────────────────────────────────────────────────────────
+      # watchOS 는 XCUITest 를 지원하지 않는다. 눌러 가며 찍을 수 없으므로
+      # simctl 로 앱을 띄우되 어느 화면으로 열지는 실행 인자로 고른다.
+      #
+      # 아래 세 단계는 실패해도 멈추지 않는다(continue-on-error). 워치가 안 되더라도
+      # 이미 찍은 아이폰 사진은 올려야 한다 — 빈 손으로 끝나는 것이 가장 나쁘다.
+
+      - name: 워치 시뮬레이터 고르기
+        id: watch
+        if: always()
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # 아이폰과 같은 이유로 두 대를 고른다: 가장 큰 워치에서 여백을,
+          # 가장 작은 워치(40/41mm)에서 잘림·넘침을 본다. 크기는 이름의
+          # "(NNmm)" 에서 읽는다 — simctl 은 화면 크기를 따로 주지 않는다.
+          xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          best = None
+          for identifier, devices in runtimes.items():
+              if "watchOS" not in identifier:
+                  continue
+              watches = [d for d in devices if d.get("isAvailable") and "Apple Watch" in d["name"]]
+              if not watches:
+                  continue
+              candidate = (version(identifier), identifier, watches)
+              if best is None or candidate[0] > best[0]:
+                  best = candidate
+
+          if best is None:
+              sys.exit("사용할 수 있는 Apple Watch 시뮬레이터가 없습니다.")
+
+          def size_mm(device):
+              match = re.search(r"\((\d+)mm\)", device["name"])
+              return int(match.group(1)) if match else 0
+
+          watches = sorted(best[2], key=size_mm)
+          small, large = watches[0], watches[-1]
+          sys.stderr.write("작은 기기: {}\n큰 기기: {}\n".format(small["name"], large["name"]))
+          print("udid={}".format(large["udid"]))
+          print("udid_small={}".format(small["udid"] if small["udid"] != large["udid"] else ""))
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: 워치 앱 빌드
+        if: always() && steps.watch.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TheJanjan.xcodeproj \
+            -scheme TheJanjanWatch \
+            -destination "id=${{ steps.watch.outputs.udid }}" \
+            -derivedDataPath build/watch-dd \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: 워치 화면 찍기
+        if: always() && steps.watch.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          BUNDLE="com.thejanjan.app.watchkitapp"
+
+          APP=$(find build/watch-dd/Build/Products -name 'TheJanjanWatch.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::빌드된 워치 앱을 찾지 못했습니다."
+            find build/watch-dd/Build/Products -maxdepth 2 -type d || true
+            exit 1
+          fi
+          echo "앱: $APP"
+
+          mkdir -p build/named
+
+          # 한 화면이 실패해도 나머지는 찍는다. 여기서 죽으면 나머지를 다 잃는데,
+          # 워치 사진은 한 번 찍는 데 macOS 러너 몇 분이 든다.
+          capture () {
+            udid="$1"; name="$2"; screen="$3"; extra="${4:-}"
+            xcrun simctl terminate "$udid" "$BUNDLE" >/dev/null 2>&1 || true
+            if ! xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData -JanjanScreen "$screen" $extra; then
+              echo "::warning::${name} 을 띄우지 못했습니다. 다음 화면으로 넘어갑니다."
+              return 0
+            fi
+            # 화면이 자리를 잡을 틈. 워치는 폰보다 느리게 뜨고,
+            # 시트는 뜬 뒤에 한 박자 늦게 올라온다.
+            sleep 6
+            xcrun simctl io "$udid" screenshot "build/named/${name}.png" \
+              || echo "::warning::${name} 을 찍지 못했습니다."
+          }
+
+          # 한 기기의 네 화면을 전부 찍는다. 접미사는 아이폰의 -좁은화면 과 같은 관례다.
+          capture_all () {
+            udid="$1"; suffix="$2"
+            xcrun simctl boot "$udid" || true
+            xcrun simctl bootstatus "$udid" -b
+            xcrun simctl install "$udid" "$APP"
+
+            # 설치 직후 첫 실행은 느리다. 그 느린 실행이 첫 사진이 되지 않도록
+            # 한 번 버리고 시작한다.
+            xcrun simctl launch "$udid" "$BUNDLE" -JanjanSeedDemoData >/dev/null 2>&1 || true
+            sleep 8
+
+            capture "$udid" "11-워치-홈${suffix}" home
+            capture "$udid" "12-워치-기분${suffix}" mood
+            capture "$udid" "13-워치-증상${suffix}" symptom
+            capture "$udid" "14-워치-복약${suffix}" dose
+            # 영어 확인용 한 장. 데모 시드가 이 인자를 보고 영어 스냅샷을 만든다.
+            capture "$udid" "18-워치-홈-영어${suffix}" home "-JanjanLanguage en"
+
+            xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+          }
+
+          capture_all "${{ steps.watch.outputs.udid }}" ""
+          SMALL="${{ steps.watch.outputs.udid_small }}"
+          if [ -n "$SMALL" ]; then
+            capture_all "$SMALL" "-작은화면"
+          else
+            echo "::warning::작은 워치 시뮬레이터가 따로 없어 큰 기기만 찍었습니다."
+          fi
+
+          ls -la build/named
+
+      - name: ci/screenshots 브랜치에 올리기
+        if: always()
+        run: |
+          set -e
+
+          # 한 장도 못 찍었으면 브랜치를 건드리지 않는다. 지난 사진을 빈 것으로
+          # 덮어쓰면 그나마 있던 것도 잃는다.
+          if ! ls build/named/*.png >/dev/null 2>&1; then
+            echo "::warning::찍힌 사진이 없어 브랜치를 그대로 둡니다."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p /tmp/shots
+
+          # 워치만 찍은 런은 지난 런의 아이폰 사진을 지우면 안 된다 -
+          # 브랜치의 기존 사진을 먼저 깔고 그 위에 새 사진을 덮는다.
+          # quotepath 를 꺼야 한글 이름이 따옴표 이스케이프 없이 그대로 나온다
+          # (런 42가 "path does not exist" 로 죽은 원인).
+          if [ "$WATCH_ONLY" = "1" ] && git fetch origin ci/screenshots 2>/dev/null; then
+            git -c core.quotepath=off ls-tree -r --name-only FETCH_HEAD -- shots | while IFS= read -r f; do
+              git show "FETCH_HEAD:$f" > "/tmp/shots/$(basename "$f")"
+            done
+          fi
+
+          cp build/named/*.png /tmp/shots/
+
+          git checkout --orphan screenshots-tmp
+          git rm -rf --cached . > /dev/null
+          rm -rf shots
+          mkdir -p shots
+          cp /tmp/shots/*.png shots/
+
+          {
+            echo "# 시뮬레이터 화면"
+            echo
+            echo "\`screenshots.yml\` 이 macOS 러너에서 찍어 올린 것입니다. 손으로 고치지 마세요."
+            echo
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo "- 찍은 때: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          } > README.md
+
+          git add -f shots README.md
+          git commit -q -m "화면 ${GITHUB_SHA:0:7}"
+          git push -f origin HEAD:ci/screenshots

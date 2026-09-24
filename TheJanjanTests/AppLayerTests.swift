@@ -24,7 +24,24 @@ final class AppLayerTests: XCTestCase {
             purposeLine: "잠들기 쉽게"
         )
         let restored = MedicationRecord.make(from: core).core
-        XCTAssertEqual(restored, core)
+
+        // 저장을 거치면 등록 시각이 생긴다. 손으로 만든 값은 언제부터였는지
+        // 모르지만(createdAt == nil), 저장소를 지난 뒤로는 모르는 약이 없다 -
+        // 그 값으로 DayPlan 이 과거 소급을 막는다(2026-09-19).
+        XCTAssertNil(core.createdAt)
+        XCTAssertNotNil(restored.createdAt)
+
+        var expected = core
+        expected.createdAt = restored.createdAt
+        XCTAssertEqual(restored, expected)
+    }
+
+    /// 저장된 등록 시각은 왕복해도 그대로다. 예시 데이터가 등록 시각을
+    /// 앞으로 당겨 두는 것이 이 성질에 기댄다.
+    func testMedicationRecordKeepsAGivenCreatedAt() {
+        let registered = Date(timeIntervalSince1970: 1_750_000_000)
+        let core = Medication(name: "라모트리진", createdAt: registered)
+        XCTAssertEqual(MedicationRecord.make(from: core).core.createdAt, registered)
     }
 
     func testDoseEventRecordRoundTripKeepsHalfTablet() {
@@ -123,9 +140,11 @@ final class AppLayerTests: XCTestCase {
     // MARK: - 디자인 토큰이 UIColor 로 살아 나오는지
 
     func testEveryTokenBecomesAUIColor() {
-        for token in JanjanColor.allCases {
-            XCTAssertNotNil(UIColor(janjanHex: token.lightHex), "\(token) 라이트")
-            XCTAssertNotNil(UIColor(janjanHex: token.darkHex), "\(token) 다크")
+        for theme in JanjanTheme.allCases {
+            for token in JanjanColor.allCases {
+                XCTAssertNotNil(UIColor(janjanHex: token.lightHex(theme)), "\(theme) \(token) 라이트")
+                XCTAssertNotNil(UIColor(janjanHex: token.darkHex(theme)), "\(theme) \(token) 다크")
+            }
         }
         XCTAssertNil(UIColor(janjanHex: "not-a-color"))
     }
@@ -143,5 +162,79 @@ final class AppLayerTests: XCTestCase {
         XCTAssertEqual(DoseNotification.doseAction(for: DoseNotification.actionSkipped), .skipped)
         XCTAssertEqual(DoseNotification.doseAction(for: DoseNotification.actionSnooze), .snooze)
         XCTAssertNil(DoseNotification.doseAction(for: UNNotificationDefaultActionIdentifier))
+    }
+}
+
+/// 늦게 답한 알림이 어느 날에 붙는가.
+///
+/// 여기가 어긋나면 두 번 먹은 것이 한 번으로 남는다. 아침 약을 밤에 뒤늦게 기록했는데
+/// 그것이 '내일 아침' 줄에 적히면, 다음 날 진짜로 아침 약을 먹고 기록할 때 그 줄을
+/// 덮어쓴다. 재고는 한 알만 줄고, 오늘 아침은 영영 미기록으로 남는다.
+/// CloudKit 제약을 실제로 확인한다.
+///
+/// 메모리 저장소로만 열어 보는 테스트는 이 제약을 확인하지 못한다.
+/// "모든 속성에 기본값" · "unique 금지" · "관계 금지" 는 `cloudKitDatabase` 를
+/// 지정했을 때만 검사되고, 어기면 던지는 것이 아니라 **그 자리에서 죽는다.**
+/// 그러니 이 테스트가 할 일은 크래시하지 않고 끝나는 것 하나뿐이다.
+/// (iCloud 를 못 쓰는 러너에서는 그냥 throw 하고, 그건 통과로 본다.)
+final class CloudKitSchemaTests: XCTestCase {
+
+    func testEveryModelSurvivesACloudKitConfiguration() throws {
+        let schema = Schema(JanjanSchema.allModels)
+        let configuration = ModelConfiguration(
+            "JanjanCloudKitSchemaCheck",
+            schema: schema,
+            cloudKitDatabase: .private(Janjan.cloudKitContainerID)
+        )
+        _ = try? ModelContainer(for: schema, configurations: configuration)
+    }
+}
+
+@MainActor
+final class PlannedDayTests: XCTestCase {
+
+    private let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
+    private func date(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: day, hour: hour, minute: minute)
+        ) ?? Date(timeIntervalSince1970: 0)
+    }
+
+    private func plannedDay(at moment: Date, slot: TimeOfDay) -> Date {
+        DoseRecorder.plannedDay(near: moment, scheduleTime: slot, calendar: calendar)
+    }
+
+    func testLateAnswerStaysOnToday() {
+        // 아침 8시 약을 그날 밤 9시에 기록. 13시간 늦었지만 오늘 것이다.
+        let chosen = plannedDay(at: date(17, 21), slot: TimeOfDay(hour: 8, minute: 0))
+        XCTAssertEqual(chosen, calendar.startOfDay(for: date(17, 12)))
+    }
+
+    func testVeryLateAnswerNeverJumpsToTomorrow() {
+        // 자정 직전이라 내일 8시가 더 가깝지만, 아직 오지 않은 예정분에는 붙이지 않는다.
+        let chosen = plannedDay(at: date(17, 23, 30), slot: TimeOfDay(hour: 8, minute: 0))
+        XCTAssertEqual(chosen, calendar.startOfDay(for: date(17, 12)))
+    }
+
+    func testAfterMidnightAnswerGoesBackToYesterday() {
+        // 어젯밤 23:50 취침약 알림에 00:05 에 답했다.
+        let chosen = plannedDay(at: date(18, 0, 5), slot: TimeOfDay(hour: 23, minute: 50))
+        XCTAssertEqual(chosen, calendar.startOfDay(for: date(17, 12)))
+    }
+
+    func testSlightlyEarlyAnswerCountsAsToday() {
+        // 알림이 울리기 20분 전에 미리 먹고 눌렀다.
+        let chosen = plannedDay(at: date(17, 22, 10), slot: TimeOfDay(hour: 22, minute: 30))
+        XCTAssertEqual(chosen, calendar.startOfDay(for: date(17, 12)))
+    }
+
+    func testOnTimeAnswer() {
+        let chosen = plannedDay(at: date(17, 8, 2), slot: TimeOfDay(hour: 8, minute: 0))
+        XCTAssertEqual(chosen, calendar.startOfDay(for: date(17, 12)))
     }
 }

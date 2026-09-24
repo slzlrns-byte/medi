@@ -1,0 +1,331 @@
+import AppIntents
+import SwiftData
+import SwiftUI
+import WidgetKit
+import JanjanCore
+
+// MARK: - 한 칸에 담을 것
+
+/// 위젯이 그릴 최소한의 것. 저장소를 그대로 들고 다니지 않는다.
+struct DoseEntry: TimelineEntry {
+    let date: Date
+
+    /// 아직 답하지 않은 가장 이른 시간대. 없으면 오늘 할 일이 끝났거나 약이 없다.
+    let slotKey: String?
+    let slotLabelKo: String
+    let timeText: String
+    let medicationNames: [String]
+    let pendingCount: Int
+
+    /// 등록한 약이 아예 없는 경우. '다 챙기셨어요' 와 구별해야 한다 —
+    /// 아무것도 안 한 사람에게 다 했다고 말하면 안 된다.
+    let hasAnyMedication: Bool
+    /// 오늘 예정된 시간대가 하나라도 있는지. 약은 있는데 오늘 요일이
+    /// 아니거나 필요시 약뿐이면 "다 챙기셨어요" 가 아니라 "예정 없음" 이다
+    /// (QA 2026-09-22). 옛 자리 표시자는 참으로 둔다.
+    var hasPlanToday: Bool = true
+
+    var isDone: Bool { slotKey == nil && hasAnyMedication && hasPlanToday }
+
+    /// 남은 것이 없을 때의 한 줄. 위젯 세 벌이 같은 말을 한다.
+    var restingText: String {
+        if !hasAnyMedication { return t("약을 등록하면 여기 나와요.", "Add a medication to see it here.") }
+        if !hasPlanToday { return t("오늘은 예정된 약이 없어요.", "No doses are planned for today.") }
+        return t("오늘 약은 다 챙기셨어요.", "You've taken all of today's meds.")
+    }
+
+    static let placeholder = DoseEntry(
+        date: Date(),
+        slotKey: "morning",
+        slotLabelKo: t("아침", "Morning"),
+        timeText: "08:00",
+        medicationNames: ["에스시탈로프람"],
+        pendingCount: 1,
+        hasAnyMedication: true
+    )
+}
+
+// MARK: - 시간표
+
+struct NextDoseProvider: TimelineProvider {
+
+    func placeholder(in context: Context) -> DoseEntry { .placeholder }
+
+    func getSnapshot(in context: Context, completion: @escaping (DoseEntry) -> Void) {
+        completion(context.isPreview ? .placeholder : read())
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<DoseEntry>) -> Void) {
+        let entry = read()
+
+        // 다음 시간대가 오면 저절로 바뀌어야 한다. 사용자가 앱을 열어 줄 때까지
+        // 지난 시간대를 붙들고 있으면 위젯이 거짓말을 하는 셈이다.
+        let next = nextRefresh(after: entry.date)
+        completion(Timeline(entries: [entry], policy: .after(next)))
+    }
+
+    /// 다음으로 다시 그릴 시각. 오늘 남은 시간대 중 가장 이른 것, 없으면 내일 자정.
+    private func nextRefresh(after now: Date) -> Date {
+        let calendar = Calendar.current
+        let container = JanjanModelContainer.make()
+        let context = ModelContext(container)
+
+        let upcoming = TodayPlanReader.slots(on: now, in: context)
+            .compactMap { line -> Date? in
+                guard !line.isCompleted else { return nil }
+                return line.time.date(on: now, calendar: calendar)
+            }
+            .filter { $0 > now }
+            .min()
+
+        let midnight = calendar.startOfDay(for: now.addingTimeInterval(24 * 60 * 60))
+        // 최소 15분은 두고 본다. 너무 촘촘하면 시스템이 어차피 미룬다.
+        let floor = now.addingTimeInterval(15 * 60)
+        return max(min(upcoming ?? midnight, midnight), floor)
+    }
+
+    private func read() -> DoseEntry {
+        let now = Date()
+        let container = JanjanModelContainer.make()
+        let context = ModelContext(container)
+
+        let medicationCount = (try? context.fetchCount(FetchDescriptor<MedicationRecord>())) ?? 0
+        let slots = TodayPlanReader.slots(on: now, in: context)
+        guard let line = slots.first(where: { !$0.isCompleted }) else {
+            return DoseEntry(
+                date: now,
+                slotKey: nil,
+                slotLabelKo: "",
+                timeText: "",
+                medicationNames: [],
+                pendingCount: 0,
+                hasAnyMedication: medicationCount > 0,
+                hasPlanToday: !slots.isEmpty
+            )
+        }
+
+        // 위젯은 구독 여부를 물을 수 없어 저장된 값만 본다. 구독이 끝난 뒤에도
+        // 가려진 채로 남는 것은 프라이버시 쪽으로 안전한 실패라 그대로 둔다.
+        let names = JanjanPrivacy.hidesNames ? [] : line.medicationNames
+
+        return DoseEntry(
+            date: now,
+            slotKey: line.slotKey,
+            slotLabelKo: line.slot.label(JanjanLanguage.current),
+            // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 아래에서 안 그린다.
+            timeText: line.slot.isCustom ? "" : line.time.description,
+            medicationNames: names,
+            pendingCount: line.pendingCount,
+            hasAnyMedication: true
+        )
+    }
+}
+
+// MARK: - 홈 화면
+
+struct NextDoseWidgetView: View {
+
+    @Environment(\.widgetFamily) private var family
+    let entry: DoseEntry
+
+    var body: some View {
+        switch family {
+        case .systemMedium: mediumBody
+        default: smallBody
+        }
+    }
+
+    // MARK: 작은 칸 — 시간대 하나와 버튼 하나
+
+    private var smallBody: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let slotKey = entry.slotKey {
+                header
+                Spacer(minLength: 0)
+                takenButton(slotKey: slotKey)
+            } else {
+                restingBody
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    // MARK: 중간 칸 — 약 이름까지 보인다
+
+    private var mediumBody: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                if entry.slotKey != nil {
+                    header
+                    if !entry.medicationNames.isEmpty {
+                        Text(entry.medicationNames.joined(separator: " · "))
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                } else {
+                    restingBody
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let slotKey = entry.slotKey {
+                takenButton(slotKey: slotKey)
+                    .fixedSize()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(entry.slotLabelKo)
+                    .font(.system(size: 20, weight: .semibold))
+                if !entry.timeText.isEmpty {
+                    Text(entry.timeText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            // 색만으로 상태를 말하지 않는다. 글자가 항상 함께 온다.
+            Text(t("\(entry.pendingCount)개 남음", "\(entry.pendingCount) left"))
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 남은 것이 없을 때. 재촉하지 않고, 하지도 않은 일을 했다고 하지도 않는다.
+    private var restingBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(entry.restingText)
+                .font(.system(size: 15))
+                .foregroundStyle(.primary)
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    /// 손목(워치)과 같은 규칙이다 - **보는 것은 무료, 여기서 바로 기록하는 것이 Pro**.
+    ///
+    /// 무료에서도 버튼은 그대로 있고 눌린다. 다만 위젯이 직접 기록하지 않고
+    /// 앱이 열린다(widgetURL 이 아니라 Link 로 그 자리만 연다). 기록 자체를
+    /// 막지 않는 것이 이 선의 핵심이다 - 약을 놓치게 만드는 구조는 만들지 않는다.
+    @ViewBuilder
+    private func takenButton(slotKey: String) -> some View {
+        if JanjanEntitlement.isPro {
+            Button(intent: LogDoseIntent(slotKey: slotKey)) {
+                takenLabel(opensApp: false)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primary)
+        } else {
+            Link(destination: Janjan.logSlotURL(slotKey: slotKey)) {
+                takenLabel(opensApp: true)
+            }
+        }
+    }
+
+    private func takenLabel(opensApp: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(t("먹었어요", "Took it"))
+                .font(.system(size: 15, weight: .medium))
+            if opensApp {
+                // 앱이 열린다는 것을 눌러 보기 전에 알 수 있어야 한다.
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 11, weight: .regular))
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .foregroundStyle(opensApp ? Color.primary : Color(uiColor: .systemBackground))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(opensApp ? Color.secondary.opacity(0.18) : Color.primary)
+        )
+    }
+}
+
+struct NextDoseWidget: Widget {
+
+    let kind = "NextDoseWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: NextDoseProvider()) { entry in
+            NextDoseWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName(t("다음 약", "Next dose"))
+        // 무료는 앱이 열리고 Pro 만 위젯에서 바로 기록된다 - "바로" 는 뺀다.
+        .description(t("다음 시간대를 보여 주고, 눌러서 기록해요.", "Shows your next time slot — tap to log it."))
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+// MARK: - 잠금화면
+
+/// 잠금화면에는 버튼을 두지 않는다.
+///
+/// 주머니 안에서 스치기만 해도 먹지 않은 약이 먹은 것으로 적히고 재고까지 깎인다.
+/// 되돌릴 수 있다 해도, 되돌려야 할 일을 만들지 않는 편이 낫다.
+/// 여기서는 알려 주기만 하고, 누르면 앱이 열린다.
+struct NextDoseLockScreenWidget: Widget {
+
+    let kind = "NextDoseLockScreenWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: NextDoseProvider()) { entry in
+            NextDoseLockScreenView(entry: entry)
+                .containerBackground(.clear, for: .widget)
+        }
+        .configurationDisplayName(t("다음 약", "Next dose"))
+        .description(t("잠금화면에서 다음 시간대를 봐요.", "See your next time slot on the Lock Screen."))
+        .supportedFamilies([.accessoryRectangular, .accessoryInline])
+    }
+}
+
+struct NextDoseLockScreenView: View {
+
+    @Environment(\.widgetFamily) private var family
+    let entry: DoseEntry
+
+    /// 잠금화면에 보일 이름. 무료 토글 "잠금화면에서 약 이름 숨기기" 도
+    /// 따른다 - 알림은 "2종" 으로 오는데 이 위젯만 이름을 그대로 띄웠다
+    /// (QA 2026-09-22). 빈 배열이면 아래가 "N개 남음" 으로 부른다.
+    private var lockScreenNames: [String] {
+        JanjanPrivacy.hidesNamesOnLockScreen ? [] : entry.medicationNames
+    }
+
+
+    var body: some View {
+        switch family {
+        case .accessoryInline:
+            Text(inlineText)
+        default:
+            VStack(alignment: .leading, spacing: 1) {
+                if entry.slotKey != nil {
+                    Text([entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " "))
+                        .font(.headline)
+                    Text(lockScreenNames.isEmpty
+                         ? t("\(entry.pendingCount)개 남음", "\(entry.pendingCount) left")
+                         : lockScreenNames.joined(separator: " · "))
+                        .font(.caption)
+                        .lineLimit(1)
+                } else {
+                    Text(entry.restingText)
+                        .font(.caption)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var inlineText: String {
+        guard entry.slotKey != nil else {
+            return entry.hasAnyMedication ? t("오늘 약 완료", "Done for today") : t("약 등록 전", "No meds yet")
+        }
+        let head = [entry.slotLabelKo, entry.timeText].filter { !$0.isEmpty }.joined(separator: " ")
+        return "\(head) · \(t("\(entry.pendingCount)개", "\(entry.pendingCount)"))"
+    }
+}

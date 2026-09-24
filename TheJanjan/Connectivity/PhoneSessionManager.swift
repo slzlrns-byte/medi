@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import SwiftData
 import WatchConnectivity
 import JanjanCore
 
@@ -16,8 +17,8 @@ final class PhoneSessionManager: NSObject {
 
     weak var doseLogger: (any DoseLogging)?
 
-    /// 워치에 보낼 오늘 요약. 화면 쪽에서 갱신해 준다.
-    var snapshotProvider: (() -> WatchSnapshot)?
+    /// 워치에 보낼 오늘 요약. 저장소를 읽어야 만들 수 있어 MainActor 로 못박는다.
+    var snapshotProvider: (@MainActor () -> WatchSnapshot)?
 
     private override init() {
         super.init()
@@ -48,14 +49,48 @@ final class PhoneSessionManager: NSObject {
     }
 
     fileprivate func handle(_ message: WatchMessage) {
+        // 워치 앱 전체가 Pro 다. 화면을 잠가 두고 기록만 받아 주면
+        // 잠긴 기능이 반쯤 동작하는 것이 된다. 스냅샷 요청은 그대로 받는다 —
+        // 잠겼다는 사실 자체를 워치에 알려 줘야 하기 때문이다.
+        if case .requestSnapshot = message {} else {
+            guard AppServices.shared.isPro else { return }
+        }
+
         switch message {
-        case .doseAction(let medicationIDs, let slotKey, let action):
+        case .doseAction(let medicationIDs, let slotKey, let action, let date):
+            // 도착한 시각이 아니라 **누른 시각**이다. 큐에 쌓였다 며칠 뒤 오면
+            // 도착한 날의 줄을 덮어썼다(QA 2026-09-22).
             doseLogger?.logDose(
                 medicationIDs: medicationIDs,
                 slotKey: slotKey,
                 action: action,
-                at: Date()
+                source: .watch,
+                at: date
             )
+        case .asNeededTaken(let medicationID, let quantity, let at):
+            guard let context = AppServices.shared.container?.mainContext else { return }
+            // 폰에서 약을 지운 직후, 옛 스냅샷을 쥔 워치가 누른 것일 수 있다.
+            // 주인 없는 기록은 이름 없는 이력 줄로 남고 복약률에 조용히 섞이므로
+            // (MedicationStore.delete 주석과 같은 위험) 여기서 거르고,
+            // 워치에는 새 스냅샷을 보내 옛 줄을 걷어 낸다.
+            guard Self.medicationExists(medicationID, in: context) else {
+                logger.error("지워진 약의 필요시 기록이 워치에서 왔습니다. 무시합니다.")
+                AppServices.shared.pushWatchSnapshot()
+                return
+            }
+            DoseRecorder.recordAsNeeded(
+                medicationID: medicationID,
+                quantity: quantity,
+                source: .watch,
+                at: at,
+                in: context
+            )
+            do {
+                try context.save()
+            } catch {
+                logger.error("필요시 복용 기록 저장 실패: \(error.localizedDescription, privacy: .public)")
+            }
+            AppServices.shared.pushWatchSnapshot()
         case .symptom(let symptomID, let severity, let date):
             doseLogger?.logSymptom(
                 symptomID: symptomID,
@@ -70,6 +105,12 @@ final class PhoneSessionManager: NSObject {
                 pushSnapshot(snapshot)
             }
         }
+    }
+
+    /// 이 약이 아직 저장소에 있는가. 워치에서 온 ID 는 이미 지워진 약일 수 있다.
+    private static func medicationExists(_ id: UUID, in context: ModelContext) -> Bool {
+        let descriptor = FetchDescriptor<MedicationRecord>(predicate: #Predicate { $0.id == id })
+        return ((try? context.fetchCount(descriptor)) ?? 0) > 0
     }
 }
 

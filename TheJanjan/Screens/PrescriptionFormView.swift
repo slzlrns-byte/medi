@@ -1,0 +1,1002 @@
+import SwiftUI
+import SwiftData
+import JanjanCore
+
+/// 진료 기록 (설계 03절 · 05절). 화면 이름은 "처방 기록" 이었는데
+/// "이번 진료 내용을 기록할 수 있어야 할 것 같은데" 라는 말에 바꿨다
+/// (2026-09-19) - 사용자는 이 일을 처방이 아니라 진료로 부른다. "지난 진료"
+/// 화면과도 짝이 맞는다.
+///
+/// 이 화면 하나가 "다음 진료 D-" 와 "진료 전에 모자라는 약" 을 살린다.
+/// 둘 다 진료일과 받아 온 개수를 알아야 계산할 수 있기 때문이다.
+/// 여기서 들은 용량 변경은 적어 두는 데 그치지 않고 약에 바로 적용된다.
+///
+/// 개수는 **제안일 뿐 강요가 아니다.** 처방일수 × 하루 예정 개수로 초안을 채워 두고
+/// 사용자가 실제로 받아 온 수로 고칠 수 있게 한다. 봉투에 적힌 수와 손에 쥔 수는 자주 다르다.
+struct PrescriptionFormView: View {
+
+    let onSaved: () -> Void
+
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var pro: ProStore
+
+    @Query(sort: \MedicationRecord.createdAt) private var medicationRecords: [MedicationRecord]
+    @Query private var scheduleRecords: [ScheduleRecord]
+    @Query private var stockRecords: [StockEventRecord]
+    /// 받기 전 개수를 미리 채우려면 지금 재고를 알아야 한다.
+    @Query private var doseRecords: [DoseEventRecord]
+    /// 이 진료가 가장 나중 진료인지 볼 때 쓴다(용량 변경 적용 규칙).
+    @Query private var prescriptionRecords: [PrescriptionRecord]
+
+    /// 처음 열릴 때의 처방일수. `hasEdits` 가 "손댔는지" 를 이 값과 견준다.
+    static let defaultDaysSupplied = 28
+
+    @State private var visitDate = Date()
+    @State private var daysSupplied = defaultDaysSupplied
+    /// 폼이 열릴 때의 값. 닫을 때 달라졌는지 보려고 들고 있는다.
+    private let initialVisitDate: Date
+    private let initialNextVisitDate: Date
+    @State private var hasNextVisit = true
+    @State private var nextVisitDate = Date()
+    @State private var clinicNote = ""
+    /// 약 id → 받아 온 개수. 여기 없으면 이번 처방에 없는 약이다.
+    @State private var refills: [UUID: Decimal] = [:]
+    /// 받아 온 개수 칸의 글자. ± 가 아니라 숫자 입력이다(사용자 요청 2026-09-22) -
+    /// "받기 전 남아 있던 개수" 와 같은 방식이어야 한 화면에서 두 문법을 안 배운다.
+    @State private var refillTexts: [UUID: String] = [:]
+    /// 받기 전 남아 있던 개수를 받아 온 약에 **더할지**. 기본은 더하지 않는다
+    /// (사용자 결정 2026-09-22) - 받아 온 개수가 곧 남은 개수가 된다.
+    @State private var addsLeftover: Set<UUID> = []
+    /// "용량이 바뀌었나요?" 의 답. 없으면 아직 안 답한 것이고, 그러면 저장이
+    /// 막힌다(사용자 결정 2026-09-22 - 눈에 안 띄어 지나치기 쉬웠다).
+    @State private var doseAnswers: [UUID: Bool] = [:]
+    /// 약 id → 진료일에 세어 둔 "받기 전 남아 있던 개수". 안 세면 여기 없다.
+    /// 매 진료마다 남은 개수를 짚고 넘어가게 하는 손잡이다(사용자 결정 2026-09-16).
+    @State private var leftovers: [UUID: Decimal] = [:]
+    /// 받기 전 개수 칸에 적힌 글자 그대로. 지우는 중("", "0.")에도 칸이 튀지 않게
+    /// 글자와 값을 따로 들고 있는다.
+    @State private var leftoverTexts: [UUID: String] = [:]
+    /// 폼 안에서 약을 막 등록했다. 목록이 갱신되면 그 약을 골라 둔다.
+    @State private var autoSelectNewest = false
+    @State private var isSaving = false
+    /// 사용자가 개수를 직접 고친 약. 제안값을 다시 덮어쓰지 않으려고 기억해 둔다.
+    @State private var edited: Set<UUID> = []
+    /// 받기 전 개수를 손으로 고친 약. 진료일을 바꿔도 이 약의 값은 안 건드린다.
+    @State private var leftoverEdited: Set<UUID> = []
+    /// 이번 진료에서 처음 받은 약을 그 자리에서 등록하는 시트.
+    @State private var isShowingNewMedication = false
+    /// 이번 진료에서 용량이 바뀐 약. 손잡이를 켠 약만 여기 있다.
+    @State private var doseEdits: [UUID: DoseEdit] = [:]
+    @State private var isConfirmingDiscard = false
+
+    /// 진료에서 들은 용량 변경 하나. 표기와 1회 개수를 따로 든다 —
+    /// "10mg 에서 15mg" 과 "아침 1정에서 2정" 은 둘 다 "용량이 바뀌었다" 이고,
+    /// 둘 중 하나만 바뀌는 날이 더 흔하다.
+    private struct DoseEdit {
+        var strengthText: String
+        /// nil 이면 개수는 건드리지 않는다. 시간대마다 개수가 다른 약도 nil 이다.
+        var perIntake: Decimal?
+    }
+
+    init(onSaved: @escaping () -> Void) {
+        self.onSaved = onSaved
+        let today = Date()
+        let suggested = Calendar.current.date(
+            byAdding: .day, value: Self.defaultDaysSupplied, to: today
+        ) ?? today
+        _visitDate = State(initialValue: today)
+        _nextVisitDate = State(initialValue: suggested)
+        initialVisitDate = today
+        initialNextVisitDate = suggested
+    }
+
+    private var activeMedications: [Medication] {
+        medicationRecords.map { $0.core.displayReady }.filter { $0.status == .active }
+    }
+
+    private var schedules: [Schedule] { scheduleRecords.map(\.core) }
+
+    /// 약 이름 가리기가 켜져 있는지. 켜는 문이 Pro 이고, 한 번 켜면 계속 가린다.
+    private var masksNames: Bool { JanjanPrivacy.hidesNames }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: CGFloat(JanjanSpacing.s)) {
+                visitCard
+                if activeMedications.isEmpty {
+                    emptyCard
+                } else {
+                    medicationCard
+                }
+                noteCard
+                if let warning = staleDateWarning {
+                    JanjanCard {
+                        Text(warning)
+                            .janjanBody(13)
+                            .foregroundStyle(Color.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                BlackPillButton(title: t("저장", "Save"), isBusy: isSaving, isEnabled: canSave) {
+                    save()
+                }
+                .padding(.top, CGFloat(JanjanSpacing.s))
+
+                if let reason = saveBlockedReason {
+                    Text(reason)
+                        .janjanBody(12)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, CGFloat(JanjanSpacing.xs))
+                }
+
+                MedicalDisclaimer()
+                    .padding(.horizontal, CGFloat(JanjanSpacing.xxs))
+                    .padding(.top, CGFloat(JanjanSpacing.s))
+            }
+            .padding(.horizontal, CGFloat(JanjanSpacing.m))
+            .padding(.top, CGFloat(JanjanSpacing.s))
+            .padding(.bottom, CGFloat(JanjanSpacing.xxl))
+        }
+        .fogBackground()
+        .scrollContentBackground(.hidden)
+        // 카드가 아니라 **화면**에 단다. 예전에는 약 목록 카드에 붙어 있어서,
+        // 약이 하나도 없는 사람에게는 이 문 자체가 없었다(사용자 지적
+        // 2026-09-22).
+        .sheet(isPresented: $isShowingNewMedication) {
+            NavigationStack {
+                // 재고 칸은 두지 않는다 - 바로 아래 "받아 온 개수" 가 그 몫이다.
+                // 방금 등록한 약은 이번 진료에서 받은 약이다 - 그러려고 여기서
+                // 등록했다. 목록에만 나타나고 체크는 안 된 채면 한 번 더 눌러야
+                // 하고, 놓치면 이번 처방에 없는 약으로 저장된다(QA 2026-09-22).
+                MedicationFormView {
+                    isShowingNewMedication = false
+                    autoSelectNewest = true
+                }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(t("닫기", "Close")) { isShowingNewMedication = false }
+                                .foregroundStyle(Color.ink)
+                        }
+                    }
+            }
+        }
+        .onChange(of: activeMedications.map(\.id)) { _, ids in
+            guard autoSelectNewest else { return }
+            autoSelectNewest = false
+            // 등록일이 가장 나중인 약 = 방금 등록한 약.
+            guard let newest = activeMedications.max(by: {
+                ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast)
+            }), ids.contains(newest.id), refills[newest.id] == nil else { return }
+            toggle(newest)
+        }
+        // 입력칸이 여럿인 화면인데 키보드를 내릴 길이 없었다 - 한 번 적고
+        // 나면 키보드가 저장 버튼을 덮은 채였다(사용자, TestFlight 17).
+        .keyboardDoneBar()
+        // 다 적어 놓고 손가락이 미끄러지면 전부 날아갔다(QA 2026-09-21).
+        // 빈 폼은 그대로 쓸어내려 닫을 수 있게 둔다 - 적은 것이 없으면
+        // 물을 이유도 없다.
+        .interactiveDismissDisabled(hasEdits)
+        .navigationTitle(t("진료 기록", "Log a visit"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(t("닫기", "Close")) {
+                    if hasEdits { isConfirmingDiscard = true } else { dismiss() }
+                }
+                .foregroundStyle(Color.ink)
+            }
+        }
+        .confirmationDialog(
+            t("적던 내용을 버릴까요?", "Discard what you've entered?"),
+            isPresented: $isConfirmingDiscard,
+            titleVisibility: .visible
+        ) {
+            Button(t("버리기", "Discard"), role: .destructive) { dismiss() }
+            Button(t("계속 적기", "Keep editing"), role: .cancel) {}
+        }
+    }
+
+    /// 닫으면 사라질 것이 있는지.
+    ///
+    /// 약을 고른 것만 세다가, 진료일과 처방일수만 고쳐 둔 사람이 아무 말도
+    /// 못 듣고 전부 잃었다(QA 2026-09-21). 처음 열렸을 때와 달라진 것이
+    /// 하나라도 있으면 묻는다.
+    private var hasEdits: Bool {
+        !refills.isEmpty
+            || !leftovers.isEmpty
+            || !doseEdits.isEmpty
+            || !doseAnswers.isEmpty
+            || !clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || daysSupplied != Self.defaultDaysSupplied
+            || !Calendar.current.isDate(visitDate, inSameDayAs: initialVisitDate)
+            || !hasNextVisit
+            || !Calendar.current.isDate(nextVisitDate, inSameDayAs: initialNextVisitDate)
+    }
+
+    // MARK: - 카드
+
+    private var visitCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.m)) {
+                // 아직 오지 않은 날은 고를 수 없다. 미래로 적으면 재고 사건이
+                // 전부 미래가 되어 받아 온 약이 한 알도 안 늘고, 그 진료는
+                // 지난 진료 목록에도 안 떠서 지울 길조차 없었다
+                // (QA 2026-09-21). 용량 변경은 이미 같은 방어가 있다.
+                DatePicker(
+                    t("진료 받은 날", "Visit date"),
+                    selection: $visitDate,
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+                .janjanBody(15)
+                .tint(Color.ink)
+                .onChange(of: visitDate) { _, _ in refreshSuggestions() }
+
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                    Text(t("며칠치를 받았어요?", "How many days' worth did you get?"))
+                        .janjanBody(12, weight: .medium)
+                        .foregroundStyle(Color.muted)
+                    CountStepper(
+                        text: t("\(daysSupplied)일치", "\(daysSupplied) days"),
+                        decreaseLabelKo: t("받은 일수 줄이기", "Decrease days supplied"),
+                        increaseLabelKo: t("받은 일수 늘리기", "Increase days supplied"),
+                        onDecrease: { changeDays(by: -7) },
+                        onIncrease: { changeDays(by: 7) }
+                    )
+                }
+
+                Toggle(t("다음 진료일이 정해졌어요", "Next visit date is set"), isOn: $hasNextVisit)
+                    .janjanBody(15)
+                    .tint(Color.ink)
+
+                if hasNextVisit {
+                    // 시간까지 받는다(사용자 결정 2026-09-16). 알림 시각은 여기서 고른
+                    // 시·분이 아니라 `AppointmentReminder` 가 정한다(전날 19시·당일 8시).
+                    DatePicker(
+                        t("다음 진료", "Next visit"),
+                        selection: $nextVisitDate,
+                        in: visitDate...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .janjanBody(15)
+                    .tint(Color.ink)
+                }
+            }
+        }
+    }
+
+    private var emptyCard: some View {
+        // 카드 어디를 눌러도 등록으로 간다(사용자 요청 2026-09-22) - 아래
+        // 버튼만 문이면 글자를 누른 사람은 아무 일도 안 일어난다고 느낀다.
+        Button {
+            isShowingNewMedication = true
+        } label: {
+            emptyCardBody
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text(t("눌러서 약을 등록합니다", "Tap to register a medication")))
+    }
+
+    private var emptyCardBody: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(t("등록된 약이 없어요", "No medications registered"))
+                    .janjanDisplay(20)
+                    .foregroundStyle(Color.ink)
+                Text(t("약을 먼저 등록하면 여기서 받아 온 개수를 함께 적을 수 있어요. 진료일만 먼저 남겨도 괜찮아요.", "Register a medication first and you can log how much you picked up here too. It's fine to just save the visit date for now."))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // "먼저 등록하면" 이라고 말해 놓고 등록할 자리를 안 주면
+                // 폼을 닫고 약 탭에 갔다 와야 한다 - 적던 진료일도 함께
+                // 날아간다(사용자 요청 2026-09-22). 약이 있을 때의
+                // "새 약 등록" 과 같은 문이다.
+                WhitePillButton(
+                    title: t("약 등록하기", "Register a medication"),
+                    systemImage: "plus"
+                ) {
+                    isShowingNewMedication = true
+                }
+                .padding(.top, CGFloat(JanjanSpacing.xs))
+            }
+        }
+    }
+
+    private var medicationCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(t("이번에 받아 온 약", "Medications picked up this time"))
+                    .janjanBody(12, weight: .medium)
+                    .foregroundStyle(Color.muted)
+
+                Text(t("이번에 받아 온 약을 골라 주세요.", "Choose the ones you picked up this time."))
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ForEach(activeMedications) { medication in
+                    medicationRow(medication)
+                }
+
+                // 이번 진료에서 처음 받은 약은 여기서 바로 등록한다 - 폼을 닫고
+                // 약 탭으로 돌아갔다 오게 하지 않는다(사용자 결정 2026-09-16).
+                WhitePillButton(title: t("새 약 등록", "Register a new medication"), systemImage: "plus") {
+                    isShowingNewMedication = true
+                }
+            }
+        }
+    }
+
+    private func medicationRow(_ medication: Medication) -> some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            selectRow(for: medication)
+
+            if let quantity = refills[medication.id] {
+                // VoiceOver 가 가린 이름을 소리 내어 읽으면 가림이 뚫린다 -
+                // 눈에 보이는 손잡이(togglePill)와 같은 규칙으로 용도줄로 부른다.
+                let spokenName = spokenName(for: medication)
+
+                // **받아 온 개수가 이 줄의 주인공이다.** 회색 11pt 라벨에 ± 였을
+                // 때는 눈에 안 띄었고, 아래 "받기 전" 칸과 입력 방식도 달랐다
+                // (사용자 지적 2026-09-22). 둘 다 같은 숫자 입력칸으로 맞추고,
+                // 이 라벨만 검정으로 세운다.
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                    Text(t("받아 온 개수", "Pills picked up"))
+                        .janjanBody(13, weight: .semibold)
+                        .foregroundStyle(Color.ink)
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        JanjanField(
+                            label: "",
+                            placeholder: DecimalQuantity.display(suggestedQuantity(for: medication)),
+                            keyboard: .decimalPad,
+                            text: refillBinding(for: medication)
+                        )
+                        .frame(maxWidth: 110)
+                        .accessibilityLabel(Text(t("\(spokenName) 받아 온 개수",
+                                                   "\(spokenName) pills picked up")))
+                        Text(t("정", "pills"))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.muted)
+                        Spacer(minLength: 0)
+                    }
+                    if quantity == 0 {
+                        Text(t("0 이면 이 약은 이번 진료에 들지 않아요.",
+                               "At 0 this medication isn't part of this visit."))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.janjan(.peachInk))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                // **받기 전 개수를 늘 묻는다**(사용자 결정 2026-09-22).
+                //
+                // 접어 두면 대부분 안 누르고, 그러면 기준점 없이 보충만 쌓여
+                // 남은 개수가 실제와 멀어진다. 매 진료마다 한 번 짚고 가면 그
+                // 자리에서 다시 맞는다.
+                //
+                // ± 버튼만 두지 않는다 - 14정이면 열네 번 눌러야 했다.
+                VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                    Text(t("받기 전 남아 있던 개수", "Pills left before this refill"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                    HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                        JanjanField(
+                            label: "",
+                            placeholder: "0",
+                            keyboard: .decimalPad,
+                            text: leftoverBinding(for: medication)
+                        )
+                        .frame(maxWidth: 110)
+                        .accessibilityLabel(Text(t("\(spokenName) 받기 전 남아 있던 개수",
+                                                   "\(spokenName) pills left before this refill")))
+                        Text(t("정", "pills"))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.muted)
+                        Spacer(minLength: 0)
+                    }
+                    // 칸은 앱이 계산한 남은 개수로 미리 채워진다.
+                    Text(t("앱이 계산한 남은 개수를 채워 뒀어요. 실제와 다르면 고쳐 주세요.",
+                           "This is the app's count. Correct it if it's off."))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // **더할지는 사용자가 정한다. 기본은 더하지 않는다**(사용자 결정
+                    // 2026-09-22). 켜지 않으면 받아 온 개수가 곧 남은 개수다 -
+                    // 남은 약을 버리거나 따로 두는 사람이 더 많다.
+                    Toggle(isOn: Binding(
+                        get: { addsLeftover.contains(medication.id) },
+                        set: { on in
+                            if on { addsLeftover.insert(medication.id) } else { addsLeftover.remove(medication.id) }
+                        }
+                    )) {
+                        Text(t("남아 있던 약을 받아 온 약에 더할까요?", "Add what was left to what you picked up?"))
+                            .janjanBody(13)
+                            .foregroundStyle(Color.ink)
+                    }
+                    .tint(Color.ink)
+                    Text(addsLeftover.contains(medication.id)
+                         ? t("남아 있던 \(DecimalQuantity.display(leftovers[medication.id] ?? 0))정에 받아 온 \(DecimalQuantity.display(quantity))정을 더해 \(DecimalQuantity.display((leftovers[medication.id] ?? 0) + quantity))정으로 세요.",
+                             "Counts \(DecimalQuantity.display(leftovers[medication.id] ?? 0)) left plus \(DecimalQuantity.display(quantity)) picked up as \(DecimalQuantity.display((leftovers[medication.id] ?? 0) + quantity)).")
+                         : t("받아 온 \(DecimalQuantity.display(quantity))정만 남은 개수로 세요. 남아 있던 약은 세지 않아요.",
+                             "Counts only the \(DecimalQuantity.display(quantity)) picked up. What was left isn't counted."))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // 등록 폼은 "지금 남은 개수" 를 정정으로 남긴다. 약국에서 받아 온
+                    // 28정을 그 칸에 적고 바로 진료를 적으면, 더하기를 켠 채로는
+                    // 28 위에 28 이 얹혀 56 이 된다(QA 2026-09-22). 진료일에 만든
+                    // 등록 정정이 있으면 그 사실을 짚어 준다.
+                    if addsLeftover.contains(medication.id),
+                       let counted = registrationStockOnVisitDay(for: medication) {
+                        Text(t(
+                            "등록할 때 적은 \(DecimalQuantity.display(counted))정에 이번에 받아 온 약이 들어 있으면 0 으로 고쳐 주세요.",
+                            "If the \(DecimalQuantity.display(counted)) you entered at registration already includes this refill, change it to 0."
+                        ))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.janjan(.peachInk))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                doseQuestion(medication)
+                doseChangeSection(medication)
+            }
+        }
+        .padding(.vertical, CGFloat(JanjanSpacing.xxs))
+    }
+
+    /// 진료에서 용량이 바뀌었을 때. **적어 두기만 하지 않고 그 자리에서 적용한다**
+    /// (사용자 요청 2026-09-19). 적어 두기만 하면 재고와 소진 예측이 옛 개수로
+    /// 계속 세고, 사용자는 앱이 틀린 숫자를 말한다고 느낀다.
+    @ViewBuilder
+    private func doseChangeSection(_ medication: Medication) -> some View {
+        if let edit = doseEdits[medication.id] {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                JanjanField(
+                    label: t("바뀐 용량", "New dose"),
+                    placeholder: medication.strengthText.isEmpty
+                        ? t("예: 15mg", "e.g. 15mg")
+                        : medication.strengthText,
+                    text: Binding(
+                        get: { doseEdits[medication.id]?.strengthText ?? "" },
+                        set: { doseEdits[medication.id]?.strengthText = $0 }
+                    )
+                )
+
+                // 여기서 숫자만 적으면 "10 → 15" 가 이력에 남는다. 그게 mg 인지
+                // 정인지는 나중에 아무도 알 수 없다(사용자 지적 2026-09-21).
+                if strengthNeedsUnit(edit.strengthText) {
+                    StrengthUnitRow(text: Binding(
+                        get: { doseEdits[medication.id]?.strengthText ?? "" },
+                        set: { doseEdits[medication.id]?.strengthText = $0 }
+                    ))
+                }
+
+                // 지워서 비워 둘 수도 없다. 단위 고르개와 달리 빈 칸에는
+                // 눌러 고칠 것이 없으므로 말로 알린다(사용자 결정 2026-09-22).
+                if edit.strengthText != medication.strengthText,
+                   edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(t("용량을 비워 둘 수 없어요. 예: 10mg",
+                           "The dose can't be empty. For example: 10mg"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let perIntake = edit.perIntake {
+                    VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xxs)) {
+                        Text(t("한 번에 먹는 개수", "Pills per dose"))
+                            .janjanBody(11)
+                            .foregroundStyle(Color.muted)
+                        CountStepper(
+                            text: t("\(DecimalQuantity.display(perIntake))정", pillsEn(perIntake)),
+                            decreaseLabelKo: t(
+                                "\(spokenName(for: medication)) 1회 개수 줄이기",
+                                "Decrease pills per dose for \(spokenName(for: medication))"
+                            ),
+                            increaseLabelKo: t(
+                                "\(spokenName(for: medication)) 1회 개수 늘리기",
+                                "Increase pills per dose for \(spokenName(for: medication))"
+                            ),
+                            onDecrease: { adjustPerIntake(medication, by: -1) },
+                            onIncrease: { adjustPerIntake(medication, by: 1) }
+                        )
+                    }
+                } else if hasMixedDoses(medication) {
+                    // 시간대마다 개수가 다른 약에 한 숫자를 밀어 넣으면 아침 2정
+                    // 저녁 1정이 조용히 2정 2정이 된다. 그 경우는 막고 보낸다.
+                    Text(t(
+                        "시간대마다 개수가 달라요. 개수는 약 화면의 '고치기' 에서 바꿔 주세요.",
+                        "The count differs by time slot. Change it with 'Edit' on the medication screen."
+                    ))
+                        .janjanBody(12)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text(t(
+                    "저장하면 이 약의 용량이 바뀌고 용량 변경 이력에 남아요. 더 나중 날짜의 변경이 이미 있으면 이력에만 남아요.",
+                    "Saving changes this medication's dose and records it in the dose change history. If a later change already exists, only the history is updated."
+                ))
+                    .janjanBody(11)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            }
+            .padding(.top, CGFloat(JanjanSpacing.xxs))
+        }
+    }
+
+    /// "용량이 바뀌었나요?" - **반드시 답한다**(사용자 결정 2026-09-22). 접힌
+    /// 버튼 하나였을 때는 눈에 안 띄어 지나쳤고, 그러면 바뀐 용량이 앱에
+    /// 안 들어온 채 옛 개수로 계속 셌다. 답하지 않으면 저장이 막힌다.
+    private func doseQuestion(_ medication: Medication) -> some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(t("용량이 바뀌었나요?", "Did the dose change?"))
+                    .janjanBody(13, weight: .semibold)
+                    .foregroundStyle(Color.ink)
+                if doseAnswers[medication.id] == nil {
+                    Text(t("답해 주세요", "Please answer"))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.janjan(.peachInk))
+                }
+            }
+            HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+                TogglePill(
+                    text: t("예, 바뀌었어요", "Yes, it changed"),
+                    isOn: doseAnswers[medication.id] == true,
+                    minWidth: 0,
+                    fillsRow: true,
+                    accessibilityLabel: t("\(spokenName(for: medication)) 용량이 바뀌었어요", "\(spokenName(for: medication)) dose changed")
+                ) { answerDoseChanged(medication, true) }
+                TogglePill(
+                    text: t("아니요, 그대로예요", "No, same as before"),
+                    isOn: doseAnswers[medication.id] == false,
+                    minWidth: 0,
+                    fillsRow: true,
+                    accessibilityLabel: t("\(spokenName(for: medication)) 용량 그대로", "\(spokenName(for: medication)) dose unchanged")
+                ) { answerDoseChanged(medication, false) }
+            }
+        }
+        .padding(.top, CGFloat(JanjanSpacing.xxs))
+    }
+
+    private func answerDoseChanged(_ medication: Medication, _ changed: Bool) {
+        doseAnswers[medication.id] = changed
+        if changed {
+            if doseEdits[medication.id] == nil {
+                doseEdits[medication.id] = DoseEdit(
+                    strengthText: medication.strengthText,
+                    perIntake: commonDose(medication)
+                )
+            }
+        } else {
+            doseEdits[medication.id] = nil
+            refreshSuggestions()
+        }
+    }
+
+    /// 이번 처방에 넣을지 고르는 줄.
+    ///
+    /// 예전에는 이름이 적힌 알약 하나였는데, 알약은 이 화면에서 요일 고르개와
+    /// 모양이 같아서 "뭐가 버튼인지 모르겠다"(사용자, TestFlight 17) 는 말이
+    /// 나왔다. 체크 동그라미를 앞에 세우면 고르는 자리라는 것이 한눈에 보이고,
+    /// 켜짐/꺼짐도 색이 아니라 모양으로 말한다.
+    ///
+    /// 이름 자리에 따로 탭을 두지 않는 것은 그대로다 - 줄 전체가 손잡이라서
+    /// 겹친다. 가려졌을 때는 점 표기만 보여 주고 눌러서 보이게 하지 않는다
+    /// (약 목록 행과 같은 판단 - `MedicationsView.medicationNameText` 참고).
+    private func selectRow(for medication: Medication) -> some View {
+        let isOn = refills[medication.id] != nil
+        // 여러 약이 전부 점이면 어느 것을 고르는지 알 수 없다. 목록 행과 같은
+        // 규칙으로 용도 한 줄이 있으면 그것으로 부르고, 그것도 없으면
+        // 용량 표기를 붙인다 - "10mg" 은 약 이름이 아니라서 가림이 뚫리지
+        // 않으면서, 점 두 개를 서로 다른 것으로 만들어 준다(QA 2026-09-19).
+        let title = masksNames ? maskedLabel(for: medication) : medication.displayTitle
+
+        return Button {
+            toggle(medication)
+        } label: {
+            HStack(spacing: CGFloat(JanjanSpacing.s)) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(Color.janjan(isOn ? .ink : .line2))
+                Text(title)
+                    .janjanBody(15, weight: isOn ? .medium : .regular)
+                    .foregroundStyle(Color.janjan(isOn ? .ink : .ink2))
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, CGFloat(JanjanSpacing.s))
+            .frame(minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                    .fill(Color.janjan(isOn ? .surface2 : .surface))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(masksNames ? maskedSpokenLabel(for: medication) : medication.displayTitle))
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : [.isButton])
+    }
+
+    /// VoiceOver 가 이 약을 부르는 말. 가렸으면 이름 대신 용도로 부른다 -
+    /// 눈에 보이는 손잡이와 같은 규칙이라야 가림이 소리로 뚫리지 않는다.
+    private func spokenName(for medication: Medication) -> String {
+        guard masksNames else { return medication.name }
+        return medication.purposeLine.isEmpty
+            ? t("가려진 약", "hidden medication")
+            : medication.purposeLine
+    }
+
+    /// 이름을 가린 약을 화면에서 부르는 말. 용도 한 줄 → 용량 표기 → 점 차례다.
+    private func maskedLabel(for medication: Medication) -> String {
+        if !medication.purposeLine.isEmpty { return medication.purposeLine }
+        if !medication.strengthText.isEmpty {
+            return "\(MaskedNameText.maskGlyph) \(medication.strengthText)"
+        }
+        return MaskedNameText.maskGlyph
+    }
+
+    /// VoiceOver 가 읽을 말. 가린 이름은 절대 읽지 않는다 - 소리로 뚫리면
+    /// 가림이 아니다.
+    private func maskedSpokenLabel(for medication: Medication) -> String {
+        if !medication.purposeLine.isEmpty { return medication.purposeLine }
+        if !medication.strengthText.isEmpty {
+            return t("가려진 약, \(medication.strengthText)", "Hidden medication, \(medication.strengthText)")
+        }
+        return t("가려진 약 이름", "Hidden medication name")
+    }
+
+    /// 진료에서 들은 말을 적는 칸.
+    ///
+    /// 한 줄짜리였는데, 여기 적히는 것은 대개 한 줄이 아니다("다음에 안 좋으면
+    /// 올리자고 하셨고, 술은 피하라고" ). 여러 줄로 늘어나게 두고, 연회색
+    /// 바탕으로 입력칸임을 보이게 한다.
+    private var noteCard: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+                Text(t("진료 메모 (선택)", "Visit note (optional)"))
+                    .janjanBody(12, weight: .medium)
+                    .foregroundStyle(Color.muted)
+                TextField(
+                    t("예: 다음에 안 좋으면 용량 올리기로", "e.g. Raise the dose next time if it's still bad"),
+                    text: $clinicNote,
+                    axis: .vertical
+                )
+                    .janjanBody(16)
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(3...8)
+                    .padding(CGFloat(JanjanSpacing.s))
+                    .background(
+                        RoundedRectangle(cornerRadius: CGFloat(JanjanRadius.row), style: .continuous)
+                            .fill(Color.janjan(.surface2))
+                    )
+                Text(t("진료 시 들었던 내용을 메모로 남겨요.", "Note down what you heard at the visit."))
+                    .janjanBody(12)
+                    .foregroundStyle(Color.muted)
+            }
+        }
+    }
+
+    // MARK: - 규칙
+
+    /// 진료일만 있어도 저장된다. 약을 아직 안 넣었어도 "다음 진료 D-" 는 살아난다.
+    ///
+    /// 다만 **새로 적은** 용량은 비어 있거나 단위가 빠져 있으면 막는다 -
+    /// 그대로 넘기면 이력에 "10 → 15" 가 남고, 그게 mg 인지 정인지는 나중에
+    /// 아무도 모른다. 여기서 빈 칸으로 지우면 약의 용량 표기가 통째로
+    /// 사라지는데, 그 길은 "약 고치기" 에서 이미 막아 두었다
+    /// (사용자 결정 2026-09-22).
+    ///
+    /// 손대지 않은 옛 표기까지 막지는 않는다. 단위 없는 약을 가진 사람이
+    /// 진료 자체를 저장할 수 없게 되기 때문이다 - 그 약은 "약 고치기" 에서
+    /// 채운다. 바꾼 것만 본다.
+    private var canSave: Bool {
+        guard !isSaving else { return false }
+        guard unansweredDoseQuestion == nil else { return false }
+        return !doseEdits.contains { medicationID, edit in
+            guard let medication = activeMedications.first(where: { $0.id == medicationID }) else { return false }
+            guard edit.strengthText != medication.strengthText else { return false }
+            let trimmed = edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty || strengthNeedsUnit(edit.strengthText)
+        }
+    }
+
+    /// 이번 진료에 든 약 중 "용량이 바뀌었나요?" 에 아직 답하지 않은 약.
+    private var unansweredDoseQuestion: Medication? {
+        activeMedications.first { medication in
+            (refills[medication.id] ?? 0) > 0 && doseAnswers[medication.id] == nil
+        }
+    }
+
+    /// 저장이 막힌 이유. 버튼 옆에서 말한다 - 등록 폼과 같은 규칙.
+    private var saveBlockedReason: String? {
+        guard !canSave, !isSaving else { return nil }
+        if unansweredDoseQuestion != nil {
+            return t("약마다 용량이 바뀌었는지 답해 주세요.", "Answer whether each medication's dose changed.")
+        }
+        return t("바뀐 용량을 단위까지 적어 주세요. 예: 15mg", "Enter the new dose with its unit. For example: 15mg")
+    }
+
+    /// 재고 계산은 **마지막 직접 정정**을 기준점으로 삼고 그 이전 사건을 전부 버린다(설계 05절).
+    /// 그래서 정정보다 앞선 날짜로 보충을 넣으면 개수가 하나도 안 늘어난다.
+    /// 규칙 자체는 옳지만, 아무 말 없이 삼켜 버리면 사용자는 앱이 고장 났다고 생각한다.
+    private var staleDateWarning: String? {
+        let chosen = Set(refills.filter { $0.value > 0 }.keys)
+        guard !chosen.isEmpty else { return nil }
+
+        let blocked = stockRecords
+            .filter { chosen.contains($0.medicationID) && $0.core.isCorrection }
+            .filter { $0.occurredAt > visitDate }
+
+        guard !blocked.isEmpty else { return nil }
+        return t(
+            "고른 약 중에 진료일 뒤에 재고를 직접 센 기록이 있어요. "
+                + "재고는 마지막으로 센 개수가 기준이라, 그보다 앞선 보충은 개수에 더해지지 않아요.",
+            "One of the medications you chose has a stock count recorded after this visit date. "
+                + "Since stock is based on the most recent count, a refill dated earlier than that won't be added."
+        )
+    }
+
+    private func changeDays(by delta: Int) {
+        let previous = daysSupplied
+        daysSupplied = min(max(daysSupplied + delta, 1), 365)
+
+        // 다음 진료일을 사용자가 따로 만지지 않았다면 처방일수를 따라가게 둔다.
+        if let suggested = Calendar.current.date(byAdding: .day, value: previous, to: visitDate),
+           Calendar.current.isDate(nextVisitDate, inSameDayAs: suggested) {
+            nextVisitDate = Calendar.current
+                .date(byAdding: .day, value: daysSupplied, to: visitDate) ?? nextVisitDate
+        }
+        refreshSuggestions()
+    }
+
+    private func toggle(_ medication: Medication) {
+        if refills[medication.id] != nil {
+            refills[medication.id] = nil
+            refillTexts[medication.id] = nil
+            leftovers[medication.id] = nil
+            leftoverTexts[medication.id] = nil
+            leftoverEdited.remove(medication.id)
+            addsLeftover.remove(medication.id)
+            doseAnswers[medication.id] = nil
+            // 이번 처방에서 뺀 약의 용량 변경까지 들고 있으면, 화면에 보이지도
+            // 않는 것이 저장될 때 적용된다.
+            doseEdits[medication.id] = nil
+            edited.remove(medication.id)
+        } else {
+            refills[medication.id] = suggestedQuantity(for: medication)
+            refillTexts[medication.id] = DecimalQuantity.display(refills[medication.id] ?? 0)
+            // 앱이 지금 아는 남은 개수를 미리 채워 둔다. 맞으면 그대로 두고
+            // 다르면 고치면 된다 - 빈 칸에서 시작하는 것보다 손이 덜 간다.
+            leftovers[medication.id] = max(InventoryCalculator.remaining(
+                for: medication.id,
+                stockEvents: stockRecords.map(\.core),
+                doseEvents: doseRecords.map(\.core),
+                asOf: visitDate
+            ), 0)
+            leftoverTexts[medication.id] = DecimalQuantity.display(leftovers[medication.id] ?? 0)
+        }
+    }
+
+    /// 등록 폼이 진료일과 같은 날에 남긴 "지금 남은 개수" 정정의 값.
+    private func registrationStockOnVisitDay(for medication: Medication) -> Decimal? {
+        let calendar = Calendar.current
+        return stockRecords.first {
+            $0.medicationID == medication.id
+                && $0.note == MedicationStore.registrationCorrectionNote
+                && calendar.isDate($0.occurredAt, inSameDayAs: visitDate)
+        }?.amount
+    }
+
+    /// 받기 전 개수 칸의 글자. 숫자로 읽히면 그대로 `leftovers` 에 옮긴다.
+    private func leftoverBinding(for medication: Medication) -> Binding<String> {
+        Binding(
+            get: { leftoverTexts[medication.id] ?? "" },
+            set: { text in
+                leftoverEdited.insert(medication.id)
+                leftoverTexts[medication.id] = text
+                let trimmed = text
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: ",", with: ".")
+                if trimmed.isEmpty {
+                    leftovers[medication.id] = 0
+                } else if let value = Decimal(string: trimmed), value >= 0 {
+                    leftovers[medication.id] = DecimalQuantity.snapToQuarter(value)
+                }
+            }
+        )
+    }
+
+    /// 받아 온 개수 칸의 글자. 숫자로 읽히면 그대로 `refills` 에 옮긴다.
+    /// 비우면 0 - 그러면 이 약은 이번 진료에 안 든 것으로 저장된다.
+    private func refillBinding(for medication: Medication) -> Binding<String> {
+        Binding(
+            get: { refillTexts[medication.id] ?? "" },
+            set: { text in
+                edited.insert(medication.id)
+                refillTexts[medication.id] = text
+                let trimmed = text
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: ",", with: ".")
+                if trimmed.isEmpty {
+                    refills[medication.id] = 0
+                } else if let value = Decimal(string: trimmed), value >= 0 {
+                    refills[medication.id] = DecimalQuantity.snapToQuarter(value)
+                }
+            }
+        )
+    }
+
+    private func mySchedules(_ medication: Medication) -> [Schedule] {
+        schedules.filter { $0.medicationID == medication.id }
+    }
+
+    /// 모든 시간대가 같은 개수일 때 그 값. 시간대가 없거나 서로 다르면 nil.
+    private func commonDose(_ medication: Medication) -> Decimal? {
+        let doses = Set(mySchedules(medication).map(\.dosePerIntake))
+        return doses.count == 1 ? doses.first : nil
+    }
+
+    private func hasMixedDoses(_ medication: Medication) -> Bool {
+        Set(mySchedules(medication).map(\.dosePerIntake)).count > 1
+    }
+
+    private func adjustPerIntake(_ medication: Medication, by direction: Int) {
+        guard var edit = doseEdits[medication.id], let current = edit.perIntake else { return }
+        // 쪼갤 수 없는 제형은 1정 단위로만 센다(등록 폼과 같은 규칙).
+        let step: Decimal = medication.form.isSplittable ? DecimalQuantity.step * 2 : 1
+        let next = DecimalQuantity.snapToQuarter(current + (direction > 0 ? step : -step))
+        edit.perIntake = max(next, step)
+        doseEdits[medication.id] = edit
+        // 하루치가 바뀌었으니 받아 온 개수 제안도 새 개수를 따라가야 말이 맞는다.
+        refreshSuggestions()
+    }
+
+    /// 처방일수 × 하루 예정 개수. 스케줄이 없으면 하루 1정으로 본다.
+    ///
+    /// 이번 진료에서 1회 개수를 바꿨다면 **새 개수로 센다.** 저장한 뒤의 하루치는
+    /// 이미 새 개수이므로, 제안만 옛 개수를 따르면 받아 온 양이 늘 어긋난다.
+    private func suggestedQuantity(for medication: Medication) -> Decimal {
+        var mine = mySchedules(medication)
+        if let pending = doseEdits[medication.id]?.perIntake {
+            mine = mine.map { schedule in
+                var changed = schedule
+                changed.dosePerIntake = pending
+                return changed
+            }
+        }
+        let daily = mine.dailyScheduledQuantity()
+        let perDay = daily > 0 ? daily : 1
+        return DecimalQuantity.snapToQuarter(Decimal(daysSupplied) * perDay)
+    }
+
+    /// 처방일수나 진료일이 바뀌면 제안값을 다시 계산한다.
+    /// 사용자가 직접 고친 약은 건드리지 않는다.
+    private func refreshSuggestions() {
+        for medication in activeMedications where refills[medication.id] != nil {
+            if !edited.contains(medication.id) {
+                refills[medication.id] = suggestedQuantity(for: medication)
+                refillTexts[medication.id] = DecimalQuantity.display(refills[medication.id] ?? 0)
+            }
+            // 미리 채운 "받기 전 개수" 는 **진료일 기준의 잔여**다. 약을 고른 뒤
+            // 진료일을 과거로 옮기면 그 사이 복용이 두 번 빠졌다 - 값은 오늘
+            // 기준으로 굳어 있고 사건은 진료일 뒤로 또 빠져서(QA 2026-09-22).
+            // 손대지 않은 칸은 새 진료일로 다시 채운다.
+            if !leftoverEdited.contains(medication.id) {
+                let remaining = max(InventoryCalculator.remaining(
+                    for: medication.id,
+                    stockEvents: stockRecords.map(\.core),
+                    doseEvents: doseRecords.map(\.core),
+                    asOf: visitDate
+                ), 0)
+                leftovers[medication.id] = remaining
+                leftoverTexts[medication.id] = DecimalQuantity.display(remaining)
+            }
+        }
+    }
+
+    // MARK: - 저장
+
+    private func save() {
+        guard canSave else { return }
+        isSaving = true
+
+        let chosen = refills.filter { $0.value > 0 }
+
+        let prescription = Prescription(
+            visitDate: visitDate,
+            daysSupplied: daysSupplied,
+            nextVisitDate: hasNextVisit ? nextVisitDate : nil,
+            clinicNote: clinicNote.trimmingCharacters(in: .whitespacesAndNewlines),
+            medicationIDs: Array(chosen.keys)
+        )
+
+        // 남은 개수는 이번 처방에 **포함한** 약의 것만 저장한다 - 세다가 약을
+        // 뺐으면 그 숫자는 버린다.
+        //
+        // 예전에는 `refills[key] != nil`(손잡이를 켜 두기만 해도 참)로 걸렀다.
+        // 그래서 약을 켜 놓고 **받아 온 개수를 0 으로 둔 채** 저장하면, 보충은
+        // 하나도 안 생기는데 "받기 전 남은 개수" 정정만 남았다. 정정은 그 앞을
+        // 전부 버리는 기준점이라 그 약의 재고가 통째로 0 이 됐다
+        // (사용자 지적 2026-09-22). 실제로 처방에 든 약(`chosen`)만 본다.
+        // **더하기를 켠 약만 남아 있던 개수를 기준점으로 삼는다.** 나머지는 0 을
+        // 기준점으로 세워 받아 온 개수가 곧 남은 개수가 된다(사용자 결정
+        // 2026-09-22). 정정이 있어야 그 앞의 사건이 끊긴다 - 정정 없이 보충만
+        // 넣으면 옛 재고 위에 얹혀 결국 더한 것과 같아진다.
+        let counted = chosen.keys.map { id in
+            (medicationID: id, count: addsLeftover.contains(id) ? (leftovers[id] ?? 0) : 0)
+        }
+
+        MedicationStore.add(
+            prescription: prescription,
+            refills: chosen.map { (medicationID: $0.key, quantity: $0.value) },
+            leftovers: counted,
+            at: visitDate,
+            in: context
+        )
+
+        applyDoseChanges()
+
+        AppServices.shared.pushWatchSnapshot()
+
+        // 다음 진료일이 바뀌었고, 1회 개수가 바뀐 약이 있으면 알림에 뜨는
+        // 개수도 달라진다. 진료 알림과 복약 알림을 함께 다시 깐다.
+        Task {
+            await ReminderPlanner.rescheduleAppointments(using: context)
+            await ReminderPlanner.reschedule(using: context)
+            isSaving = false
+            onSaved()
+        }
+    }
+
+    /// 진료에서 들은 용량 변경을 약에 실제로 옮긴다.
+    ///
+    /// 바뀐 것이 없는 줄은 건너뛴다 - 손잡이만 켰다가 아무것도 고치지 않은
+    /// 경우에 "10mg → 10mg" 이 이력에 쌓이면 안 된다. 날짜는 오늘이 아니라
+    /// **진료일**이다. 전후 비교가 그 날을 축으로 그린다.
+    private func applyDoseChanges() {
+        // **가장 나중 진료의 용량이 현재 용량이다.** 같은 날 다른 시각에 적어 둔
+        // 용량 변경이 있으면 시각 비교만으로는 이번 것이 "더 옛것" 으로 판정돼
+        // 이력에만 남고 지금 값이 안 바뀌었다(사용자 지적 2026-09-22). 이 진료가
+        // 마지막 진료면 시각과 무관하게 적용한다.
+        let latestOtherVisit = prescriptionRecords.map(\.visitDate).max()
+        let isNewestVisit = latestOtherVisit.map { $0 <= visitDate } ?? true
+        for (medicationID, edit) in doseEdits {
+            guard let medication = activeMedications.first(where: { $0.id == medicationID }) else { continue }
+
+            let newText = edit.strengthText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let textChanged = !newText.isEmpty && newText != medication.strengthText
+            let doseChanged = edit.perIntake != nil && edit.perIntake != commonDose(medication)
+            guard textChanged || doseChanged else { continue }
+
+            MedicationStore.applyDoseChange(
+                medicationID: medicationID,
+                newStrengthText: textChanged ? newText : nil,
+                newDosePerIntake: doseChanged ? edit.perIntake : nil,
+                changedAt: visitDate,
+                note: clinicNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? nil
+                    : clinicNote.trimmingCharacters(in: .whitespacesAndNewlines),
+                forceApply: isNewestVisit,
+                in: context
+            )
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        PrescriptionFormView {}
+    }
+    .environmentObject(ProStore())
+    .modelContainer(for: JanjanSchema.allModels, inMemory: true)
+}

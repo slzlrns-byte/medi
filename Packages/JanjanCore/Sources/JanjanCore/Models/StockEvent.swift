@@ -18,6 +18,17 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
             case .correction: return "직접 정정"
             }
         }
+
+        public var labelEn: String {
+            switch self {
+            case .refill: return "Refill"
+            case .correction: return "Manual count"
+            }
+        }
+
+        public func label(_ language: JanjanLanguage) -> String {
+            language == .english ? labelEn : labelKo
+        }
     }
 
     public var id: UUID
@@ -58,16 +69,24 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
         )
     }
 
+    /// 진료에서 만들어진 정정은 그 처방에 매어 둔다.
+    ///
+    /// 진료를 지울 때 보충만 걷고 이 정정을 남기면, 남은 것이 **받기 전**
+    /// 개수라서 기준점이 그대로 서고 재고가 음수로 내려간다
+    /// (9/1 에 4정 세고 28정 받음 → 20일 복용 → 12정이 맞는데, 진료를 지우면
+    /// 4 − 20 = −16 이 된다). 둘은 한 사건의 두 쪽이라 함께 움직여야 한다.
     public static func correction(
         medicationID: UUID,
         setTo: Decimal,
         at date: Date,
+        prescriptionID: UUID? = nil,
         note: String? = nil
     ) -> StockEvent {
         StockEvent(
             medicationID: medicationID,
             kind: .correction(setTo: DecimalQuantity.snapToQuarter(setTo)),
             occurredAt: date,
+            prescriptionID: prescriptionID,
             note: note
         )
     }
@@ -75,5 +94,25 @@ public struct StockEvent: Identifiable, Hashable, Codable, Sendable {
     public var isCorrection: Bool {
         if case .correction = kind { return true }
         return false
+    }
+
+    /// 보충이면 받아 온 개수, 정정이면 nil. "받아 온 N정" 표시가 쓴다.
+    public var refillQuantity: Decimal? {
+        if case .refill(let quantity) = kind { return quantity }
+        return nil
+    }
+
+    /// 이 약의 가장 최근 보충 개수. 한 번도 보충을 적지 않았으면 nil.
+    ///
+    /// "남은 12정" 옆에 "받아 온 28정" 을 놓기 위한 값이다. 남은 개수처럼
+    /// 계산된 값이 아니라 사용자가 적은 사실 그대로라서 무료 영역이다.
+    public static func lastRefillQuantity(
+        of medicationID: UUID,
+        in events: [StockEvent]
+    ) -> Decimal? {
+        events
+            .filter { $0.medicationID == medicationID && $0.refillQuantity != nil }
+            .max { $0.occurredAt < $1.occurredAt }?
+            .refillQuantity
     }
 }

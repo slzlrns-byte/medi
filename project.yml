@@ -27,6 +27,14 @@ configs:
 packages:
   JanjanCore:
     path: Packages/JanjanCore
+  # 이 앱의 유일한 외부 의존성이다(2026-09-19 광고 도입 결정).
+  # 앱 타깃에만 붙인다 - 위젯·워치는 광고를 그리지 않는다.
+  #
+  # 11.x 로 묶어 둔다. 12 부터 이름이 Swift 식(BannerView·Request)으로 바뀌어
+  # JanjanAds.swift 를 함께 고쳐야 하므로, 올릴 때는 그 파일만 보면 된다.
+  GoogleMobileAds:
+    url: https://github.com/googleads/swift-package-manager-google-mobile-ads
+    from: 11.0.0
 
 # ── 공통 빌드 설정 ────────────────────────────────────────────────────────
 # DEVELOPMENT_TEAM 은 일부러 비워 둔다. XcodeGen 은 ${ENV} 치환을 지원하지 않으므로
@@ -86,11 +94,14 @@ targets:
         buildPhase: resources
     dependencies:
       - package: JanjanCore
+      - package: GoogleMobileAds
       - target: TheJanjanWatch
         embed: true
         copy:
           destination: productsDirectory
           subpath: "$(CONTENTS_FOLDER_PATH)/Watch"
+      - target: TheJanjanWidgets
+        embed: true
     info:
       path: TheJanjan/Info.plist
       properties:
@@ -100,10 +111,23 @@ targets:
         CFBundlePackageType: "APPL"
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
+        # AdMob 앱 ID (2026-09-19 발급). JanjanAds.Unit 의 단위 ID 와 같은
+        # 계정이어야 한다 - 앞자리(8133411184190419)가 다르면 광고가 안 나온다.
+        GADApplicationIdentifier: "ca-app-pub-8133411184190419~2959187825"
+        # 추적 동의(ATT) 팝업은 띄우지 않는다. 비개인화 광고만 쓰므로 필요가 없고,
+        # 건강 앱은 애초에 건강 데이터 기반 타겟 광고가 금지된다(App Store 5.1.3).
+        # 무료 위젯의 "먹었어요" 가 앱을 여는 데 쓴다(Janjan.urlScheme 과 동일해야 함).
+        # 밖에서 들어오는 주소를 받기만 하고, 이 주소로 나가는 링크는 앱에 없다.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.thejanjan.app
+            CFBundleURLSchemes:
+              - thejanjan
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "약봉투의 약 이름을 읽어 등록을 도와드려요. 사진은 저장되지 않습니다."
+        # 카메라가 없는 기기에서는 앨범에서 고르게 떨어진다. 그 경로도 문구가 있어야 한다.
+        NSPhotoLibraryUsageDescription: "약봉투 사진에서 약 이름을 읽어 등록을 도와드려요. 사진은 저장되지 않습니다."
         NSFaceIDUsageDescription: "앱 잠금을 해제할 때만 Face ID를 사용합니다. 기록은 기기 밖으로 나가지 않습니다."
         UIAppFonts:
           - "SUIT-Light.otf"
@@ -112,11 +136,19 @@ targets:
           - "Pretendard-Regular.otf"
           - "Pretendard-Medium.otf"
           - "Pretendard-SemiBold.otf"
+          - "IBMPlexSansKR-Light.ttf"
+          - "IBMPlexSansKR-Regular.ttf"
+          - "IBMPlexSansKR-Medium.ttf"
+          - "IBMPlexSansKR-SemiBold.ttf"
+          - "GowunDodum-Regular.ttf"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app
         PRODUCT_NAME: TheJanjan
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # 아이폰 전용. 아이패드는 확대 모드로 돈다(심사 체크리스트 4.5).
+        # "1,2" 로 두면 아이패드 네이티브로 올라가는데, 그 레이아웃은 만들지도
+        # 확인하지도 않았다 — 심사에서 그대로 걸린다.
+        TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
@@ -143,6 +175,68 @@ targets:
         JANJAN_DISABLE_CLOUDKIT: "1"
 
   # ── watchOS 앱 (단일 타깃, iOS 앱에 임베드) ─────────────────────────────
+  # ── 위젯 (홈 화면 · 잠금화면) ──────────────────────────────────────────
+  # 앱을 열지 않고 한 번에 기록하기 위한 것이다. 그래서 익스텐션이 앱과 **같은
+  # 저장소**(App Group)를 직접 열고 그 자리에서 적는다. 앱이 켜질 때까지 미뤄 두면
+  # 앱을 안 여는 날의 기록이 늦거나 사라진다.
+  #
+  # Persistence 와 Shared 를 함께 컴파일한다. 둘 다 Foundation·SwiftData·JanjanCore
+  # 만 쓰므로 익스텐션에서도 그대로 돈다. 계산을 한 벌 더 쓰지 않는 것이 요점이다 -
+  # 화면과 위젯이 서로 다른 숫자를 말하면 안 된다.
+  TheJanjanWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TheJanjanWidgets
+        excludes:
+          - "TheJanjanWidgets.entitlements"
+      - path: TheJanjanWidgets/TheJanjanWidgets.entitlements
+        buildPhase: none
+      # 폴더째 넣지 않고 세 파일만 이름으로 넣는다.
+      #
+      # 폴더로 넣었다가 MedicationStore 가 딸려 들어와 깨졌다. 그 파일은
+      # NotificationManager 를 부르는데 알림 코드는 앱에만 있다. 제외 목록으로
+      # 막으면 Persistence 에 새 파일이 생길 때마다 위젯 빌드가 조용히 깨지고,
+      # 그 파일을 쓴 사람은 위젯을 건드린 적도 없다. 필요한 것만 적는 쪽이
+      # 늘어나는 제외 목록보다 안전하다.
+      #
+      # 셋 다 Persistence 안의 다른 파일을 부르지 않는다(확인함).
+      - path: TheJanjan/Persistence/Records.swift
+      - path: TheJanjan/Persistence/JanjanModelContainer.swift
+      - path: TheJanjan/Persistence/DoseRecorder.swift
+      - path: TheJanjan/Shared
+      # 위젯도 Shared(언어·가리기 = UserDefaults)와 SwiftData(파일 API)를 쓰므로
+      # 익스텐션 번들에 개인정보 매니페스트가 따로 있어야 한다. 앱 것을 같이 쓴다 -
+      # 내용(추적 없음·수집 없음·CA92.1·C617.1)이 똑같아서다.
+      - path: TheJanjan/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: JanjanCore
+    info:
+      path: TheJanjanWidgets/Info.plist
+      properties:
+        CFBundleName: "$(PRODUCT_NAME)"
+        CFBundleDisplayName: "더잔잔"
+        CFBundleDevelopmentRegion: "ko"
+        CFBundlePackageType: "XPC!"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.widgets
+        PRODUCT_NAME: TheJanjanWidgets
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: TheJanjanWidgets/TheJanjanWidgets.entitlements
+
   TheJanjanWatch:
     type: application
     platform: watchOS
@@ -180,6 +274,25 @@ targets:
         Release:
           CODE_SIGN_ENTITLEMENTS: TheJanjanWatch/TheJanjanWatch.entitlements
 
+  # ── iOS UI 테스트 (화면 찍기) ──────────────────────────────────────────
+  # 개발 머신에 맥이 없어 시뮬레이터를 눈으로 볼 수 없다. 이 타깃이 CI 의 macOS
+  # 러너에서 앱을 띄우고 화면마다 사진을 찍어 첨부로 남긴다(screenshots.yml).
+  # 평소 CI 에는 들어가지 않는다 — 느리고, 컴파일 확인은 단위 테스트로 충분하다.
+  TheJanjanUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - TheJanjanUITests
+    dependencies:
+      - target: TheJanjan
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thejanjan.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: TheJanjan
+        CODE_SIGN_STYLE: Automatic
+
   # ── iOS 단위 테스트 ────────────────────────────────────────────────────
   # 순수 로직 테스트는 Packages/JanjanCore 의 swift test 가 담당하고,
   # 여기서는 앱 계층(레코드 매핑·토큰 파싱)만 얇게 확인한다.
@@ -199,3 +312,29 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TheJanjan.app/TheJanjan"
         BUNDLE_LOADER: "$(TEST_HOST)"
         CODE_SIGN_STYLE: Automatic
+
+# ── 화면 찍기 전용 스킴 ──────────────────────────────────────────────────
+# UI 테스트를 기본 스킴에 넣지 않는 이유: 느리다. 평소 CI 는 컴파일과 단위 테스트만
+# 보면 되고, 화면은 필요할 때 screenshots.yml 로 따로 부른다.
+schemes:
+  # 워치 앱을 따로 빌드해 시뮬레이터에 설치하려면 스킴이 필요하다.
+  # watchOS 는 XCUITest 가 없어서 simctl 로 띄우고 찍는다.
+  TheJanjanWatch:
+    build:
+      targets:
+        TheJanjanWatch: all
+
+  Screenshots:
+    build:
+      targets:
+        TheJanjan: all
+        TheJanjanUITests: [test]
+    test:
+      targets:
+        - TheJanjanUITests
+      gatherCoverageData: false
+      # 구독 화면을 찍으려면 상품과 가격이 있어야 한다. 시뮬레이터에는
+      # App Store 계정이 없어서, 로컬 StoreKit 설정이 붙지 않으면 페이월이
+      # "불러오는 중" 카드만 그린다. 이 값은 테스트로 띄울 때만 쓰이고
+      # 아카이브·TestFlight 빌드와는 무관하다.
+      storeKitConfiguration: TheJanjan/Configuration/Janjan.storekit
