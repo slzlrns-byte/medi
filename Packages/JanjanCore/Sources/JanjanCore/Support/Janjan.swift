@@ -56,6 +56,21 @@ public enum Janjan {
     public static let supportURLString = "https://janjan.loviti.app/site/support.html"
     public static let termsURLString = "https://janjan.loviti.app/site/terms.html"
 
+    /// App Store 의 앱 번호(App Store Connect > 앱 정보 > Apple ID). 앱이
+    /// 스토어에 올라가야 생기므로 1.0 을 낼 때까지 비어 있었다.
+    ///
+    /// 비어 있으면 설정의 "리뷰 남기기" 줄을 **그리지 않는다.** 없는 번호로
+    /// 보내면 App Store 가 빈 화면을 띄우고, 리뷰를 남기려던 사람이 그
+    /// 자리에서 멈춘다 - 줄이 아예 없는 편이 낫다.
+    public static let appStoreID = ""
+
+    /// 리뷰 쓰기 화면을 바로 여는 주소. 별점 창(`requestReview`)과 다른
+    /// 길이다 - 저쪽은 시스템이 때를 정하고 평생 몇 번뿐이지만, 이쪽은
+    /// 사용자가 스스로 찾아와 누르는 것이라 횟수 제한이 없다.
+    public static var writeReviewURLString: String {
+        "https://apps.apple.com/app/id\(appStoreID)?action=write-review"
+    }
+
     /// 앱 어디에도 진단·조언을 쓰지 않는다는 약속을 문장으로 고정해 둔다.
     public static let medicalDisclaimerKo =
         "이 앱은 의료 조언이 아닙니다. 복용 변경은 담당 의사와 상의해 주세요."

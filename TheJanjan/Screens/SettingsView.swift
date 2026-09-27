@@ -601,6 +601,15 @@ struct SettingsView: View {
                 Link(t("이용약관", "Terms of Use"), destination: url)
                     .foregroundStyle(Color.ink)
             }
+            // 별점 창은 시스템이 때를 정하고 평생 한 번뿐이라, 뒤늦게 "한마디
+            // 남기고 싶다" 고 생각한 사람에게는 길이 없었다. 여기는 본인이
+            // 찾아와 누르는 자리라 횟수 제한이 없다. 앱 번호가 없으면(스토어에
+            // 올라가기 전) 줄 자체를 그리지 않는다.
+            if !Janjan.appStoreID.isEmpty,
+               let url = URL(string: Janjan.writeReviewURLString) {
+                Link(t("리뷰 남기기", "Write a review"), destination: url)
+                    .foregroundStyle(Color.ink)
+            }
             Button(t("오픈소스 라이선스", "Open source licenses")) {
                 isShowingLicenses = true
             }
