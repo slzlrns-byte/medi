@@ -30,6 +30,10 @@ enum DemoSeed {
 
         for medication in SampleData.medications {
             let record = MedicationRecord.make(from: medication)
+            // 영어 화면을 찍을 때는 목적 한 줄도 영어로. 이름은 DrugNames 가
+            // 화면에서 바꿔 주지만 목적은 사용자가 적는 글이라 저장된 그대로
+            // 나온다(영어 스토어 사진에 한글이 섞였다, 2026-09-29).
+            record.purposeLine = englishPurpose(for: medication.id) ?? medication.purposeLine
             // 예시 기록은 **지난 16일치**다(SampleData.doseEvents).
             //
             // 등록 시각이 "지금" 이면 DayPlan 이 그 앞의 날들을 이 약이 없던
@@ -55,7 +59,9 @@ enum DemoSeed {
             if isRecentMorningGap(event, now: now) { continue }
             context.insert(DoseEventRecord.make(from: event))
         }
-        context.insert(PrescriptionRecord.make(from: SampleData.prescription(referenceDate: now)))
+        let prescription = PrescriptionRecord.make(from: SampleData.prescription(referenceDate: now))
+        prescription.clinicNote = t(prescription.clinicNote, "Bring up the morning drowsiness next visit")
+        context.insert(prescription)
 
         seedCheckIns(context: context, now: now)
         seedSymptoms(context: context, now: now)
@@ -103,14 +109,29 @@ enum DemoSeed {
         }
     }
 
+    /// 영어로 찍을 때의 약 목적 한 줄. SampleData 는 코어라 언어를 모르므로
+    /// 앱 계층인 여기서 바꿔 끼운다. 한국어면 nil 을 돌려 원문을 쓴다.
+    private static func englishPurpose(for medicationID: UUID) -> String? {
+        guard JanjanLanguage.current == .english else { return nil }
+        switch medicationID {
+        case SampleData.quetiapine.id: return "To fall asleep more easily"
+        case SampleData.lamotrigine.id: return "To keep my mood from swinging"
+        case SampleData.escitalopram.id: return "To ease the low mood"
+        case SampleData.lorazepam.id: return "When anxiety closes in"
+        default: return nil
+        }
+    }
+
     /// 지난 2주의 기분. 오르내림이 있어야 "지난 기록" 이 한 줄짜리로 보이지 않는다.
     private static func seedCheckIns(context: ModelContext, now: Date) {
         let calendar = Calendar.current
         let scores = [0, -1, -2, -1, 0, 1, 0, -1, -2, -2, -1, 0, 1, 1]
-        let notes = [
-            "잠이 늦게 들었어요", nil, "회사에서 힘든 날", nil, nil,
-            "오랜만에 산책했어요", nil, nil, "약 시간을 놓쳤어요", nil,
-            nil, "조금 나은 것 같아요", nil, nil
+        let notes: [String?] = [
+            t("잠이 늦게 들었어요", "Fell asleep late"), nil,
+            t("회사에서 힘든 날", "Rough day at work"), nil, nil,
+            t("오랜만에 산책했어요", "First walk in a while"), nil, nil,
+            t("약 시간을 놓쳤어요", "Missed my dose time"), nil,
+            nil, t("조금 나은 것 같아요", "Feeling a little better"), nil, nil
         ]
 
         for (offset, score) in scores.enumerated() {
@@ -148,7 +169,7 @@ enum DemoSeed {
                     dreamVividness: 3,
                     nightmare: true,
                     dreamRecall: 3,
-                    dreamNote: "쫓기는 꿈을 꿨어요",
+                    dreamNote: t("쫓기는 꿈을 꿨어요", "Dreamed I was being chased"),
                     activities: offset % 4 == 0 ? ["outdoors", "caffeine"] : ["work"],
                     note: notes.indices.contains(offset) ? notes[offset] : nil,
                     updatedAt: day
@@ -206,20 +227,22 @@ enum DemoSeed {
             MedicationNote(
                 medicationID: first.id,
                 kind: .heardFromDoctor,
-                text: "처음 며칠 졸릴 수 있는데 1~2주면 지나간다고 하심",
+                text: t("처음 며칠 졸릴 수 있는데 1~2주면 지나간다고 하심",
+                        "Said the first few days may feel drowsy; it passes in 1–2 weeks"),
                 symptomID: "drowsiness",
                 createdAt: now
             ),
             MedicationNote(
                 medicationID: first.id,
                 kind: .heardFromDoctor,
-                text: "술은 피하라고 하심",
+                text: t("술은 피하라고 하심", "Said to avoid alcohol"),
                 createdAt: now
             ),
             MedicationNote(
                 medicationID: first.id,
                 kind: .questionForDoctor,
-                text: "아침에 더 졸린데 시간을 옮겨도 되는지",
+                text: t("아침에 더 졸린데 시간을 옮겨도 되는지",
+                        "Drowsier in the morning; can I move the time?"),
                 createdAt: now
             )
         ]
