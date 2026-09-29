@@ -114,22 +114,24 @@ struct ReportView: View {
 
     // MARK: - 리뷰 요청
 
-    /// 평생 한 번, 서로 다른 14일 이상 기록한 사람이 리포트를 열었을 때만
-    /// 시스템 리뷰 창을 청한다(심사 체크리스트 4.9). 시스템이 또 거르므로
-    /// 실제로는 더 드물게 뜬다. 조르지 않는다 - 조건을 못 채우면 영영 안 뜬다.
+    /// 평생 한 번, 서로 다른 며칠 이상 기록한 사람이 리포트를 열었을 때만
+    /// 시스템 리뷰 창을 청한다(심사 체크리스트 4.9). 며칠인지는
+    /// `ReviewRequestPolicy` 가 정한다 - 출시 직후 3일, 그 뒤 7일. 시스템이
+    /// 또 거르므로 실제로는 더 드물게 뜬다. 조르지 않는다 - 조건을 못 채우면
+    /// 영영 안 뜬다.
     private static let reviewAskedKey = "janjan.review.asked"
 
     private func maybeAskForReview() {
         #if DEBUG
-        // 화면 찍기가 예시 기록(14일 이상)으로 리포트를 여는 순간 시스템 리뷰
-        // 창이 떠서 탭바를 덮는다(런 35). 예시 기록 실행에서는 청하지 않는다.
+        // 화면 찍기가 예시 기록(문턱을 넘는 날수)으로 리포트를 여는 순간 시스템
+        // 리뷰 창이 떠서 탭바를 덮는다(런 35). 예시 기록 실행에서는 청하지 않는다.
         if ProcessInfo.processInfo.arguments.contains("-JanjanSeedDemoData") { return }
         #endif
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: Self.reviewAskedKey) else { return }
         let calendar = Calendar.current
         let recordedDays = Set(doseRecords.map { calendar.startOfDay(for: $0.core.effectiveDate) })
-        guard recordedDays.count >= 14 else { return }
+        guard ReviewRequestPolicy.shouldAsk(recordedDays: recordedDays.count, asOf: Date()) else { return }
         defaults.set(true, forKey: Self.reviewAskedKey)
         requestReview()
     }
