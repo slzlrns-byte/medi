@@ -49,9 +49,12 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
 
 ---
 
-## c. App ID 2개와 iCloud 컨테이너 만들기
+## c. App ID 3개 · iCloud 컨테이너 · App Group 만들기
 
-아이폰 앱과 워치 앱은 서로 다른 번들 ID를 씁니다. 둘 다 미리 등록해야 서명이 통과합니다.
+아이폰 앱 · 워치 앱 · 위젯은 서로 다른 번들 ID를 씁니다. 셋 다 미리 등록해야 서명이 통과합니다.
+
+**순서가 중요합니다.** 컨테이너와 그룹을 먼저 만들어야 App ID 에서 고를 수 있습니다.
+거꾸로 하면 Capabilities 화면에 체크할 항목이 비어 있습니다.
 
 ### c-1. iCloud 컨테이너 먼저
 
@@ -60,7 +63,16 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
 3. **+** → Description 은 `TheJanjan`, Identifier 는 정확히
    **`iCloud.com.thejanjan.app`** → Continue → Register.
 
-### c-2. 아이폰 앱 ID
+### c-2. App Group 만들기
+
+앱과 위젯이 **같은 저장소 파일**을 열기 위한 것입니다. 이게 없으면 위젯은
+앱 데이터를 못 보고 빈 화면이 됩니다(앱 자체는 멀쩡합니다).
+
+1. 같은 화면에서 드롭다운을 **App Groups** 로 바꿉니다.
+2. **+** → Description `TheJanjan Shared`, Identifier 는 정확히
+   **`group.com.thejanjan.app`** → Continue → Register.
+
+### c-3. 아이폰 앱 ID
 
 1. 다시 드롭다운을 **App IDs** 로 바꾸고 **+** 를 누릅니다.
 2. **App** 을 고르고 Continue.
@@ -69,9 +81,10 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
    - **iCloud** → 체크하면 아래에 `Configure` 버튼이 생깁니다.
      누르고 **CloudKit** 을 고른 뒤 위에서 만든 `iCloud.com.thejanjan.app` 을 체크 → Save.
    - **Push Notifications** → 체크만 합니다.
+   - **App Groups** → 체크하고 `Configure` → `group.com.thejanjan.app` 체크 → Save.
 5. Continue → Register.
 
-### c-3. 워치 앱 ID
+### c-4. 워치 앱 ID
 
 1. **+** → **App** → Continue.
 2. Description `The Janjan Watch`, Bundle ID **Explicit** → **`com.thejanjan.app.watchkitapp`**.
@@ -80,6 +93,20 @@ CI가 애플과 대화할 때 쓰는 열쇠입니다. 애플 ID/비밀번호를 
    같은 컨테이너 `iCloud.com.thejanjan.app` 체크 → Save.
    - 워치 앱도 같은 컨테이너를 entitlements 에 선언해 두었기 때문에 여기서 빠지면 서명이 실패합니다.
 4. Push Notifications 는 워치엔 필요 없습니다. 체크하지 마세요.
+5. Continue → Register.
+   - 워치는 App Group 을 쓰지 않습니다. 워치 화면은 폰이 보내 주는 스냅샷을 그리고,
+     저장소를 직접 열지 않기 때문입니다.
+
+### c-5. 위젯 앱 ID
+
+1. **+** → **App** → Continue.
+2. Description `The Janjan Widgets`, Bundle ID **Explicit** → **`com.thejanjan.app.widgets`**.
+3. Capabilities 에서 **두 개**를 체크합니다.
+   - **App Groups** → Configure → `group.com.thejanjan.app` 체크 → Save.
+     **이게 위젯의 핵심입니다.** 위젯은 별도 프로세스라 이 그룹으로만 앱 데이터에 닿습니다.
+   - **iCloud** → Configure → **CloudKit** → `iCloud.com.thejanjan.app` 체크 → Save.
+     위젯에서 누른 '먹었어요' 가 다른 기기로 따라가야 하기 때문입니다.
+4. Push Notifications 는 필요 없습니다.
 5. Continue → Register.
 
 ---
@@ -210,8 +237,10 @@ $pat  = "ghp_여기에_토큰"
 | `Authentication failed` (git) | `MATCH_GIT_BASIC_AUTHORIZATION` 이 잘못됐다 | `사용자이름:PAT` 를 base64 한 값인지, 줄바꿈이 섞이지 않았는지 확인. PAT 에 `repo` 권한이 있는지 확인 |
 | `Invalid curve name` / `Could not create API key` | `ASC_KEY_CONTENT` 가 base64가 아니거나 줄바꿈이 섞였다 | PowerShell `Set-Clipboard` 방식으로 다시 넣기 |
 | `No signing certificate "Apple Distribution" found` | 배포 인증서가 없다 | `first_run` 켜고 실행. 이미 3개(최대치)면 developer.apple.com 에서 안 쓰는 인증서를 폐기 |
-| `Provisioning profile ... doesn't include the com.apple.developer.icloud-services entitlement` | App ID 에 iCloud capability 를 안 켰다 | c-2 / c-3 을 다시 확인. **워치 App ID 도** iCloud + 컨테이너 체크 필요 |
-| `...watchkitapp` 프로파일이 없다고 나옴 | 워치 App ID 를 등록하지 않았다 | c-3 을 하고 `first_run` 으로 다시 실행 |
+| `Provisioning profile ... doesn't include the com.apple.developer.icloud-services entitlement` | App ID 에 iCloud capability 를 안 켰다 | c-3 / c-4 / c-5 를 다시 확인. **워치와 위젯 App ID 에도** iCloud + 컨테이너 체크가 필요합니다 |
+| `...watchkitapp` 프로파일이 없다고 나옴 | 워치 App ID 를 등록하지 않았다 | c-4 를 하고 `first_run` 으로 다시 실행 |
+| `...widgets` 프로파일이 없다고 나옴 | 위젯 App ID 를 등록하지 않았다 | c-5 를 하고 `first_run` 으로 다시 실행 |
+| 위젯이 앱을 열면 데이터가 있는데 홈 화면에서는 계속 비어 있다 | App Group 이 App ID 에 안 붙었다 | c-2 의 그룹이 만들어졌는지, 그리고 **앱(c-3)과 위젯(c-5) 양쪽** App ID 에 App Groups 가 체크됐는지 확인. 한쪽만 붙으면 서로 다른 저장소를 엽니다 |
 | `aps-environment` 불일치 | (설정되어 있음) Release 는 production 으로 자동 주입된다 | 손대지 말 것. `project.yml` 의 `APS_ENVIRONMENT` 참고 |
 | TestFlight 에 빌드가 안 보임 | 아직 처리 중 | **10~30분** 기다리기. 1시간 넘으면 애플에서 거절 메일이 왔는지 확인 |
 | `Missing app icon` 으로 업로드 거절 | 아이콘이 없거나 알파 채널이 있다 | 현재 1024×1024 불투명 PNG 가 들어 있다. 새 아이콘으로 바꿀 때 **투명도를 넣지 말 것** |
@@ -226,3 +255,28 @@ $pat  = "ghp_여기에_토큰"
 - entitlements 는 Debug/Release 양쪽 구성에 모두 연결돼 있고, CI가 매번 그걸 검사합니다.
 - 빌드 번호는 워크플로 실행 번호(`GITHUB_RUN_NUMBER`)로 자동 증가합니다. 손댈 필요 없습니다.
 - 버전(`0.1.0`)은 `project.yml` 의 `MARKETING_VERSION` 에서 올립니다.
+
+---
+
+## CI 분(minute) 아끼기
+
+**macOS 러너는 분당 10배로 청구됩니다.** 비공개 저장소 무료 한도는 월 2,000분이고,
+CI 한 번이 5~8분이면 **50~80분**이 깎입니다. 2026-08-26 에 하루 스무 번 넘게 돌려
+한도를 소진한 적이 있습니다.
+
+| 워크플로 | 러너 | 실제 시간 | 깎이는 분 | 언제 도는가 |
+| --- | --- | --- | --- | --- |
+| `ci.yml` · 순수 로직 (리눅스) | ubuntu | ~2분 | **2분** | main push · PR · 수동 |
+| `ci.yml` · 빌드와 테스트 | macos-15 | 5~8분 | **50~80분** | 위와 같음, 단 문서·데이터만 바뀌면 건너뜀 |
+| `screenshots.yml` | macos-15 | 7~9분 | **70~90분** | `screenshots.yml` 을 일부러 건드릴 때만 |
+
+지키는 규칙:
+
+1. **순수 로직은 리눅스에서 본다.** JanjanCore 는 Foundation 만 쓰므로 우분투에서
+   그대로 돕니다. macOS 는 시뮬레이터가 정말 필요한 것만 맡습니다.
+2. **문서·데이터만 바뀌면 안 돌린다.** `docs/`, `data/`, `*.md` 는 `paths-ignore` 입니다.
+3. **커밋마다 부르지 않는다.** 작업을 묶어 한 번만 돌립니다.
+4. **화면 찍기는 손으로만.** 가장 비싸므로 자동으로 돌지 않게 해 두었습니다.
+
+한도가 모자라면 GitHub → Settings → Billing and licenses → Plans and usage 에서
+남은 분과 지출 한도를 확인하세요.

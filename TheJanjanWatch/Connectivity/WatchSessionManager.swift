@@ -29,6 +29,15 @@ final class WatchSessionManager: NSObject, ObservableObject {
         super.init()
     }
 
+    #if DEBUG
+    /// 화면을 찍기 위해 스냅샷을 직접 넣는다. `WatchDemoSeed` 만 부른다.
+    /// 시뮬레이터에는 짝지어진 아이폰이 없어 그냥 두면 placeholder 만 보인다.
+    @MainActor
+    func applyDemoSnapshot(_ snapshot: WatchSnapshot) {
+        self.snapshot = snapshot
+    }
+    #endif
+
     func activate() {
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
@@ -36,28 +45,123 @@ final class WatchSessionManager: NSObject, ObservableObject {
         session.activate()
     }
 
+    /// 활성화가 끝나기 전에 눌린 전송. 미활성 세션에 보내면 WCSession 이
+    /// 에러를 내므로, 잠깐 들고 있다가 활성화 콜백에서 흘려보낸다.
+    private var pendingPayloads: [(payload: [String: Any], isRecord: Bool)] = []
+
     /// 폰에 사건을 보낸다. 닿으면 즉시, 아니면 큐에.
     func send(_ message: WatchMessage) {
         guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        let payload = message.payload
+        // 큐 표시("아이폰과 만나면 전달돼요")는 기록에만 붙인다.
+        // 스냅샷 요청은 기록이 아니고, 폰이 없는 화면 찍기에서도 매번 나간다.
+        let isRecord: Bool
+        if case .requestSnapshot = message { isRecord = false } else { isRecord = true }
+        deliver(message.payload, isRecord: isRecord)
+    }
 
-        guard session.isReachable else {
-            queue(payload)
+    private func deliver(_ payload: [String: Any], isRecord: Bool) {
+        let session = WCSession.default
+
+        guard session.activationState == .activated else {
+            onMain { $0.pendingPayloads.append((payload, isRecord)) }
+            session.activate()
             return
         }
 
-        setQueuedFlag(false)
+        guard session.isReachable else {
+            queue(payload, isRecord: isRecord)
+            return
+        }
+
+        if isRecord { setQueuedFlag(false) }
         session.sendMessage(payload, replyHandler: nil) { [weak self] error in
             guard let self else { return }
             self.logger.error("즉시 전송 실패, 큐로 돌립니다: \(error.localizedDescription, privacy: .public)")
-            self.queue(payload)
+            self.queue(payload, isRecord: isRecord)
         }
     }
 
-    private func queue(_ payload: [String: Any]) {
+    /// 방금 보낸 기록을 화면에 먼저 반영한다(낙관적 갱신).
+    ///
+    /// 폰이 새 스냅샷을 밀어주기 전까지 그 줄이 "미완료" 로 남아 있으면
+    /// 사용자가 같은 시간대를 두 번 누르게 된다(QA 2026-09-10). 진짜 스냅샷이
+    /// 오면 그대로 덮여서, 폰이 처리하지 못한 경우에도 다시 미완료로 돌아온다.
+    func markSlotCompleted(_ slotKey: String) {
+        onMain { manager in
+            let old = manager.snapshot
+            var completedCount = 0
+            let slots = old.slots.map { slot -> WatchSnapshot.SlotLine in
+                guard slot.slotKey == slotKey, !slot.isCompleted else { return slot }
+                completedCount = slot.medicationIDs.isEmpty
+                    ? slot.medicationNames.count
+                    : slot.medicationIDs.count
+                return WatchSnapshot.SlotLine(
+                    slotKey: slot.slotKey,
+                    labelKo: slot.labelKo,
+                    timeText: slot.timeText,
+                    medicationNames: slot.medicationNames,
+                    medicationIDs: slot.medicationIDs,
+                    isCompleted: true
+                )
+            }
+            // **빠진 칸은 기본값으로 채워진다.** `asNeeded` 와 `languageRaw` 를
+            // 안 넘기면 시간대 하나를 누른 순간 필요시 약 목록이 통째로 사라지고
+            // 화면이 한국어로 되돌아갔다 - 폰이 다음 스냅샷을 밀어 줄 때까지
+            // (QA 2026-09-21). 옮겨 적는 것은 **전부** 옮겨 적는다.
+            manager.snapshot = WatchSnapshot(
+                generatedAt: old.generatedAt,
+                dateText: old.dateText,
+                slots: slots,
+                asNeeded: old.asNeeded,
+                remainingCountToday: max(0, old.remainingCountToday - completedCount),
+                isPro: old.isPro,
+                themeRaw: old.themeRaw,
+                languageRaw: old.languageRaw
+            )
+        }
+    }
+
+    /// 필요시 약 한 번 복용을 보내고, 화면에 먼저 반영한다(낙관적 갱신).
+    ///
+    /// `markSlotCompleted` 와 같은 이유다 - 폰의 새 스냅샷이 오기 전까지 방금 누른
+    /// 사실이 화면에 없으면 같은 약을 두 번 누르게 된다. 진짜 스냅샷이 오면 덮인다.
+    func recordAsNeeded(_ line: WatchSnapshot.AsNeededLine) {
+        let now = Date()
+        send(.asNeededTaken(medicationID: line.medicationID, quantity: line.quantity, at: now))
+
+        onMain { manager in
+            let old = manager.snapshot
+            let calendar = Calendar.current
+            let timeText = String(
+                format: "%02d:%02d",
+                calendar.component(.hour, from: now),
+                calendar.component(.minute, from: now)
+            )
+            let asNeeded = old.asNeeded.map { existing -> WatchSnapshot.AsNeededLine in
+                guard existing.medicationID == line.medicationID else { return existing }
+                return WatchSnapshot.AsNeededLine(
+                    medicationID: existing.medicationID,
+                    title: existing.title,
+                    quantity: existing.quantity,
+                    takenTodayTexts: existing.takenTodayTexts + [timeText]
+                )
+            }
+            manager.snapshot = WatchSnapshot(
+                generatedAt: old.generatedAt,
+                dateText: old.dateText,
+                slots: old.slots,
+                asNeeded: asNeeded,
+                remainingCountToday: old.remainingCountToday,
+                isPro: old.isPro,
+                themeRaw: old.themeRaw,
+                languageRaw: old.languageRaw
+            )
+        }
+    }
+
+    private func queue(_ payload: [String: Any], isRecord: Bool) {
         guard WCSession.isSupported() else { return }
-        setQueuedFlag(true)
+        if isRecord { setQueuedFlag(true) }
         WCSession.default.transferUserInfo(payload)
     }
 
@@ -110,6 +214,12 @@ extension WatchSessionManager: WCSessionDelegate {
         }
         setReachable(session.isReachable)
         if activationState == .activated {
+            // 활성화 전에 눌려 들고 있던 전송부터 흘려보낸다.
+            onMain { manager in
+                let held = manager.pendingPayloads
+                manager.pendingPayloads = []
+                for item in held { manager.deliver(item.payload, isRecord: item.isRecord) }
+            }
             requestSnapshot()
         }
     }

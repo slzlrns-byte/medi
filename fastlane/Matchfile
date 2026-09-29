@@ -12,7 +12,8 @@ type("appstore")
 
 app_identifier([
   "com.thejanjan.app",
-  "com.thejanjan.app.watchkitapp"
+  "com.thejanjan.app.watchkitapp",
+  "com.thejanjan.app.widgets"
 ])
 
 # 기본은 readonly. CI 가 실수로 인증서를 새로 발급해 기존 것을 무효화하는 사고를 막는다.

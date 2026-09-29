@@ -61,4 +61,16 @@ final class LockPolicyTests: XCTestCase {
         XCTAssertEqual(LockPolicy.graceLabelKo(forSeconds: 60), "1분 후")
         XCTAssertEqual(LockPolicy.graceLabelKo(forSeconds: 300), "5분 후")
     }
+
+    func testEnglishSettingsLabels() {
+        XCTAssertEqual(LockPolicy.graceLabel(forSeconds: 0, language: .english), "Right away")
+        XCTAssertEqual(LockPolicy.graceLabel(forSeconds: 60, language: .english), "After 1 minute")
+        XCTAssertEqual(LockPolicy.graceLabel(forSeconds: 300, language: .english), "After 5 minutes")
+        XCTAssertEqual(
+            LockPolicy.graceLabel(forSeconds: 60, language: .korean),
+            LockPolicy.graceLabelKo(forSeconds: 60)
+        )
+        XCTAssertEqual(Janjan.slogan(.english), "For a calmer day")
+        XCTAssertEqual(Janjan.slogan(.korean), Janjan.sloganKo)
+    }
 }

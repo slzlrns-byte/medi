@@ -2,14 +2,33 @@
 #
 # 개발자에게 맥이 없다. 컴파일러는 이 워크플로다.
 # 시크릿을 하나도 쓰지 않으므로 포크에서도 그대로 돈다.
+#
+# ── 분(minute) 아끼기 ────────────────────────────────────────────────────
+# **macOS 러너는 분당 10배로 청구된다.** 한 번 도는 데 5~8분이면 50~80분이
+# 깎이고, 비공개 저장소 무료 한도는 월 2,000분이다. 하루에 스무 번 돌리면
+# 그것만으로 한도가 사라진다(2026-08-26 에 실제로 그렇게 됐다).
+#
+# 그래서 셋을 지킨다.
+#   1. 순수 로직은 리눅스에서 본다(1배). macOS 는 시뮬레이터가 필요한 것만.
+#   2. 문서·데이터만 바뀌면 아예 돌리지 않는다.
+#   3. 커밋마다 부르지 않는다 — 묶어서 한 번.
+# 화면 찍기(screenshots.yml)는 이보다 더 비싸므로 손으로만 부른다.
 
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'data/**'
+      - '**.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'data/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
@@ -20,14 +39,35 @@ permissions:
   contents: read
 
 jobs:
+  # 순수 로직은 macOS 가 필요 없다. JanjanCore 는 Foundation 만 쓰므로
+  # 리눅스에서 그대로 돈다. 이 잡을 따로 두는 이유:
+  #   · macOS 러너는 자주 밀린다. 재고 계산이 깨졌는지를 30분씩 기다려 알 수 없다.
+  #   · 청구도 macOS 는 10배다. 하루에 몇 번씩 도는 것을 거기 얹을 이유가 없다.
+  # 시뮬레이터 빌드는 아래 macOS 잡이 계속 맡는다.
+  core-tests:
+    name: 순수 로직 테스트 (리눅스)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    timeout-minutes: 15
+
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 버전 확인
+        run: swift --version
+
+      - name: JanjanCore 테스트
+        run: swift test --package-path Packages/JanjanCore
+
   build-and-test:
     name: 빌드와 테스트
     runs-on: macos-15
-    timeout-minutes: 45
+    # 실제로는 5~8분이면 끝난다. 45분으로 두면 한 번 매달릴 때 450분이 깎인다.
+    timeout-minutes: 25
 
     env:
       SCHEME: TheJanjan
-      DESTINATION: "platform=iOS Simulator,name=iPhone 16,OS=latest"
 
     steps:
       - name: 체크아웃
@@ -71,7 +111,8 @@ jobs:
 
       - name: 번들 서체 무결성 확인
         run: |
-          # OTF 는 'OTTO' 로 시작한다. LFS 포인터나 HTML 오류 페이지가 커밋되면 여기서 걸린다.
+          # OTF 는 'OTTO', TTF 는 00 01 00 00 으로 시작한다.
+          # LFS 포인터나 HTML 오류 페이지가 커밋되면 여기서 걸린다.
           for f in TheJanjan/Resources/Fonts/*.otf; do
             MAGIC=$(head -c 4 "$f")
             if [ "$MAGIC" != "OTTO" ]; then
@@ -80,9 +121,54 @@ jobs:
             fi
             echo "ok $f"
           done
+          for f in TheJanjan/Resources/Fonts/*.ttf; do
+            MAGIC=$(head -c 4 "$f" | xxd -p)
+            if [ "$MAGIC" != "00010000" ]; then
+              echo "::error::$f 가 올바른 TTF 가 아닙니다 (magic=$MAGIC)"
+              exit 1
+            fi
+            echo "ok $f"
+          done
 
-      - name: 순수 로직 테스트 (JanjanCore)
-        run: swift test --package-path Packages/JanjanCore
+      # JanjanCore 테스트는 리눅스 잡(core-tests)이 1배로 돌린다.
+      # 여기서 또 돌리면 같은 것을 10배로 사는 셈이다.
+      # 시뮬레이터 빌드가 JanjanCore 를 iOS 로 컴파일하므로 빌드 오류는 여기서 잡힌다.
+
+      # 기기 이름을 못 박지 않는다. 러너 이미지마다 깔린 시뮬레이터가 달라서
+      # "iPhone 16" 같은 이름은 언젠가 반드시 없어진다(실제로 없어져서 CI가 깨졌다).
+      # 그때그때 실제로 있는 iPhone 중 가장 최신 iOS 것을 골라 UDID 로 지목한다.
+      - name: 시뮬레이터 고르기
+        id: simulator
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+
+          runtimes = json.load(sys.stdin)["devices"]
+
+          def version(identifier):
+              tail = identifier.rsplit(".", 1)[-1]          # com.apple...iOS-18-2 -> iOS-18-2
+              parts = [p for p in tail.split("-") if p.isdigit()]
+              return tuple(int(p) for p in parts) or (0,)
+
+          best = None
+          for identifier, devices in runtimes.items():
+              if "iOS" not in identifier:
+                  continue
+              phones = [d for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")]
+              if not phones:
+                  continue
+              candidate = (version(identifier), identifier, phones[0])
+              if best is None or candidate[0] > best[0]:
+                  best = candidate
+
+          if best is None:
+              sys.exit("사용할 수 있는 iPhone 시뮬레이터가 없습니다.")
+
+          sys.stderr.write("고른 기기: {} ({})\n".format(best[2]["name"], best[1]))
+          print(best[2]["udid"])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: 앱 빌드와 테스트 (시뮬레이터, 서명 없음)
         run: |
@@ -90,7 +176,7 @@ jobs:
           xcodebuild \
             -project TheJanjan.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
             -resultBundlePath build/TheJanjan.xcresult \
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \

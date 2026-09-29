@@ -4,11 +4,11 @@
 
 | 파일 | 내용 | 상태 |
 | --- | --- | --- |
-| `drug_catalog.json` | 약 정보 카탈로그 | 미생성 (스키마만 있음) |
+| `drug_catalog.json` | 약 정보 카탈로그 | **v1.1 이후로 미룸** (스키마만 있음) — 2026-08-26 결정 |
 | `symptom_catalog.json` | 증상 카탈로그 기본 목록 | 초안 |
 | `emotion_words.json` | 감정 단어 36개 | 초안 |
 | `question_cards.json` | 기분일기 질문 카드 30장 | 초안 |
-| `schema/drug_catalog.schema.json` | `drug_catalog.json` 의 JSON Schema (draft-07) | 초안 |
+| `schema/drug_catalog.schema.json` | `drug_catalog.json` 의 JSON Schema (draft-07) | 초안 (미룬 설계와 함께 보존) |
 
 ## 앱 번들로의 복사 (지금은 수동)
 
@@ -31,6 +31,10 @@ data/question_cards.json   →  Packages/JanjanCore/Sources/JanjanCore/Resources
 ---
 
 ## `drug_catalog.json`
+
+> **v1 에는 넣지 않는다** (2026-08-26 결정 · `docs/decisions.md`).
+> 식약처 이상반응 원문을 펼쳐 보이는 대신, 진료에서 들은 말을 사용자가 직접 적어 두는
+> `MedicationNote` 로 갔다. 아래 설계와 스키마는 나중을 위해 지우지 않고 남겨 둔다.
 
 국내 정신건강 관련 성분 약 120종 × 상품명 약 600개. 항목당 필드:
 

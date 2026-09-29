@@ -2,4 +2,5 @@
 
 "CFBundleDisplayName" = "Janjan";
 "NSCameraUsageDescription" = "Reads the medication name on your pharmacy label so you don't have to type it. Photos are never saved.";
+"NSPhotoLibraryUsageDescription" = "Reads the medication name from a photo of your pharmacy label so you don't have to type it. Photos are never saved.";
 "NSFaceIDUsageDescription" = "Face ID is used only to unlock the app. Your records never leave this device.";

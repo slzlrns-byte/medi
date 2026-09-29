@@ -1,0 +1,458 @@
+import Foundation
+
+/// 하루치 복용 계획 (설계 03절 · 10절).
+///
+/// 스케줄과 복용 사건에서 "오늘 이 시간대에 무엇이 남았는가" 를 만든다.
+/// 오늘 화면·워치 스냅샷·알림 재예약이 전부 이 한 곳을 거친다. 그래야 폰과 워치가
+/// 서로 다른 숫자를 말하지 않는다.
+///
+/// 재고와 같은 원칙을 쓴다 — **계획은 저장하지 않는다.** 매번 사건에서 다시 만든다.
+/// 사용자가 어제 기록을 고쳐도 오늘의 화면이 어긋나지 않는다.
+public enum DayPlan {
+
+    // MARK: - 한 줄
+
+    /// 시간대 한 줄 안의 약 하나.
+    public struct Entry: Identifiable, Hashable, Sendable {
+
+        /// 스케줄 ID. 한 약이 같은 시간대에 두 줄로 오지는 않으므로 이것으로 식별한다.
+        public let id: UUID
+        public let medicationID: UUID
+        public let medicationName: String
+        /// 1회 복용 개수. 반 알이면 0.5.
+        public let dose: Decimal
+        /// 기록된 상태. 아직 아무 기록도 없으면 nil.
+        public let status: DoseEvent.Status?
+        /// 대응하는 저장된 사건. 답을 고쳐 쓸 때 이 ID 로 찾는다.
+        public let eventID: UUID?
+        /// 그 사건을 누가 남겼는가. `.automatic` 은 앱이 채운 것이라 답이 아니다.
+        public let source: DoseEvent.Source?
+
+        public init(
+            id: UUID,
+            medicationID: UUID,
+            medicationName: String,
+            dose: Decimal,
+            status: DoseEvent.Status? = nil,
+            eventID: UUID? = nil,
+            source: DoseEvent.Source? = nil
+        ) {
+            self.id = id
+            self.medicationID = medicationID
+            self.medicationName = medicationName
+            self.dose = DecimalQuantity.snapToQuarter(dose)
+            self.status = status
+            self.eventID = eventID
+            self.source = source
+        }
+
+        /// 사용자가 답을 준 줄인가. `awaitsAnswer` 의 반대말이다.
+        ///
+        /// 예전에는 미기록이면 무조건 답이 아니라고 봤다. 그때는 미기록이
+        /// 생기는 길이 하나뿐이었기 때문인데, 앱이 스스로 채우는 길이
+        /// 생기면서 둘을 갈라야 했다(2026-09-19). **직접 고른 "기억나지
+        /// 않아요" 는 답이다** - 그렇게 보지 않으면 그 시간대의 타일이
+        /// 영영 미완료로 남아 다 답한 날에도 "먹었어요 N개" 가 떠 있다.
+        public var isAnswered: Bool { !awaitsAnswer }
+
+        /// 아직 물어볼 줄인가.
+        ///
+        /// 아무 사건도 없거나, 앱이 스스로 채워 둔 미기록이면 참이다 -
+        /// 후자는 채워졌을 뿐 답을 받은 것이 아니다. 사용자가 직접 고른
+        /// "기억나지 않아요" 는 답이므로 여기서 빠진다. 같은 질문을 두 번
+        /// 하지 않는 것이 이 구분의 이유다.
+        public var awaitsAnswer: Bool {
+            guard let status else { return true }
+            return status == .unrecorded && source == .automatic
+        }
+    }
+
+    /// 한 시간대(아침·점심·저녁·취침·사용자 정의) 한 줄.
+    public struct SlotLine: Identifiable, Hashable, Sendable {
+
+        public let slot: DoseSlot
+        /// 이 시간대에 실제로 알림이 가는 시각. 같은 시간대에 여러 시각이 섞이면 가장 이른 것.
+        public let time: TimeOfDay
+        public let entries: [Entry]
+
+        public var id: String { slot.storageKey }
+        public var slotKey: String { slot.storageKey }
+
+        public init(slot: DoseSlot, time: TimeOfDay, entries: [Entry]) {
+            self.slot = slot
+            self.time = time
+            self.entries = entries
+        }
+
+        /// 이 시간대의 약을 전부 답했는가. 빈 줄은 완료로 보지 않는다.
+        public var isCompleted: Bool {
+            !entries.isEmpty && entries.allSatisfy(\.isAnswered)
+        }
+
+        /// 아직 답하지 않은 약의 수.
+        public var pendingCount: Int {
+            entries.filter { !$0.isAnswered }.count
+        }
+
+        public var medicationNames: [String] {
+            entries.map(\.medicationName)
+        }
+
+        /// 하루 안에서의 정렬 기준. 사용자가 시각을 옮겼으면 옮긴 시각을 따른다.
+        public var sortKey: Int { time.minutesFromMidnight }
+    }
+
+    // MARK: - 계획 세우기
+
+    /// `day` 하루의 시간대별 계획.
+    ///
+    /// - Parameters:
+    ///   - day: 계획을 만들 날짜. 시·분은 무시하고 그 날 전체를 본다.
+    ///   - schedules: 전체 스케줄. 그 날 살아 있지 않은 줄은 내부에서 걸러 낸다.
+    ///   - medications: 이름을 붙이는 데 쓴다. 중단한 약과 목록에 없는 약은 빠진다.
+    ///   - doseEvents: 전체 복용 사건. 그 날의 정기 예정분만 짝지어 본다.
+    public static func slots(
+        on day: Date,
+        schedules: [Schedule],
+        medications: [Medication],
+        doseEvents: [DoseEvent],
+        calendar: Calendar = .current
+    ) -> [SlotLine] {
+
+        // 이름을 붙일 수 있고 아직 복용 중인 약만 계획에 올린다.
+        var activeMedications: [UUID: Medication] = [:]
+        for medication in medications where medication.status == .active {
+            activeMedications[medication.id] = medication
+        }
+
+        let todaysSchedules = schedules.filter { schedule in
+            guard let medication = activeMedications[schedule.medicationID] else { return false }
+            // **약이 아직 없던 날에는 그 약의 계획도 없다**(QA 2026-09-19).
+            // 계획은 저장하지 않고 매번 지금의 스케줄로 다시 만드는 구조라,
+            // 이 가드가 없으면 오늘 등록한 약이 지난 한 달 내내 있었던 것이
+            // 되고 "기록 없이 지나간 시간대" 가 등록하자마자 쏟아진다.
+            // 시간대를 나중에 더한 경우는 Schedule.startDate 가 막는다.
+            if let createdAt = medication.createdAt,
+               calendar.startOfDay(for: createdAt) > calendar.startOfDay(for: day) {
+                return false
+            }
+            return schedule.isActive(on: day, calendar: calendar)
+        }
+
+        // 그 날의 정기 예정분 사건만 미리 추려 둔다. 스케줄마다 전체를 훑지 않기 위해서다.
+        //
+        // 실제 복용 시각이 아니라 **예정 시각**으로 날짜를 가른다.
+        // 어젯밤 22:30 취침약을 자정 넘겨 00:10 에 먹었어도 그것은 어제의 취침 줄이다.
+        var eventsByKey: [String: [DoseEvent]] = [:]
+        for event in doseEvents {
+            guard event.kind == .scheduled, let slotKey = event.slotKey else { continue }
+            guard calendar.isDate(event.scheduledAt, inSameDayAs: day) else { continue }
+            eventsByKey["\(event.medicationID.uuidString)|\(slotKey)", default: []].append(event)
+        }
+
+        let grouped = Dictionary(grouping: todaysSchedules, by: { $0.slot.storageKey })
+
+        return grouped.compactMap { key, group -> SlotLine? in
+            guard let slot = DoseSlot(storageKey: key) else { return nil }
+
+            let sorted = group.sorted { lhs, rhs in
+                if lhs.timeOfDay != rhs.timeOfDay { return lhs.timeOfDay < rhs.timeOfDay }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            guard let earliest = sorted.first else { return nil }
+
+            let entries = sorted.compactMap { schedule -> Entry? in
+                guard let medication = activeMedications[schedule.medicationID] else { return nil }
+                let event = latestEvent(
+                    in: eventsByKey["\(schedule.medicationID.uuidString)|\(key)"] ?? []
+                )
+                return Entry(
+                    id: schedule.id,
+                    medicationID: schedule.medicationID,
+                    medicationName: medication.name,
+                    dose: schedule.dosePerIntake,
+                    status: event?.status,
+                    eventID: event?.id,
+                    source: event?.source
+                )
+            }
+
+            guard !entries.isEmpty else { return nil }
+            return SlotLine(slot: slot, time: earliest.timeOfDay, entries: entries)
+        }
+        .sorted { lhs, rhs in
+            if lhs.sortKey != rhs.sortKey { return lhs.sortKey < rhs.sortKey }
+            return lhs.slotKey < rhs.slotKey
+        }
+    }
+
+    /// 같은 약·같은 시간대에 사건이 여러 개면 가장 나중 것을 진실로 본다.
+    /// (알림으로 건너뜀을 눌렀다가 앱에서 복용함으로 고친 경우가 여기 걸린다.)
+    private static func latestEvent(in events: [DoseEvent]) -> DoseEvent? {
+        events.max { lhs, rhs in
+            if lhs.effectiveDate != rhs.effectiveDate { return lhs.effectiveDate < rhs.effectiveDate }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    // MARK: - 요약
+
+    /// 오늘 아직 답하지 않은 약의 총 개수.
+    public static func pendingCount(in slots: [SlotLine]) -> Int {
+        slots.reduce(0) { $0 + $1.pendingCount }
+    }
+
+    /// 아직 답하지 않은 시간대의 수. 오늘 화면 인사말이 쓴다.
+    public static func pendingSlotCount(in slots: [SlotLine]) -> Int {
+        slots.filter { !$0.isCompleted }.count
+    }
+
+    /// 지금 시각 기준으로 가장 먼저 답해야 할 시간대.
+    /// 남은 것이 없으면 nil — 화면은 "다 챙기셨어요" 를 보인다.
+    public static func nextPendingSlot(
+        in slots: [SlotLine],
+        at now: Date,
+        calendar: Calendar = .current
+    ) -> SlotLine? {
+        let minutes = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
+        let pending = slots.filter { !$0.isCompleted }
+        // 아직 오지 않은 시간대가 있으면 그 중 가장 이른 것, 다 지났으면 지난 것 중 가장 이른 것.
+        return pending.first { $0.sortKey >= minutes } ?? pending.first
+    }
+
+    // MARK: - 알림 목록
+
+    /// 한 주에 한 번씩 반복되는 알림 한 건. 요일마다 따로 만든다.
+    public struct WeeklyReminder: Identifiable, Hashable, Sendable {
+
+        public let slot: DoseSlot
+        public let weekday: Weekday
+        public let time: TimeOfDay
+        public let medicationIDs: [UUID]
+        public let medicationNames: [String]
+
+        public var id: String { "\(slot.storageKey)-\(weekday.rawValue)" }
+
+        public init(
+            slot: DoseSlot,
+            weekday: Weekday,
+            time: TimeOfDay,
+            medicationIDs: [UUID],
+            medicationNames: [String]
+        ) {
+            self.slot = slot
+            self.weekday = weekday
+            self.time = time
+            self.medicationIDs = medicationIDs
+            self.medicationNames = medicationNames
+        }
+    }
+
+    /// 알림으로 깔 목록.
+    ///
+    /// 시간대 하나에 요일 하나씩 따로 만든다. 시간대별로 요일을 합쳐 버리면,
+    /// 월요일만 먹는 약이 화요일 알림 문구에도 이름을 올린다.
+    public static func weeklyReminders(
+        schedules: [Schedule],
+        medications: [Medication],
+        asOf now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [WeeklyReminder] {
+
+        var active: [UUID: Medication] = [:]
+        for medication in medications where medication.status == .active {
+            active[medication.id] = medication
+        }
+
+        // 이미 끝난 스케줄은 알림을 남기지 않는다. 시작 전 스케줄은 남긴다 —
+        // 알림은 매주 반복이라 시작일이 오면 저절로 맞아떨어진다.
+        let live = schedules.filter { schedule in
+            guard active[schedule.medicationID] != nil else { return false }
+            // 종료일은 그 날이 다 갈 때까지 살아 있다. 시각으로 자르면 마지막 날
+            // 오후에 이미 끝난 것이 되어 그 날 알림이 통째로 사라진다.
+            if let end = schedule.endDate,
+               calendar.startOfDay(for: end) < calendar.startOfDay(for: now) {
+                return false
+            }
+            return true
+        }
+
+        var reminders: [WeeklyReminder] = []
+
+        for weekday in Weekday.allCases {
+            let onThatDay = live.filter { $0.weekdays.contains(weekday) }
+            let grouped = Dictionary(grouping: onThatDay, by: { $0.slot.storageKey })
+
+            for (key, group) in grouped {
+                guard let slot = DoseSlot(storageKey: key) else { continue }
+
+                let sorted = group.sorted { lhs, rhs in
+                    if lhs.timeOfDay != rhs.timeOfDay { return lhs.timeOfDay < rhs.timeOfDay }
+                    return lhs.id.uuidString < rhs.id.uuidString
+                }
+                guard let earliest = sorted.first else { continue }
+
+                // 한 약이 같은 시간대에 두 줄이면 이름이 두 번 나오지 않게 한 번만 싣는다.
+                var seen: Set<UUID> = []
+                var ids: [UUID] = []
+                var names: [String] = []
+                for schedule in sorted where seen.insert(schedule.medicationID).inserted {
+                    guard let medication = active[schedule.medicationID] else { continue }
+                    ids.append(medication.id)
+                    names.append(medication.name)
+                }
+
+                guard !ids.isEmpty else { continue }
+                reminders.append(
+                    WeeklyReminder(
+                        slot: slot,
+                        weekday: weekday,
+                        time: earliest.timeOfDay,
+                        medicationIDs: ids,
+                        medicationNames: names
+                    )
+                )
+            }
+        }
+
+        return reminders.sorted { lhs, rhs in
+            if lhs.weekday != rhs.weekday { return lhs.weekday < rhs.weekday }
+            if lhs.time != rhs.time { return lhs.time < rhs.time }
+            return lhs.slot.storageKey < rhs.slot.storageKey
+        }
+    }
+
+    // MARK: - 워치 스냅샷
+
+    /// 같은 계획을 워치가 그릴 수 있는 형태로 굽는다.
+    /// 워치는 재고도 스케줄도 모르고 이 스냅샷만 그린다(설계 10절).
+    public static func watchSnapshot(
+        on day: Date,
+        schedules: [Schedule],
+        medications: [Medication],
+        doseEvents: [DoseEvent],
+        calendar: Calendar = .current,
+        generatedAt: Date = Date(),
+        isPro: Bool = true,
+        themeRaw: String = JanjanTheme.standard.rawValue,
+        language: JanjanLanguage = .standard,
+        maskNames: Bool = false
+    ) -> WatchSnapshot {
+
+        // 구독하지 않았으면 오늘 일정을 담지 않는다. 워치 앱 전체가 Pro 이므로
+        // "잠긴 기능이 반쯤 동작하는" 경로를 여기서도 만들지 않는다.
+        guard isPro else {
+            return .locked(
+                dateText: shortDateText(for: day, language: language),
+                generatedAt: generatedAt,
+                themeRaw: themeRaw,
+                languageRaw: language.rawValue
+            )
+        }
+
+        let lines = slots(
+            on: day,
+            schedules: schedules,
+            medications: medications,
+            doseEvents: doseEvents,
+            calendar: calendar
+        )
+
+        // 필요시 약. 워치는 이 줄을 눌러 그 순간의 복용을 보낸다 - 개수는
+        // 지난번에 먹은 개수를 따르고(없으면 1), 오늘 이력은 시각으로만 보인다.
+        let asNeededLines = medications
+            .filter { $0.status == .active && $0.kind == .asNeeded }
+            .map { medication -> WatchSnapshot.AsNeededLine in
+                let taken = doseEvents
+                    .filter {
+                        $0.medicationID == medication.id
+                            && $0.kind == .asNeeded && $0.status == .taken
+                    }
+                    .sorted { $0.effectiveDate < $1.effectiveDate }
+                let today = taken.filter { calendar.isDate($0.effectiveDate, inSameDayAs: day) }
+                // 이름을 가리면 용도 한 줄("불안이 몰려올 때")로 부른다 - 무엇에
+                // 쓰는 약인지는 보이되 이름은 곁의 시선에 남지 않는다.
+                let maskedTitle = medication.purposeLine.isEmpty
+                    ? (language == .english ? "As-needed med" : "필요시 약")
+                    : medication.purposeLine
+                return WatchSnapshot.AsNeededLine(
+                    medicationID: medication.id,
+                    title: maskNames ? maskedTitle : medication.displayTitle,
+                    quantity: taken.last?.quantity ?? 1,
+                    takenTodayTexts: today.map { clockText(for: $0.effectiveDate, calendar: calendar) }
+                )
+            }
+
+        return WatchSnapshot(
+            generatedAt: generatedAt,
+            dateText: shortDateText(for: day, language: language),
+            slots: lines.map { line in
+                WatchSnapshot.SlotLine(
+                    slotKey: line.slotKey,
+                    // 이름이 labelKo 지만 폰이 고른 언어로 구워 보낸다 - 워치는
+                    // 받은 글자를 그대로 그릴 뿐이다.
+                    labelKo: line.slot.label(language),
+                    // 직접 넣은 시간대는 이름이 곧 시각이다. 비워 두면 워치가 안 그린다.
+                    timeText: line.slot.isCustom ? "" : line.time.description,
+                    // 이름을 가리면 비워 보낸다 - 워치는 이름이 없으면 "2종" 으로
+                    // 부르는 기존 규칙(summary)을 그대로 탄다.
+                    medicationNames: maskNames ? [] : line.medicationNames,
+                    medicationIDs: line.entries.map(\.medicationID),
+                    isCompleted: line.isCompleted
+                )
+            },
+            asNeeded: asNeededLines,
+            remainingCountToday: pendingCount(in: lines),
+            themeRaw: themeRaw,
+            languageRaw: language.rawValue
+        )
+    }
+
+    /// "14:19". 필요시 이력의 시각 - 두 언어에서 같은 24시간 표기를 쓴다.
+    static func clockText(for date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    /// "8/17". 워치 화면 맨 위 한 줄.
+    static func shortDateText(for day: Date, language: JanjanLanguage = .standard) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: language.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter.string(from: day)
+    }
+}
+
+
+// MARK: - 목소리로 골라야 할 때
+
+public extension DayPlan {
+
+    /// "약 먹었어" 라고만 들었을 때 고를 시간대.
+    ///
+    /// 화면이 있는 곳(오늘·위젯)은 가장 이른 미답을 **보여 주고** 사용자가 보고
+    /// 누른다. 시리는 보여 줄 화면이 없다. 밤에 아침이 미답이라고 아침을 적어
+    /// 버리면, 방금 먹은 취침 약이 엉뚱한 줄에 남는다. 그래서 여기서는 **지금
+    /// 시각과 가장 가까운 미답**을 고른다. 무엇을 적었는지는 대화문이 말해
+    /// 주므로, 어긋나면 그 자리에서 들리고 앱에서 고칠 수 있다.
+    static func nearestPending(
+        in lines: [SlotLine],
+        at moment: Date,
+        calendar: Calendar = .current
+    ) -> SlotLine? {
+        lines
+            .filter { !$0.isCompleted }
+            .min { lhs, rhs in
+                distance(of: lhs, from: moment, calendar: calendar)
+                    < distance(of: rhs, from: moment, calendar: calendar)
+            }
+    }
+
+    private static func distance(
+        of line: SlotLine,
+        from moment: Date,
+        calendar: Calendar
+    ) -> TimeInterval {
+        abs(line.time.date(on: moment, calendar: calendar).timeIntervalSince(moment))
+    }
+}

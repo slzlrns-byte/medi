@@ -26,6 +26,11 @@ final class MedicationRecord {
     var catalogID: String?
     var purposeLine: String = ""
     var createdAt: Date = Date()
+    // CloudKit 호환을 위해 선택적 필드로 더한다. 이 필드가 없던 판이 저장한
+    // 레코드는 nil 로 읽힌다 - 그런 "옛 중단" 은 중단 시점을 모르는 것으로 다룬다.
+    var stoppedAt: Date?
+    // 마지막 중단 구간이 끝난 시각. stoppedAt 과 짝이다 (Medication.resumedAt 참고).
+    var resumedAt: Date?
 
     init(
         id: UUID = UUID(),
@@ -37,7 +42,9 @@ final class MedicationRecord {
         note: String = "",
         catalogID: String? = nil,
         purposeLine: String = "",
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        stoppedAt: Date? = nil,
+        resumedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -49,6 +56,8 @@ final class MedicationRecord {
         self.catalogID = catalogID
         self.purposeLine = purposeLine
         self.createdAt = createdAt
+        self.stoppedAt = stoppedAt
+        self.resumedAt = resumedAt
     }
 
     static func make(from core: Medication) -> MedicationRecord {
@@ -61,7 +70,12 @@ final class MedicationRecord {
             statusRaw: core.status.rawValue,
             note: core.note,
             catalogID: core.catalogID,
-            purposeLine: core.purposeLine
+            purposeLine: core.purposeLine,
+            // 저장할 때는 반드시 값을 갖는다. 저장소를 거친 뒤로는
+            // "언제부터인지 모르는 약" 이 없다.
+            createdAt: core.createdAt ?? Date(),
+            stoppedAt: core.stoppedAt,
+            resumedAt: core.resumedAt
         )
     }
 
@@ -75,7 +89,10 @@ final class MedicationRecord {
             status: Medication.Status(rawValue: statusRaw) ?? .active,
             note: note,
             catalogID: catalogID,
-            purposeLine: purposeLine
+            purposeLine: purposeLine,
+            stoppedAt: stoppedAt,
+            resumedAt: resumedAt,
+            createdAt: createdAt
         )
     }
 }
@@ -291,6 +308,11 @@ final class CheckInRecord {
     var sleepMinutes: Int?
     var sleepQualityRaw: String?
     var dreamed: Bool?
+    // 꿈 3척도 (강점 결정서 D15). 나머지 필드처럼 전부 옵셔널이라 CloudKit 제약도 지킨다.
+    var dreamVividness: Int?
+    var nightmare: Bool?
+    var dreamRecall: Int?
+    var dreamNote: String?
     var activities: [String] = []
     var note: String?
     var longText: String?
@@ -307,6 +329,10 @@ final class CheckInRecord {
         sleepMinutes: Int? = nil,
         sleepQualityRaw: String? = nil,
         dreamed: Bool? = nil,
+        dreamVividness: Int? = nil,
+        nightmare: Bool? = nil,
+        dreamRecall: Int? = nil,
+        dreamNote: String? = nil,
         activities: [String] = [],
         note: String? = nil,
         longText: String? = nil,
@@ -322,6 +348,10 @@ final class CheckInRecord {
         self.sleepMinutes = sleepMinutes
         self.sleepQualityRaw = sleepQualityRaw
         self.dreamed = dreamed
+        self.dreamVividness = dreamVividness
+        self.nightmare = nightmare
+        self.dreamRecall = dreamRecall
+        self.dreamNote = dreamNote
         self.activities = activities
         self.note = note
         self.longText = longText
@@ -340,6 +370,10 @@ final class CheckInRecord {
             sleepMinutes: core.sleepMinutes,
             sleepQualityRaw: core.sleepQuality?.rawValue,
             dreamed: core.dreamed,
+            dreamVividness: core.dreamVividness,
+            nightmare: core.nightmare,
+            dreamRecall: core.dreamRecall,
+            dreamNote: core.dreamNote,
             activities: core.activities,
             note: core.note,
             longText: core.longText,
@@ -359,6 +393,10 @@ final class CheckInRecord {
             sleepMinutes: sleepMinutes,
             sleepQuality: sleepQualityRaw.flatMap(CheckIn.SleepQuality.init(rawValue:)),
             dreamed: dreamed,
+            dreamVividness: dreamVividness,
+            nightmare: nightmare,
+            dreamRecall: dreamRecall,
+            dreamNote: dreamNote,
             activities: activities,
             note: note,
             longText: longText,
@@ -432,6 +470,155 @@ final class SymptomEntryRecord {
     }
 }
 
+@Model
+final class PrescriptionRecord {
+
+    var id: UUID = UUID()
+    var visitDate: Date = Date()
+    var daysSupplied: Int = 0
+    var nextVisitDate: Date?
+    var clinicNote: String = ""
+    /// UUID.uuidString 목록. 관계를 쓰지 않는 규칙 그대로 문자열로 담는다.
+    var medicationIDValues: [String] = []
+
+    init(
+        id: UUID = UUID(),
+        visitDate: Date = Date(),
+        daysSupplied: Int = 0,
+        nextVisitDate: Date? = nil,
+        clinicNote: String = "",
+        medicationIDValues: [String] = []
+    ) {
+        self.id = id
+        self.visitDate = visitDate
+        self.daysSupplied = daysSupplied
+        self.nextVisitDate = nextVisitDate
+        self.clinicNote = clinicNote
+        self.medicationIDValues = medicationIDValues
+    }
+
+    static func make(from core: Prescription) -> PrescriptionRecord {
+        PrescriptionRecord(
+            id: core.id,
+            visitDate: core.visitDate,
+            daysSupplied: core.daysSupplied,
+            nextVisitDate: core.nextVisitDate,
+            clinicNote: core.clinicNote,
+            medicationIDValues: core.medicationIDs.map(\.uuidString)
+        )
+    }
+
+    var core: Prescription {
+        Prescription(
+            id: id,
+            visitDate: visitDate,
+            daysSupplied: daysSupplied,
+            nextVisitDate: nextVisitDate,
+            clinicNote: clinicNote,
+            medicationIDs: medicationIDValues.compactMap(UUID.init(uuidString:))
+        )
+    }
+}
+
+@Model
+final class MedicationNoteRecord {
+
+    var id: UUID = UUID()
+    var medicationID: UUID = UUID()
+    var kindRaw: String = MedicationNote.Kind.heardFromDoctor.rawValue
+    var text: String = ""
+    /// 증상 카탈로그의 id. 이어 두지 않았으면 nil.
+    var symptomID: String?
+    var createdAt: Date = Date()
+
+    init(
+        id: UUID = UUID(),
+        medicationID: UUID = UUID(),
+        kindRaw: String = MedicationNote.Kind.heardFromDoctor.rawValue,
+        text: String = "",
+        symptomID: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.medicationID = medicationID
+        self.kindRaw = kindRaw
+        self.text = text
+        self.symptomID = symptomID
+        self.createdAt = createdAt
+    }
+
+    static func make(from core: MedicationNote) -> MedicationNoteRecord {
+        MedicationNoteRecord(
+            id: core.id,
+            medicationID: core.medicationID,
+            kindRaw: core.kind.rawValue,
+            text: core.text,
+            symptomID: core.symptomID,
+            createdAt: core.createdAt
+        )
+    }
+
+    var core: MedicationNote {
+        MedicationNote(
+            id: id,
+            medicationID: medicationID,
+            kind: MedicationNote.Kind(rawValue: kindRaw) ?? .heardFromDoctor,
+            text: text,
+            symptomID: symptomID,
+            createdAt: createdAt
+        )
+    }
+}
+
+@Model
+final class DoseChangeRecord {
+
+    var id: UUID = UUID()
+    var medicationID: UUID = UUID()
+    var changedAt: Date = Date()
+    var fromText: String = ""
+    var toText: String = ""
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        medicationID: UUID = UUID(),
+        changedAt: Date = Date(),
+        fromText: String = "",
+        toText: String = "",
+        note: String? = nil
+    ) {
+        self.id = id
+        self.medicationID = medicationID
+        self.changedAt = changedAt
+        self.fromText = fromText
+        self.toText = toText
+        self.note = note
+    }
+
+    static func make(from core: DoseChange) -> DoseChangeRecord {
+        DoseChangeRecord(
+            id: core.id,
+            medicationID: core.medicationID,
+            changedAt: core.changedAt,
+            fromText: core.fromText,
+            toText: core.toText,
+            note: core.note
+        )
+    }
+
+    var core: DoseChange {
+        DoseChange(
+            id: id,
+            medicationID: medicationID,
+            changedAt: changedAt,
+            fromText: fromText,
+            toText: toText,
+            note: note
+        )
+    }
+}
+
 /// 스키마 한 곳. ModelContainer 와 테스트가 같은 목록을 쓴다.
 enum JanjanSchema {
     static let allModels: [any PersistentModel.Type] = [
@@ -440,6 +627,9 @@ enum JanjanSchema {
         DoseEventRecord.self,
         StockEventRecord.self,
         CheckInRecord.self,
-        SymptomEntryRecord.self
+        SymptomEntryRecord.self,
+        PrescriptionRecord.self,
+        MedicationNoteRecord.self,
+        DoseChangeRecord.self
     ]
 }

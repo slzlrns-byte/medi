@@ -29,21 +29,53 @@ final class ProStore: ObservableObject {
     @Published private(set) var products: [Product] = []
 
     /// Pro 권한. 화면은 이 값 하나만 본다.
-    @Published private(set) var isPro = janjanForcesPro
+    /// SwiftUI 밖(알림 예약)에서도 봐야 해서 UserDefaults 에 그림자를 남긴다.
+    ///
+    /// **시작값을 그림자에서 가져온다**(2026-09-19 광고 도입 때 발견).
+    /// `refreshEntitlements()` 는 StoreKit 을 기다리는 비동기라 첫 프레임에는
+    /// 아직 답이 없다. false 로 시작하면 돈을 낸 사람이 앱을 열 때마다 배너가
+    /// 깜빡였다가 사라진다 - 결제한 사람에게 광고를 보이는 것은 최악이다.
+    /// 지난번에 확인된 값에서 시작하고, 곧바로 도는 StoreKit 이 정정한다.
+    ///
+    /// 틀리는 방향도 안전한 쪽이다. 구독이 끝났는데 그림자가 남아 있으면
+    /// 잠깐 광고를 덜 보이는 것뿐이고(우리 손해), 그 반대는 일어나지 않는다 -
+    /// 이 값은 검증된 거래에서만 참이 된다.
+    @Published private(set) var isPro = janjanForcesPro || JanjanEntitlement.isPro {
+        // 위젯은 별도 프로세스라 standard defaults 가 안 보인다.
+        // 앱 그룹에도 같이 써야 홈 화면이 같은 값을 본다.
+        didSet { JanjanEntitlement.store(isPro) }
+    }
+
+    /// 알림 예약처럼 ProStore 를 들 수 없는 곳이 읽는 그림자 값.
+    /// 저장·조회는 `JanjanEntitlement` 가 맡는다.
+    static let cachedProKey = JanjanEntitlement.proKey
+
+    /// Pro 가 평생 이용권으로 열렸는지. 기능 잠금은 isPro 하나로 충분하지만,
+    /// 평생권 구매자에게 "구독 관리에서 해지" 라고 말하면 거짓말이 된다(QA 2026-09-19).
+    @Published private(set) var hasLifetime = false
 
     /// 연간 7일 무료 체험을 받을 수 있는지. 못 받는 계정에는 체험 문구를 아예 숨긴다(3.1.2(b)).
     @Published private(set) var isYearlyTrialEligible = false
+    /// 연간 상품의 무료 체험 기간을 사람 말로("7일" · "1개월"). StoreKit 이 준 값에서
+    /// 만든다 - 하드코딩 "7일" 은 ASC 에서 혜택을 바꾸면 거짓이 됐다(QA 2026-09-23).
+    /// 소개 혜택이 무료 체험이 아니면(할인가) nil 이라 "무료" 를 적지 않는다.
+    @Published private(set) var yearlyTrialLengthText: String?
 
     /// 상품을 못 불러온 상태. 네트워크일 수도, 계약·상품 상태일 수도 있다.
     @Published private(set) var storeUnavailable = false
 
     @Published private(set) var isLoading = false
+    /// 복원이 도는 동안만 참. `isLoading` 은 상품을 받아올 때도 참이라
+    /// 복원 버튼의 문구에는 쓸 수 없다.
+    @Published private(set) var isRestoring = false
 
     /// 사용자에게 보여 줄 마지막 안내. 사용자가 닫을 수 있어야 하니 var 로 둔다.
     @Published var lastError: String?
 
-    static let storeUnavailableMessageKo =
-        "지금은 스토어에 연결할 수 없어요. 무료 기능은 그대로 쓸 수 있어요."
+    static var storeUnavailableMessage: String {
+        t("지금은 스토어에 연결할 수 없어요. 무료 기능은 그대로 쓸 수 있어요.",
+          "Can't reach the store right now. Free features keep working as they are.")
+    }
 
     private var updatesTask: Task<Void, Never>?
 
@@ -72,6 +104,9 @@ final class ProStore: ObservableObject {
 
     var yearlyProduct: Product? { product(for: ProProduct.yearly) }
     var monthlyProduct: Product? { product(for: ProProduct.monthly) }
+    /// 비소모성 평생 이용권. 구독과 같은 isPro 하나로 열린다 —
+    /// 비소모성은 만료일이 없어 currentEntitlements 에 계속 남는다.
+    var lifetimeProduct: Product? { product(for: ProProduct.lifetime) }
 
     func product(for id: String) -> Product? {
         products.first { $0.id == id }
@@ -102,12 +137,12 @@ final class ProStore: ObservableObject {
             }
             storeUnavailable = products.isEmpty
             if products.isEmpty {
-                lastError = Self.storeUnavailableMessageKo
+                lastError = Self.storeUnavailableMessage
             }
         } catch {
             products = []
             storeUnavailable = true
-            lastError = Self.storeUnavailableMessageKo
+            lastError = Self.storeUnavailableMessage
         }
 
         await refreshEntitlements()
@@ -120,33 +155,59 @@ final class ProStore: ObservableObject {
     @discardableResult
     func refreshEntitlements() async -> Bool {
         var entitled = janjanForcesPro
+        var lifetime = false
 
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             guard transaction.revocationDate == nil else { continue }
-            if let expiration = transaction.expirationDate, expiration <= Date() { continue }
+            // 만료일을 손으로 거르지 않는다. `currentEntitlements` 는 만료된 구독을
+            // 이미 빼고 주되, **결제 유예기간(Billing Grace Period)** 중에는 만료일이
+            // 지난 거래를 일부러 남겨 둔다. 그것까지 떨구면 카드 갱신에 실패한
+            // 사람이 유예 중에 Pro 를 잃는다(QA 2026-09-23). 애플의 판정을 믿는다.
             if ProProduct.allIDs.contains(transaction.productID) {
                 entitled = true
+            }
+            if transaction.productID == ProProduct.lifetime {
+                lifetime = true
             }
         }
 
         isPro = entitled
+        hasLifetime = lifetime
         return entitled
     }
 
-    /// 연간 상품에 소개 혜택(7일 무료)이 있고, 이 계정이 아직 써 본 적 없을 때만 true.
+    /// 연간 상품에 **무료 체험** 소개 혜택이 있고, 이 계정이 아직 써 본 적 없을
+    /// 때만 true. 기간은 StoreKit 값으로 `yearlyTrialLengthText` 에 적는다.
     @discardableResult
     func yearlyTrialEligible() async -> Bool {
         guard let subscription = yearlyProduct?.subscription,
-              subscription.introductoryOffer != nil
+              let offer = subscription.introductoryOffer,
+              offer.paymentMode == .freeTrial
         else {
             isYearlyTrialEligible = false
+            yearlyTrialLengthText = nil
             return false
         }
 
         let eligible = await subscription.isEligibleForIntroOffer
         isYearlyTrialEligible = eligible
+        yearlyTrialLengthText = Self.trialLengthText(offer.period)
         return eligible
+    }
+
+    /// "7일" · "2주" · "1개월" - 단위와 개수를 그대로 옮긴다.
+    static func trialLengthText(_ period: Product.SubscriptionPeriod) -> String {
+        let count = period.value
+        switch period.unit {
+        case .day: return t("\(count)일", count == 1 ? "1 day" : "\(count) days")
+        case .week:
+            // 1주는 "7일" 로 읽는 사람이 많다 - 스토어도 그렇게 적는다.
+            return count == 1 ? t("7일", "7 days") : t("\(count)주", "\(count) weeks")
+        case .month: return t("\(count)개월", count == 1 ? "1 month" : "\(count) months")
+        case .year: return t("\(count)년", count == 1 ? "1 year" : "\(count) years")
+        @unknown default: return t("\(count)일", "\(count) days")
+        }
     }
 
     // MARK: - 구매 · 복원
@@ -165,35 +226,45 @@ final class ProStore: ObservableObject {
                     await refreshEntitlements()
                 case .unverified:
                     // 서명이 맞지 않는 거래는 권한으로 세지 않는다.
-                    lastError = "구매를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+                    lastError = t("구매를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                                  "Couldn't verify the purchase. Please try again in a moment.")
                 }
             case .userCancelled:
                 break
             case .pending:
                 // 가족 승인 대기 등. 승인되면 Transaction.updates 로 들어온다.
-                lastError = "승인을 기다리는 중이에요. 승인되면 자동으로 열려요."
+                lastError = t("승인을 기다리는 중이에요. 승인되면 자동으로 열려요.",
+                              "Waiting for approval. It opens automatically once approved.")
             @unknown default:
                 break
             }
         } catch {
-            lastError = "구매를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요."
+            lastError = t("구매를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                          "Couldn't complete the purchase. Please try again in a moment.")
         }
     }
 
     /// 복원. 로그인이 없는 앱이라 복원은 애플 계정 동기화 한 번이면 끝난다.
     func restore() async {
         isLoading = true
+        isRestoring = true
         lastError = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            isRestoring = false
+        }
 
         do {
             try await AppStore.sync()
             await refreshEntitlements()
             if !isPro {
-                lastError = "이 애플 계정에서 복원할 구독을 찾지 못했어요."
+                // 구독만이 아니라 평생 이용권도 이 길로 복원된다 - "구매" 라고 말한다.
+                lastError = t("이 애플 계정에서 복원할 구매를 찾지 못했어요.",
+                              "Couldn't find a purchase to restore on this Apple account.")
             }
         } catch {
-            lastError = "복원을 마치지 못했어요. 잠시 뒤 다시 시도해 주세요."
+            lastError = t("복원을 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+                          "Couldn't finish restoring. Please try again in a moment.")
         }
     }
 }

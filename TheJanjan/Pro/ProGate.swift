@@ -8,8 +8,8 @@ struct ProBadge: View {
         HStack(spacing: 3) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 9, weight: .regular))
-            Text("Pro")
-                .font(JanjanFont.body(11, weight: .semibold))
+            Text("Pro") // 상표성 표기라 언어와 무관하게 그대로 둔다.
+                .janjanBody(11, weight: .semibold)
         }
         .foregroundStyle(Color.janjan(.lavInk))
         .padding(.horizontal, CGFloat(JanjanSpacing.xs))
@@ -27,6 +27,10 @@ struct ProBadge: View {
 struct ProGate: ViewModifier {
 
     let feature: ProFeature
+    /// 자물쇠 알약을 그릴지. 같은 기능의 버튼이 목록으로 여러 개 설 때
+    /// 첫 줄에만 달려고 끈다 - 줄마다 배지가 붙으면 목록이 잠금 표시로
+    /// 뒤덮인다(지난 진료 기록이 이미 같은 판단을 했다).
+    var showsBadge: Bool = true
 
     @EnvironmentObject private var pro: ProStore
     @State private var isShowingPaywall = false
@@ -34,11 +38,17 @@ struct ProGate: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .topTrailing) {
-                if !pro.isPro {
+                if !pro.isPro, showsBadge {
                     ProBadge()
                         .offset(x: CGFloat(JanjanSpacing.xs), y: -CGFloat(JanjanSpacing.s))
                 }
             }
+            // **여기서 통째로 숨기지 않는다.** 한때 `.accessibilityHidden(!pro.isPro)`
+            // 를 걸었다가 되돌렸다 - 이 문은 부분만 연 카드에도 씌워지는데
+            // (패턴 보기는 최근 7일이 무료고, 지난 진료 카드는 날짜가 남는다),
+            // 통째로 지우면 VoiceOver 사용자만 그 무료 부분을 못 본다.
+            // 소리로 새면 안 되는 것은 **흐린 내용 자체**이므로, 숨김은 그
+            // 자리에서 `accessibilityHidden(true)` 로 건다(QA 2026-09-21).
             .overlay {
                 if !pro.isPro {
                     // 아래 버튼이 눌리는 대신 페이월이 열린다. 잠긴 기능이 반쯤 동작해서
@@ -49,8 +59,11 @@ struct ProGate: ViewModifier {
                         Color.clear.contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(Text("\(feature.titleKo) — Pro 기능"))
-                    .accessibilityHint(Text("눌러서 Pro 를 알아봅니다"))
+                    .accessibilityLabel(Text(t(
+                        "\(feature.titleKo) — Pro 기능",
+                        "\(feature.title(.english)) — Pro feature"
+                    )))
+                    .accessibilityHint(Text(t("눌러서 Pro 를 알아봅니다", "Tap to learn about Pro")))
                 }
             }
             .sheet(isPresented: $isShowingPaywall) {
@@ -62,8 +75,8 @@ struct ProGate: ViewModifier {
 extension View {
 
     /// Pro 기능임을 표시하고, 무료 사용자가 누르면 페이월을 올린다.
-    func proGated(_ feature: ProFeature) -> some View {
-        modifier(ProGate(feature: feature))
+    func proGated(_ feature: ProFeature, showsBadge: Bool = true) -> some View {
+        modifier(ProGate(feature: feature, showsBadge: showsBadge))
     }
 }
 
@@ -71,8 +84,8 @@ extension View {
     VStack(spacing: 24) {
         ProBadge()
 
-        WhitePillButton(title: "PDF 로 내보내기", systemImage: "square.and.arrow.up") {}
-            .proGated(.reports)
+        WhitePillButton(title: t("약봉투 스캔", "Pharmacy bag scan"), systemImage: "camera") {}
+            .proGated(.pharmacyScan)
     }
     .padding(40)
     .fogBackground()

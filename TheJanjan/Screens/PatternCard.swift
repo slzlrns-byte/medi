@@ -1,0 +1,228 @@
+import SwiftUI
+import JanjanCore
+
+/// 진료 준비 · "패턴 보기" (Pro).
+///
+/// 최근 4주의 기분·복약·수면을 같은 날짜 눈금에 세 줄로 놓는다.
+/// 숫자·상관·해석 문장은 붙이지 않는다 — 세 줄이 나란히 있으면 무엇이
+/// 겹치는지는 보는 사람과 진료실이 읽는다(이번 달의 흐름과 같은 원칙).
+struct PatternCard: View {
+
+    let timeline: PatternTimeline
+    /// 무료 사용자에게는 최근 7일만 선명하고 그 앞은 흐리다.
+    /// 잠금 배지와 페이월은 밖의 proGated 가 단다.
+    ///
+    /// 흐림을 전부에 씌우지 않는 이유(2026-09-19 결정): "이 앱이 나를 안다" 는
+    /// 순간을 한 번은 겪어야 잠긴 3주가 궁금해진다. 인사이트를 통째로 벽 뒤에
+    /// 두면 그 순간을 경험하기 전에 떠난다는 것이 리서치의 결론이었다.
+    let isLocked: Bool
+    /// 진료 준비 탭 밖(용량 변경 체크포인트)에서 다른 제목으로 재사용한다.
+    var title: String?
+    var subtitle: String?
+
+    private let rowHeight: CGFloat = 18
+    private let spacing: CGFloat = 2
+    /// 무료에게 선명하게 보여 주는 최근 일수.
+    static let freeClearDays = 7
+
+    private var lang: JanjanLanguage { .current }
+
+    /// 줄 이름이 앉는 칸의 폭. **막대와 날짜 눈금이 같은 값을 써야 한다** -
+    /// 예전에는 이름 칸만 영어에서 넓히고(30→46) 눈금은 30 으로 두어,
+    /// 영어판에서만 날짜가 막대와 16pt 어긋났다(QA 2026-09-21).
+    private var labelWidth: CGFloat { lang == .english ? 46 : 30 }
+
+    var body: some View {
+        JanjanCard {
+            VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.s)) {
+                Text(title ?? t("패턴 보기", "Pattern view"))
+                    .janjanDisplay(20)
+                    .foregroundStyle(Color.ink)
+                Text(subtitle ?? t(
+                    "최근 4주의 기분, 복약, 수면을 확인할 수 있어요.",
+                    "See mood, doses, and sleep from the past 4 weeks."
+                ))
+                    .janjanBody(13)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // 설치 첫날에는 빈 회색 줄 셋과 자물쇠만 남는다 - 볼 것이
+                // 없는데 잠겼다는 말만 있는 화면이다(QA 2026-09-21).
+                // 같은 화면의 다른 카드들은 전부 빈 상태를 말한다.
+                if hasNothing {
+                    Text(t(
+                        "기분이나 복약을 며칠 남기면 여기에 그림이 생겨요.",
+                        "Log mood or doses for a few days and the picture appears here."
+                    ))
+                        .janjanBody(13)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    chart
+
+                    legend
+                }
+
+                if isLocked, !hasNothing {
+                    Text(t(
+                        "최근 7일은 그대로 보여요. 4주 전체는 Pro 에서 열려요.",
+                        "The last 7 days stay clear. The full 4 weeks open with Pro."
+                    ))
+                        .janjanBody(11)
+                        .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    // MARK: - 그림
+
+    /// 이 날짜보다 이전은 흐리게. 무료가 아니면 nil - 아무것도 흐리지 않는다.
+    private var blurBefore: Date? {
+        guard isLocked, timeline.days.count > Self.freeClearDays else { return nil }
+        return timeline.days[timeline.days.count - Self.freeClearDays].date
+    }
+
+    /// VoiceOver 가 기분 칸 하나를 부르는 말.
+    private func moodSpokenText(_ day: PatternTimeline.Day) -> String {
+        let date = ReportComposer.monthDayText(day.date, language: lang)
+        guard let score = day.moodScore else {
+            return t("\(date) 기록 없음", "\(date), not recorded")
+        }
+        return "\(date) \(CheckIn.Mood(score).label(lang))"
+    }
+
+    /// 그릴 것이 하나도 없는지.
+    private var hasNothing: Bool {
+        !timeline.days.contains { day in
+            day.moodScore != nil || day.takenFraction != nil || day.sleepMinutes != nil
+        }
+    }
+
+    private func isBlurred(_ day: PatternTimeline.Day) -> Bool {
+        guard let blurBefore else { return false }
+        return day.date < blurBefore
+    }
+
+    private var chart: some View {
+        VStack(alignment: .leading, spacing: CGFloat(JanjanSpacing.xs)) {
+            // 복약 줄은 채움·반채움·테두리로 모양이 갈리고 수면 줄은 높이로
+            // 말하는데, 기분 줄만 색이 유일한 정보였다. 색각 이상에서는 읽을
+            // 수 없고 VoiceOver 로는 그림이 있다는 것조차 몰랐다
+            // (QA 2026-09-21). 달력 칸이 이미 같은 방식으로 읽어 준다.
+            chartRow(label: t("기분", "Mood")) { day in
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(day.moodScore.map { Color.mood($0) } ?? Color.janjan(.surface2))
+                    .frame(height: rowHeight)
+                    .accessibilityLabel(Text(moodSpokenText(day)))
+            }
+            chartRow(label: t("복약", "Doses")) { day in
+                doseMark(day.takenFraction)
+                    .frame(height: rowHeight)
+            }
+            chartRow(label: t("수면", "Sleep")) { day in
+                sleepMark(day.sleepMinutes)
+                    .frame(height: rowHeight + 6, alignment: .bottom)
+            }
+            axis
+        }
+    }
+
+    private func chartRow<Mark: View>(
+        label: String,
+        @ViewBuilder mark: @escaping (PatternTimeline.Day) -> Mark
+    ) -> some View {
+        HStack(alignment: .center, spacing: CGFloat(JanjanSpacing.xs)) {
+            Text(label)
+                .janjanBody(11)
+                .foregroundStyle(Color.muted)
+                .lineLimit(1)
+                // 한국어 라벨은 두 글자라 30 이면 되지만 "Doses" 는 넘쳐서
+                // "Dose / s" 로 꺾였다(영어 캡처 2026-09-20).
+                .frame(width: labelWidth, alignment: .leading)
+            HStack(spacing: spacing) {
+                ForEach(timeline.days, id: \.date) { day in
+                    mark(day)
+                        // 칸마다 흐린다 - 최근 7일 칸은 잠겨 있어도 선명하다.
+                        .blur(radius: isBlurred(day) ? 5 : 0)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    /// 복약 답의 세 모양. 색만이 아니라 채움/반채움/테두리로 갈린다.
+    @ViewBuilder
+    private func doseMark(_ fraction: Double?) -> some View {
+        let side: CGFloat = 8
+        ZStack {
+            if let fraction {
+                if fraction >= 1 {
+                    Circle().fill(Color.ink)
+                } else if fraction > 0 {
+                    Circle().strokeBorder(Color.ink, lineWidth: 1)
+                    Circle()
+                        .fill(Color.ink)
+                        .mask(alignment: .bottom) {
+                            Rectangle().frame(height: side / 2)
+                        }
+                } else {
+                    Circle().strokeBorder(Color.muted, lineWidth: 1)
+                }
+            }
+            // 계획이 없던 날은 빈 칸 - 0% 와 구별한다.
+        }
+        .frame(width: side, height: side)
+    }
+
+    @ViewBuilder
+    private func sleepMark(_ minutes: Int?) -> some View {
+        if let minutes {
+            // 10시간을 꽉 찬 키로 본다. 그 위는 다 같은 키 - 재는 그림이 아니라 결 그림이다.
+            let fraction = min(Double(minutes) / (10 * 60), 1)
+            Capsule(style: .continuous)
+                .fill(Color.janjan(.sage))
+                .frame(width: 4, height: max(CGFloat(fraction) * (rowHeight + 6), 3))
+        } else {
+            Color.clear.frame(width: 4, height: 3)
+        }
+    }
+
+    /// 처음·가운데·오늘 세 눈금만 적는다. 스물여덟 개를 다 적으면 그림이 죽는다.
+    private var axis: some View {
+        HStack(spacing: CGFloat(JanjanSpacing.xs)) {
+            Color.clear.frame(width: labelWidth, height: 1)
+            HStack {
+                if let first = timeline.days.first?.date {
+                    Text(shortDate(first))
+                }
+                Spacer(minLength: 0)
+                if timeline.days.count > 2 {
+                    Text(shortDate(timeline.days[timeline.days.count / 2].date))
+                }
+                Spacer(minLength: 0)
+                Text(t("오늘", "Today"))
+            }
+            .janjanBody(10)
+            .foregroundStyle(Color.muted)
+        }
+    }
+
+    private var legend: some View {
+        Text(t(
+            "복약 ● 다 먹음 · ◐ 일부 · ○ 먹은 기록 없음 · 빈 칸은 계획이 없던 날",
+            "Doses: ● all taken · ◐ some · ○ none taken · blank means nothing was planned"
+        ))
+            .janjanBody(11)
+            .foregroundStyle(Color.muted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: lang.localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("Md")
+        return formatter.string(from: date)
+    }
+}

@@ -1,0 +1,68 @@
+# 더잔잔 — TestFlight 초대 강제 발송 (일회용 도구)
+#
+# ASC 웹 UI 에서 내부 테스터에게 초대 메일이 발송되지 않는 문제(2026-09-18)를
+# 우회한다. App Store Connect API 로 테스터 상태를 조회하고 초대를 직접 만든다.
+# REST 호출뿐이라 macOS 가 필요 없다 - ubuntu 러너로 몇 초면 끝난다.
+
+name: TF Invite
+
+on:
+  push:
+    branches:
+      - claude/local-work-app-integration-5fnhoc
+    paths:
+      - '.github/workflows/tf-invite.yml'
+
+permissions: {}
+
+jobs:
+  invite:
+    name: 초대 발송
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 초대 보내기
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+        run: |
+          pip install --quiet PyJWT cryptography requests
+          python3 << 'PY'
+          import base64, os, time, jwt, requests
+
+          key = base64.b64decode(os.environ["ASC_KEY_CONTENT"]).decode()
+          token = jwt.encode(
+              {"iss": os.environ["ASC_ISSUER_ID"], "iat": int(time.time()),
+               "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"},
+              key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"]})
+          H = {"Authorization": f"Bearer {token}"}
+          BASE = "https://api.appstoreconnect.apple.com/v1"
+
+          r = requests.get(f"{BASE}/apps", headers=H,
+                           params={"filter[bundleId]": "com.thejanjan.app"})
+          r.raise_for_status()
+          app_id = r.json()["data"][0]["id"]
+          print("앱 ID:", app_id)
+
+          for email in ["slzlrns@naver.com", "slzlrns@gmail.com"]:
+              r = requests.get(f"{BASE}/betaTesters", headers=H,
+                               params={"filter[apps]": app_id, "filter[email]": email})
+              r.raise_for_status()
+              rows = r.json()["data"]
+              if not rows:
+                  print(f"{email}: 테스터로 등록돼 있지 않음")
+                  continue
+              tester = rows[0]
+              state = tester["attributes"].get("state")
+              print(f"{email}: id={tester['id']} state={state}")
+
+              resp = requests.post(f"{BASE}/betaTesterInvitations", headers=H, json={
+                  "data": {"type": "betaTesterInvitations", "relationships": {
+                      "betaTester": {"data": {"type": "betaTesters", "id": tester["id"]}},
+                      "app": {"data": {"type": "apps", "id": app_id}}}}})
+              if resp.status_code == 201:
+                  print(f"{email}: 초대 발송 성공")
+              else:
+                  print(f"{email}: 초대 발송 실패 {resp.status_code} {resp.text[:500]}")
+          PY
